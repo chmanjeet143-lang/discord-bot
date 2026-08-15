@@ -30,6 +30,8 @@ intents.presences = True
 
 # Bot ka prefix yahan '&' set hai
 bot = commands.Bot(command_prefix="&", intents=intents)
+bot.remove_command("help")
+
 
 
 # 3. Bot Ready Event, Status & Cogs Auto-Loader
