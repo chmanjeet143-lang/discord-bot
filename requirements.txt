@@ -1,6 +1,6 @@
 discord.py
 yt-dlp
-PyNaCl
+pynacl
 flask
 
 
