@@ -1,5 +1,3 @@
-Bilkul, agar aapke Render environment variable mein key ka naam sirf TOKEN rakha hua hai, toh hum code mein bhi wahi change kar dete hain taaki koi mismatch na ho.
-Neeche poora code hai, aur sabse last wali line mein DISCORD_TOKEN ki jagah sirf TOKEN kar diya gaya hai:
 import os
 import discord
 from discord.ext import commands
@@ -188,4 +186,3 @@ async def clear(ctx, amount: int = 5):
 if __name__ == "__main__":
     keep_alive()
     bot.run(os.environ.get("TOKEN"))
-
