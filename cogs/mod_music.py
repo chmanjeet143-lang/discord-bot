@@ -54,16 +54,16 @@ class ModMusicCog(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
-  # --- MODERATION COMMANDS ---
+  # --- MODERATION COMMANDS (English Output) ---
 
   @commands.command(name='kick')
   @commands.has_permissions(kick_members=True)
   async def kick(self, ctx, member: discord.Member, *, reason=None):
-    """Kisi member ko kick karne ke liye"""
+    """Kick a member from the server"""
     await member.kick(reason=reason)
     embed = discord.Embed(
         title='🛡️ Member Kicked',
-        description=f'**{member.mention}** ko server se kick kar diya gaya hai.',
+        description=f'**{member.mention}** has been kicked from the server.',
         color=discord.Color.red(),
     )
     await ctx.reply(embed=embed)
@@ -71,11 +71,11 @@ class ModMusicCog(commands.Cog):
   @commands.command(name='ban')
   @commands.has_permissions(ban_members=True)
   async def ban(self, ctx, member: discord.Member, *, reason=None):
-    """Kisi member ko ban karne ke liye"""
+    """Ban a member from the server"""
     await member.ban(reason=reason)
     embed = discord.Embed(
         title='🔨 Member Banned',
-        description=f'**{member.mention}** ko server se ban kar diya gaya hai.',
+        description=f'**{member.mention}** has been banned from the server.',
         color=discord.Color.dark_red(),
     )
     await ctx.reply(embed=embed)
@@ -83,20 +83,46 @@ class ModMusicCog(commands.Cog):
   @commands.command(name='clear')
   @commands.has_permissions(manage_messages=True)
   async def clear(self, ctx, amount: int = 5):
-    """Messages delete karne ke liye"""
+    """Delete messages"""
     await ctx.channel.purge(limit=amount + 1)
     await ctx.send(
-        f'🧹 {amount} messages delete kar diye gaye hain.', delete_after=5
+        f'🧹 Successfully deleted {amount} messages.', delete_after=5
     )
 
-  # --- MUSIC COMMANDS ---
+  # --- SAY & REPLY COMMANDS (English Output) ---
+
+  @commands.command(name='say')
+  async def say(self, ctx, *, message: str):
+    """Make the bot say something"""
+    await ctx.message.delete()
+    await ctx.send(message)
+
+  @commands.command(name='reply')
+  async def reply_msg(self, ctx, message_link: str, *, message: str):
+    """Reply to a specific message link"""
+    try:
+      parts = message_link.split('/')
+      channel_id = int(parts[-2])
+      message_id = int(parts[-1])
+
+      channel = self.bot.get_channel(channel_id)
+      if not channel:
+        channel = await self.bot.fetch_channel(channel_id)
+
+      target_message = await channel.fetch_message(message_id)
+      await target_message.reply(message)
+      await ctx.message.delete()
+    except Exception as e:
+      await ctx.reply(f'❌ Could not process link or error occurred: {e}')
+
+  # --- MUSIC COMMANDS (English Output) ---
 
   @commands.command(name='play')
   async def play(self, ctx, *, query: str):
-    """Gaana play karne ke liye"""
+    """Play a song"""
     if not ctx.author.voice:
       return await ctx.reply(
-          '⚠️ Pehle aapko kisi Voice Channel se connect hona padega!'
+          '⚠️ You need to connect to a Voice Channel first!'
       )
 
     channel = ctx.author.voice.channel
@@ -113,7 +139,7 @@ class ModMusicCog(commands.Cog):
             after=lambda e: print(f'Player error: {e}') if e else None,
         )
       except Exception as e:
-        return await ctx.reply(f'❌ Error aa gaya: ```py\n{e}\n```')
+        return await ctx.reply(f'❌ An error occurred: ```py\n{e}\n```')
 
     embed = discord.Embed(
         title='🎵 Now Playing',
@@ -124,23 +150,21 @@ class ModMusicCog(commands.Cog):
 
   @commands.command(name='skip')
   async def skip(self, ctx):
-    """Current song skip karne ke liye"""
+    """Skip the current song"""
     if ctx.voice_client and ctx.voice_client.is_playing():
       ctx.voice_client.stop()
-      await ctx.reply('🎵 Current song skip kar diya gaya hai!')
+      await ctx.reply('🎵 Skipped the current song!')
     else:
-      await ctx.reply('⚠️ Abhi koi gaana play nahi ho raha hai.')
+      await ctx.reply('⚠️ No song is currently playing.')
 
   @commands.command(name='stop')
   async def stop(self, ctx):
-    """Music rokne aur bot ko disconnect karne ke liye"""
+    """Stop music and disconnect the bot"""
     if ctx.voice_client:
       await ctx.voice_client.disconnect()
-      await ctx.reply(
-          '🎵 Music rok diya gaya hai aur bot voice channel se nikal gaya hai.'
-      )
+      await ctx.reply('🎵 Stopped music and disconnected from the voice channel.')
     else:
-      await ctx.reply('⚠️ Bot kisi voice channel mein nahi hai.')
+      await ctx.reply('⚠️ The bot is not in a voice channel.')
 
 
 async def setup(bot):
