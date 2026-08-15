@@ -23,10 +23,13 @@ def keep_alive():
 
 
 # 2. Bot Intents & Configuration
+# 2. Bot Intents & Configuration
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.presences = True
+intents.voice_states = True  # Yeh line add karni hai zaroori hai!
+
 
 # Bot ka prefix yahan '&' set hai
 bot = commands.Bot(command_prefix="&", intents=intents)
