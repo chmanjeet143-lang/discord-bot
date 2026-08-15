@@ -8,17 +8,22 @@ class HelpDropdown(discord.ui.Select):
     options = [
         discord.SelectOption(
             label="Moderation",
-            description="Server moderation commands (kick, ban, clear)",
+            description="Kick, ban, clear and mute commands",
             emoji="🛡️",
         ),
         discord.SelectOption(
             label="Music",
-            description="Music player commands (play, skip, stop)",
+            description="Play, skip and queue songs",
             emoji="🎵",
+        ),
+        discord.SelectOption(
+            label="Fun Commands",
+            description="Games and entertainment features",
+            emoji="✨",
         ),
     ]
     super().__init__(
-        placeholder="Select a module to see commands...",
+        placeholder="Select a module to see...",
         min_values=1,
         max_values=1,
         options=options,
@@ -29,9 +34,9 @@ class HelpDropdown(discord.ui.Select):
       embed = discord.Embed(
           title="🛡️ Moderation Commands",
           description=(
-              "Server ko control karne ke liye commands:\n\n`&kick` - Member ko"
-              " kick karein\n`&ban` - Member ko ban karein\n`&clear` - Messages"
-              " delete karein"
+              "Server control commands:\n\n`.kick` - Member ko kick"
+              " karein\n`.ban` - Member ko ban karein\n`.clear` - Messages delete"
+              " karein"
           ),
           color=discord.Color.red(),
       )
@@ -41,10 +46,18 @@ class HelpDropdown(discord.ui.Select):
       embed = discord.Embed(
           title="🎵 Music Commands",
           description=(
-              "Gaane sunne ke liye commands:\n\n`&play` - Gaana play karein\n`&skip`"
-              " - Song skip karein\n`&stop` - Music rokein"
+              "Music player commands:\n\n`.play` - Gaana play"
+              " karein\n`.skip` - Song skip karein\n`.stop` - Music rokein"
           ),
           color=discord.Color.blue(),
+      )
+      await interaction.response.edit_message(embed=embed, view=self.view)
+
+    elif self.values[0] == "Fun Commands":
+      embed = discord.Embed(
+          title="✨ Fun Commands",
+          description="Entertainment commands jald hi add honge!",
+          color=discord.Color.gold(),
       )
       await interaction.response.edit_message(embed=embed, view=self.view)
 
@@ -64,12 +77,13 @@ class HelpCog(commands.Cog):
   @commands.command(name="help")
   async def help(self, ctx):
     embed = discord.Embed(
-        title="🤖 Bot Help Menu",
+        title="🤖 Custom Bot Help Menu",
         description=(
-            "Niche diye gaye dropdown menu se category select karein taaki aapko"
-            " commands ki list dikh sake!"
+            "• My prefix for this server is `.` (ya jo aapne set kiya ho)\n•"
+            " Total modules: 3 active categories\n\nSelect a module from the"
+            " dropdown below 👇"
         ),
-        color=discord.Color.green(),
+        color=discord.Color.blurple(),
     )
     view = HelpView()
     await ctx.reply(embed=embed, view=view)
