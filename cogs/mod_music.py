@@ -113,7 +113,7 @@ class ModMusicCog(commands.Cog):
             after=lambda e: print(f'Player error: {e}') if e else None,
         )
       except Exception as e:
-        return await ctx.reply(f'❌ Gaana play karne mein error aaya: {e}')
+        return await ctx.reply(f'❌ Error aa gaya: ```py\n{e}\n```')
 
     embed = discord.Embed(
         title='🎵 Now Playing',
