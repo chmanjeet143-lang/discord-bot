@@ -73,7 +73,8 @@ async def ping(ctx):
 keep_alive()
 
 # Yahan apna asli Discord Bot Token daal dein
-bot.run("TOKEN")
+bot.run(os.getenv("TOKEN"))
+
 
 
 
