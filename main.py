@@ -1,42 +1,79 @@
-from flask import Flask
-from threading import Thread
+Apni main.py file ke andar aap ek professional aur feature-packed code daal sakte hain. Isme Render ke liye Keep-Alive Server (Flask), Automatic Status Changer, Cogs Auto-Loader, aur ek fast Ping Command pehle se joda hua hai.
+Apni GitHub ki main.py file ko kholein, uske andar ka saara purana code mita kar yeh naya code daal dein aur Commit changes kar dein:
 import os
 from discord.ext import commands
 import discord
+from flask import Flask
+from threading import Thread
 
-app = Flask('')
+# 1. Render ke liye Uptime Keep-Alive Server
+app = Flask("")
 
-@app.route('/')
+
+@app.route("/")
 def home():
-    return "Bot is online!"
+  return "🤖 Bot is Alive and Running!"
+
 
 def run():
-    app.run(host='0.0.0.0', port=10000)
+  app.run(host="0.0.0.0", port=10000)
+
 
 def keep_alive():
-    t = Thread(target=run)
-    t.start()
+  t = Thread(target=run)
+  t.start()
 
+
+# 2. Bot Intents & Configuration
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.presences = True
 
-bot = commands.Bot(command_prefix='&', intents=intents)
+# Bot ka prefix yahan '&' set hai
+bot = commands.Bot(command_prefix="&", intents=intents)
 
+
+# 3. Bot Ready Event, Status & Cogs Auto-Loader
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user}')
+  print(f"-----------------------------------")
+  print(f"Logged in as: {bot.user.name} (ID: {bot.user.id})")
+  print(f"Status: Online & Ready!")
+  print(f"-----------------------------------")
 
-@bot.command()
+  # Bot ka Rich Presence Status set karein
+  activity = discord.Activity(
+      type=discord.ActivityType.watching, name="&help | Managing Servers"
+  )
+  await bot.change_presence(status=discord.Status.online, activity=activity)
+
+  # Cogs folder se saari files automatically load karega
+  for filename in os.listdir("./cogs"):
+    if filename.endswith(".py"):
+      try:
+        await bot.load_extension(f"cogs.{filename[:-3]}")
+        print(f"✅ Loaded Cog Module: {filename[:-3]}")
+      except Exception as e:
+        print(f"❌ Failed to load {filename[:-3]}: {e}")
+
+
+# 4. Quick Core Feature: Ping Command
+@bot.command(name="ping")
 async def ping(ctx):
-    await ctx.send('Pong!')
+  """Bot ki speed/latency check karne ke liye"""
+  latency = round(bot.latency * 1000)
+  embed = discord.Embed(
+      title="🏓 Pong!",
+      description=f"Bot ki speed **{latency}ms** hai.",
+      color=discord.Color.green(),
+  )
+  await ctx.reply(embed=embed)
 
-@bot.command()
-async def say(ctx, *, message: str):
-    await ctx.message.delete()
-    await ctx.send(message)
 
+# Bot ko online rakhne ke liye server start karein
 keep_alive()
 
-bot.run(os.getenv('DISCORD_TOKEN'))
+# Yahan apna asli Discord Bot Token daal dein
+bot.run("YOUR_BOT_TOKEN_HERE")
+
