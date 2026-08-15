@@ -1,5 +1,3 @@
-Apni main.py file ke andar aap ek professional aur feature-packed code daal sakte hain. Isme Render ke liye Keep-Alive Server (Flask), Automatic Status Changer, Cogs Auto-Loader, aur ek fast Ping Command pehle se joda hua hai.
-Apni GitHub ki main.py file ko kholein, uske andar ka saara purana code mita kar yeh naya code daal dein aur Commit changes kar dein:
 import os
 from discord.ext import commands
 import discord
