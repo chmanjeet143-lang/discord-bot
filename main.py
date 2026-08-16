@@ -55,14 +55,26 @@ async def on_message(message):
     author_id = message.author.id
     user_messages[author_id] = user_messages.get(author_id, 0) + 1
 
+    # AFK Check & Removal
     if author_id in afk_users:
         del afk_users[author_id]
-        await message.channel.send(f"Welcome back {message.author.mention}, I removed your AFK status!", delete_after=5)
+        embed_wb = discord.Embed(
+            description=f"✨ Welcome back {message.author.mention}, I've removed your AFK status!",
+            color=0x00b0b0
+        )
+        await message.channel.send(embed=embed_wb, delete_after=5)
 
+    # AFK Mention Check (Stylish Embed)
     for user in message.mentions:
         if user.id in afk_users:
             reason = afk_users[user.id]
-            await message.reply(f"💤 **{user.name}** is currently AFK: {reason}")
+            embed_afk = discord.Embed(
+                title="💤 User is AFK",
+                description=f"» 🤍 **{user.name}** is currently AFK\n• **Reason:** `{reason}`",
+                color=0xe74c3c
+            )
+            embed_afk.set_thumbnail(url=user.avatar.url if user.avatar else user.default_avatar.url)
+            await message.reply(embed=embed_afk)
 
     await bot.process_commands(message)
 
@@ -152,15 +164,12 @@ async def menu(ctx):
     await ctx.reply(embed=embed)
 
 
-# --- STATS COMMANDS (&m, &i, &v) - [AESTHETIC EMBED UPDATED] ---
+# --- STATS COMMANDS (&m, &i, &v) ---
 
 @bot.command(name='m')
 async def check_messages(ctx, member: discord.Member = None):
-    """Check message count in a stylish embed"""
     target = member or ctx.author
     count = user_messages.get(target.id, 0)
-    
-    # Server total messages (approximation ya storage ke mutabiq)
     total_server_msgs = sum(user_messages.values())
 
     embed = discord.Embed(
@@ -179,7 +188,6 @@ async def check_messages(ctx, member: discord.Member = None):
 
 @bot.command(name='i')
 async def check_invites(ctx, member: discord.Member = None):
-    """Check invite count in a stylish embed (Jaise image mein hai)"""
     target = member or ctx.author
     count = user_invites.get(target.id, 0)
 
@@ -223,7 +231,7 @@ async def check_voice(ctx, member: discord.Member = None):
     await ctx.reply(embed=embed)
 
 
-# --- RESET COMMANDS (&rm, &ri, &rv) ---
+# --- RESET COMMANDS ---
 
 @bot.command(name='rm')
 @commands.has_permissions(administrator=True)
@@ -246,15 +254,24 @@ async def reset_voice(ctx, member: discord.Member):
     await ctx.reply(f"🔄 Successfully reset voice time for **{member.name}**.")
 
 
-# --- AFK COMMAND ---
+# --- AFK COMMAND (STYLED EMBED) ---
 
 @bot.command(name='afk')
 async def afk(ctx, *, reason="AFK"):
+    """Set your AFK status with a stylish embed"""
     afk_users[ctx.author.id] = reason
-    await ctx.reply(f"💤 **{ctx.author.name}** is now AFK: {reason}")
+    
+    embed = discord.Embed(
+        title="💤 AFK Status Updated",
+        description=f"» 🤍 **{ctx.author.name}** is now AFK\n• **Reason:** `{reason}`",
+        color=0x3498db
+    )
+    embed.set_thumbnail(url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+    embed.set_footer(text=f"Requested by {ctx.author.name} • Today")
+    await ctx.reply(embed=embed)
 
 
-# --- UTILITY COMMANDS (Say & Reply) ---
+# --- UTILITY COMMANDS ---
 
 @bot.command(name='say')
 async def say(ctx, *, message: str):
