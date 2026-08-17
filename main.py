@@ -5,7 +5,7 @@ from discord.ext import commands
 from flask import Flask
 from threading import Thread
 
-# 1. Flask server to keep the bot alive on Render 24/7
+# 1. Flask server to keep bot alive 24/7
 app = Flask('')
 
 @app.route('/')
@@ -19,14 +19,14 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# 2. Bot Intents & Configuration (All Intents Enabled for Full Logging)
+# 2. Bot Intents & Configuration
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.presences = True
 intents.voice_states = True
 intents.guilds = True
 intents.bans = True
+intents.invites = True
 
 bot = commands.Bot(command_prefix="&", intents=intents)
 bot.remove_command("help")
@@ -37,11 +37,15 @@ user_invites = {}
 user_voice_time = {}
 voice_join_timestamps = {}
 afk_users = {}
-
-# Guild wise log channels storage: {guild_id: {type: channel_id}}
 guild_logs = {}
 
-# 3. Bot Ready Event
+def get_log_channel(guild_id, log_type):
+    if guild_id in guild_logs and log_type in guild_logs[guild_id]:
+        guild = bot.get_guild(guild_id)
+        if guild:
+            return guild.get_channel(guild_logs[guild_id][log_type])
+    return None
+
 @bot.event
 async def on_ready():
     print(f"----------------------------------------")
@@ -50,14 +54,7 @@ async def on_ready():
     print(f"----------------------------------------")
 
 
-# --- ADVANCED LOGGING EVENTS ---
-
-def get_log_channel(guild_id, log_type):
-    if guild_id in guild_logs and log_type in guild_logs[guild_id]:
-        guild = bot.get_guild(guild_id)
-        if guild:
-            return guild.get_channel(guild_logs[guild_id][log_type])
-    return None
+# --- TRACKING & LOG EVENTS ---
 
 @bot.event
 async def on_message(message):
@@ -74,8 +71,12 @@ async def on_message(message):
 
     for user in message.mentions:
         if user.id in afk_users:
-            reason = afk_users[user.id]
-            await message.reply(f"💤 **{user.name}** is currently AFK: {reason}")
+            embed = discord.Embed(
+                title="💤 AFK Notice",
+                description=f"**{user.name}** is currently AFK: {afk_users[user.id]}",
+                color=discord.Color.blue()
+            )
+            await message.reply(embed=embed)
 
     await bot.process_commands(message)
 
@@ -94,30 +95,15 @@ async def on_message_delete(message):
         await channel.send(embed=embed)
 
 @bot.event
-async def on_message_edit(before, after):
-    if before.author.bot or not before.guild or before.content == after.content:
-        return
-    channel = get_log_channel(before.guild.id, 'message')
-    if channel:
-        embed = discord.Embed(
-            title="✏️ Message Edited",
-            description=f"**Author:** {before.author.mention}\n**Channel:** {before.channel.mention}\n**Before:** {before.content}\n**After:** {after.content}",
-            color=discord.Color.blue(),
-            timestamp=discord.utils.utcnow()
-        )
-        await channel.send(embed=embed)
-
-@bot.event
 async def on_member_join(member):
     channel = get_log_channel(member.guild.id, 'member')
     if channel:
         embed = discord.Embed(
             title="📥 Member Joined",
-            description=f"**User:** {member.mention} ({member.name})\n**Created At:** {member.created_at.strftime('%Y-%m-%d')}",
+            description=f"**User:** {member.mention} ({member.name})",
             color=discord.Color.green(),
             timestamp=discord.utils.utcnow()
         )
-        embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
         await channel.send(embed=embed)
 
 @bot.event
@@ -133,68 +119,6 @@ async def on_member_remove(member):
         await channel.send(embed=embed)
 
 @bot.event
-async def on_member_update(before, after):
-    # Timeout log
-    if before.timed_out_until != after.timed_out_until and after.timed_out_until is not None:
-        channel = get_log_channel(after.guild.id, 'mod')
-        if channel:
-            embed = discord.Embed(
-                title="🔇 Member Timed Out",
-                description=f"**User:** {after.mention}\n**Until:** {after.timed_out_until}",
-                color=discord.Color.red(),
-                timestamp=discord.utils.utcnow()
-            )
-            await channel.send(embed=embed)
-
-@bot.event
-async def on_guild_channel_create(channel_obj):
-    channel = get_log_channel(channel_obj.guild.id, 'channel')
-    if channel:
-        embed = discord.Embed(
-            title="📁 Channel Created",
-            description=f"**Name:** {channel_obj.name} ({channel_obj.type})",
-            color=discord.Color.green(),
-            timestamp=discord.utils.utcnow()
-        )
-        await channel.send(embed=embed)
-
-@bot.event
-async def on_guild_channel_delete(channel_obj):
-    channel = get_log_channel(channel_obj.guild.id, 'channel')
-    if channel:
-        embed = discord.Embed(
-            title="❌ Channel Deleted",
-            description=f"**Name:** {channel_obj.name}",
-            color=discord.Color.red(),
-            timestamp=discord.utils.utcnow()
-        )
-        await channel.send(embed=embed)
-
-@bot.event
-async def on_guild_role_create(role):
-    channel = get_log_channel(role.guild.id, 'role')
-    if channel:
-        embed = discord.Embed(
-            title="✨ Role Created",
-            description=f"**Role:** {role.mention}",
-            color=discord.Color.green(),
-            timestamp=discord.utils.utcnow()
-        )
-        await channel.send(embed=embed)
-
-@bot.event
-async def on_guild_role_delete(role):
-    channel = get_log_channel(role.guild.id, 'role')
-    if channel:
-        embed = discord.Embed(
-            title="🗑️ Role Deleted",
-            description=f"**Role Name:** {role.name}",
-            color=discord.Color.red(),
-            timestamp=discord.utils.utcnow()
-        )
-        await channel.send(embed=embed)
-
-@bot.event
 async def on_voice_state_update(member, before, after):
     if member.bot:
         return
@@ -203,7 +127,6 @@ async def on_voice_state_update(member, before, after):
     guild = member.guild
     channel = get_log_channel(guild.id, 'voice')
 
-    # Voice Time tracking logic
     if before.channel is None and after.channel is not None:
         voice_join_timestamps[user_id] = time.time()
         if channel:
@@ -219,14 +142,12 @@ async def on_voice_state_update(member, before, after):
             await channel.send(embed=embed)
 
 
-# --- AUTO SETUP COMMAND (`&setup`) ---
+# --- SETUP COMMAND ---
 
 @bot.command(name='setup')
 @commands.has_permissions(administrator=True)
 async def setup(ctx):
-    """Automatically creates all requested log channels"""
     guild = ctx.guild
-    
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(read_messages=False),
         guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
@@ -250,9 +171,9 @@ async def setup(ctx):
         }
 
         embed = discord.Embed(
-            title="⚙️ All Logs Setup Complete Successfully!",
+            title="⚙️ Setup Complete Successfully!",
             description=(
-                f"✅ Created channels:\n"
+                f"✅ Created all 6 log channels:\n"
                 f"• {member_ch.mention}\n"
                 f"• {msg_ch.mention}\n"
                 f"• {mod_ch.mention}\n"
@@ -264,38 +185,37 @@ async def setup(ctx):
         )
         await ctx.reply(embed=embed)
     except Exception as e:
-        await ctx.reply(f"❌ Error during setup: {e}")
+        await ctx.reply(embed=discord.Embed(title="❌ Error", description=str(e), color=discord.Color.red()))
 
 
-# --- CUSTOM HELP & MENU ---
-
-@bot.command(name='help')
-async def custom_help(ctx):
-    embed = discord.Embed(title="🤖 Bot Help Menu", color=discord.Color.blurple())
-    embed.add_field(name="🛡️ Moderation & Setup", value="`&setup`, `&timeout`, `&kick`, `&ban`, `&unban`, `&clear`", inline=False)
-    embed.add_field(name="📊 Stats & Utility", value="`&m`, `&i`, `&v`, `&afk`, `&say`, `&reply`", inline=False)
-    await ctx.reply(embed=embed)
+# --- HELP & MENU COMMANDS ---
 
 @bot.command(name='menu')
 async def menu(ctx):
-    embed = discord.Embed(title="📋 Bot Feature Menu", color=discord.Color.green())
-    embed.add_field(name="⚙️ Setup", value="`&setup` (Creates all 6 log channels automatically)", inline=False)
+    embed = discord.Embed(title="📋 Ultimate Bot Menu", color=discord.Color.green())
+    embed.add_field(name="⚙️ Setup", value="`&setup` (Auto creates all log channels)", inline=False)
+    embed.add_field(name="📊 Stats", value="`&m`, `&i`, `&v`", inline=False)
+    embed.add_field(name="🔄 Resets (Admin)", value="`&rm`, `&ri`, `&rv`", inline=False)
     embed.add_field(name="🛡️ Moderation", value="`&timeout`, `&kick`, `&ban`, `&unban`, `&clear`", inline=False)
-    embed.add_field(name="📊 Stats & Reset", value="`&m`, `&i`, `&v`, `&afk` | Reset: `&rm`, `&ri`, `&rv`", inline=False)
+    embed.add_field(name="💤 Utility", value="`&afk`", inline=False)
     await ctx.reply(embed=embed)
 
 
-# --- STATS & RESET COMMANDS ---
+# --- STATS COMMANDS (Embed) ---
 
 @bot.command(name='m')
 async def check_messages(ctx, member: discord.Member = None):
     target = member or ctx.author
-    await ctx.reply(f"💬 **{target.name}** has sent **{user_messages.get(target.id, 0)}** messages.")
+    count = user_messages.get(target.id, 0)
+    embed = discord.Embed(title="💬 Message Stats", description=f"**{target.mention}** has sent **{count}** messages.", color=discord.Color.blurple())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='i')
 async def check_invites(ctx, member: discord.Member = None):
     target = member or ctx.author
-    await ctx.reply(f"✉️ **{target.name}** has brought **{user_invites.get(target.id, 0)}** invites.")
+    count = user_invites.get(target.id, 0)
+    embed = discord.Embed(title="✉️ Invite Stats", description=f"**{target.mention}** has brought **{count}** invites.", color=discord.Color.green())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='v')
 async def check_voice(ctx, member: discord.Member = None):
@@ -303,74 +223,66 @@ async def check_voice(ctx, member: discord.Member = None):
     secs = user_voice_time.get(target.id, 0)
     if target.id in voice_join_timestamps:
         secs += int(time.time() - voice_join_timestamps[target.id])
-    await ctx.reply(f"🎙️ **{target.name}** spent **{secs // 3600}h {(secs % 3600) // 60}m** in voice.")
+    hours, minutes = secs // 3600, (secs % 3600) // 60
+    embed = discord.Embed(title="🎙️ Voice Time Stats", description=f"**{target.mention}** has spent **{hours}h {minutes}m** in voice.", color=discord.Color.gold())
+    await ctx.reply(embed=embed)
+
+
+# --- RESET COMMANDS (Admin Only, Embed) ---
 
 @bot.command(name='rm')
 @commands.has_permissions(administrator=True)
 async def reset_messages(ctx, member: discord.Member):
     user_messages[member.id] = 0
-    await ctx.reply(f"🔄 Reset messages for **{member.name}**.")
+    embed = discord.Embed(title="🔄 Message Reset", description=f"Reset message count for **{member.mention}**.", color=discord.Color.orange())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='ri')
 @commands.has_permissions(administrator=True)
 async def reset_invites(ctx, member: discord.Member):
     user_invites[member.id] = 0
-    await ctx.reply(f"🔄 Reset invites for **{member.name}**.")
+    embed = discord.Embed(title="🔄 Invite Reset", description=f"Reset invite count for **{member.mention}**.", color=discord.Color.orange())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='rv')
 @commands.has_permissions(administrator=True)
 async def reset_voice(ctx, member: discord.Member):
     user_voice_time[member.id] = 0
-    await ctx.reply(f"🔄 Reset voice time for **{member.name}**.")
+    if member.id in voice_join_timestamps:
+        voice_join_timestamps[member.id] = time.time()
+    embed = discord.Embed(title="🔄 Voice Time Reset", description=f"Reset voice time for **{member.mention}**.", color=discord.Color.orange())
+    await ctx.reply(embed=embed)
 
 
-# --- MODERATION COMMANDS ---
+# --- MODERATION & UTILITY COMMANDS (Embed) ---
 
 @bot.command(name='timeout')
 @commands.has_permissions(moderate_members=True)
 async def timeout_member(ctx, member: discord.Member, minutes: int, *, reason="No reason provided"):
     duration = discord.utils.utcnow() + discord.utils.timedelta(minutes=minutes)
     await member.timeout(duration, reason=reason)
-    await ctx.reply(f"🔇 **{member.mention}** has been timed out for {minutes} minutes.")
+    embed = discord.Embed(title="🔇 Member Timed Out", description=f"**{member.mention}** has been timed out for **{minutes}m**.\nReason: {reason}", color=discord.Color.red())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='afk')
 async def afk(ctx, *, reason="AFK"):
     afk_users[ctx.author.id] = reason
-    await ctx.reply(f"💤 **{ctx.author.name}** is now AFK: {reason}")
-
-@bot.command(name='say')
-async def say(ctx, *, message: str):
-    await ctx.message.delete()
-    await ctx.send(message)
-
-@bot.command(name='reply')
-async def reply_msg(ctx, message_link: str, *, message: str):
-    try:
-        parts = message_link.split('/')
-        channel = bot.get_channel(int(parts[-2])) or await bot.fetch_channel(int(parts[-2]))
-        target_message = await channel.fetch_message(int(parts[-1]))
-        await target_message.reply(message)
-        await ctx.message.delete()
-    except Exception as e:
-        await ctx.reply(f"❌ Error: {e}")
+    embed = discord.Embed(title="💤 AFK Status Set", description=f"**{ctx.author.name}** is now AFK: {reason}", color=discord.Color.blue())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='kick')
 @commands.has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason=None):
     await member.kick(reason=reason)
-    channel = get_log_channel(ctx.guild.id, 'mod')
-    if channel:
-        await channel.send(f"🛡️ **{member}** was kicked by {ctx.author.mention}. Reason: {reason}")
-    await ctx.reply(f"🛡️ **{member.mention}** has been kicked.")
+    embed = discord.Embed(title="🛡️ Member Kicked", description=f"**{member.mention}** has been kicked.\nReason: {reason or 'None'}", color=discord.Color.orange())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='ban')
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason=None):
     await member.ban(reason=reason)
-    channel = get_log_channel(ctx.guild.id, 'mod')
-    if channel:
-        await channel.send(f"🔨 **{member}** was banned by {ctx.author.mention}. Reason: {reason}")
-    await ctx.reply(f"🔨 **{member.mention}** has been banned.")
+    embed = discord.Embed(title="🔨 Member Banned", description=f"**{member.mention}** has been banned.\nReason: {reason or 'None'}", color=discord.Color.dark_red())
+    await ctx.reply(embed=embed)
 
 @bot.command(name='unban')
 @commands.has_permissions(ban_members=True)
@@ -379,15 +291,17 @@ async def unban(ctx, *, member_name):
     for ban_entry in banned_users:
         if ban_entry.user.name == member_name:
             await ctx.guild.unban(ban_entry.user)
-            await ctx.reply(f"✅ Unbanned **{ban_entry.user.mention}**.")
+            embed = discord.Embed(title="✅ Member Unbanned", description=f"Successfully unbanned **{ban_entry.user.mention}**.", color=discord.Color.green())
+            await ctx.reply(embed=embed)
             return
-    await ctx.reply(f"⚠️ User not found.")
+    await ctx.reply(embed=discord.Embed(title="⚠️ Warning", description="User not found in ban list.", color=discord.Color.orange()))
 
 @bot.command(name='clear')
 @commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount: int = 5):
     await ctx.channel.purge(limit=amount + 1)
-    await ctx.send(f"🧹 Deleted {amount} messages.", delete_after=5)
+    embed = discord.Embed(title="🧹 Messages Cleared", description=f"Successfully deleted **{amount}** messages.", color=discord.Color.green())
+    await ctx.send(embed=embed, delete_after=5)
 
 
 # 4. Run Bot
