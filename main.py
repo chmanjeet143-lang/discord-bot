@@ -54,7 +54,7 @@ async def on_ready():
     print(f"----------------------------------------")
 
 
-# --- EVENTS & NICKNAME CHANNEL LOGIC (No Message Delete) ---
+# --- EVENTS & NICKNAME CHANNEL LOGIC (No Deletion at all) ---
 
 @bot.event
 async def on_message(message):
@@ -63,14 +63,13 @@ async def on_message(message):
 
     guild_id = message.guild.id if message.guild else None
 
-    # Nickname change channel: Message will NOT be deleted, user message is kept, bot replies nicely with embed
+    # Nickname change channel: User message stays, bot replies nicely with a permanent embed
     if guild_id and guild_id in guild_logs and 'nickname' in guild_logs[guild_id]:
         if message.channel.id == guild_logs[guild_id]['nickname']:
             try:
                 new_nick = message.content
                 await message.author.edit(nick=new_nick)
                 
-                # Clean, professional style embed matching your requested theme
                 embed = discord.Embed(
                     title="Nickname Updated",
                     description=(
@@ -78,17 +77,17 @@ async def on_message(message):
                         f"• **New Nickname** : `{new_nick}`\n"
                         f"• **Status** : Successfully Changed ✨"
                     ),
-                    color=discord.Color.from_rgb(40, 40, 40) # Clean dark/neutral accent matching screenshot vibe
+                    color=discord.Color.blurple()
                 )
-                await message.reply(embed=embed, delete_after=10)
+                await message.reply(embed=embed) # No delete_after, message will stay permanently!
                 return
             except Exception as e:
                 embed = discord.Embed(
                     title="Nickname Update Failed",
                     description=f"• **Reason** : `{e}`",
-                    color=discord.Color.from_rgb(200, 50, 50)
+                    color=discord.Color.red()
                 )
-                await message.reply(embed=embed, delete_after=10)
+                await message.reply(embed=embed)
                 return
 
     author_id = message.author.id
@@ -100,7 +99,7 @@ async def on_message(message):
         welcome_embed = discord.Embed(
             title="AFK Status Removed",
             description=f"• **Welcome Back** : {message.author.mention}\n• **Status** : AFK mode deactivated.",
-            color=discord.Color.from_rgb(40, 40, 40)
+            color=discord.Color.blurple()
         )
         await message.channel.send(embed=welcome_embed, delete_after=5)
 
@@ -109,7 +108,7 @@ async def on_message(message):
             embed = discord.Embed(
                 title="User is AFK",
                 description=f"• **User** : {user.mention}\n• **Reason** : {afk_users[user.id]}",
-                color=discord.Color.from_rgb(40, 40, 40)
+                color=discord.Color.blurple()
             )
             await message.reply(embed=embed)
 
@@ -124,7 +123,7 @@ async def on_message_delete(message):
         embed = discord.Embed(
             title="Message Deleted",
             description=f"• **Author** : {message.author.mention}\n• **Channel** : {message.channel.mention}\n• **Content** : {message.content or '[Embed/Attachment]'}",
-            color=discord.Color.from_rgb(40, 40, 40),
+            color=discord.Color.orange(),
             timestamp=discord.utils.utcnow()
         )
         await channel.send(embed=embed)
@@ -136,7 +135,7 @@ async def on_member_join(member):
         embed = discord.Embed(
             title="Member Joined",
             description=f"• **User** : {member.mention}\n• **Name** : {member.name}",
-            color=discord.Color.from_rgb(40, 40, 40),
+            color=discord.Color.green(),
             timestamp=discord.utils.utcnow()
         )
         await channel.send(embed=embed)
@@ -148,7 +147,7 @@ async def on_member_remove(member):
         embed = discord.Embed(
             title="Member Left",
             description=f"• **User** : {member.mention}\n• **Name** : {member.name}",
-            color=discord.Color.from_rgb(40, 40, 40),
+            color=discord.Color.red(),
             timestamp=discord.utils.utcnow()
         )
         await channel.send(embed=embed)
@@ -165,7 +164,7 @@ async def on_voice_state_update(member, before, after):
     if before.channel is None and after.channel is not None:
         voice_join_timestamps[user_id] = time.time()
         if channel:
-            embed = discord.Embed(title="Voice Join", description=f"• **User** : {member.mention}\n• **Channel** : {after.channel.name}", color=discord.Color.from_rgb(40, 40, 40), timestamp=discord.utils.utcnow())
+            embed = discord.Embed(title="Voice Join", description=f"• **User** : {member.mention}\n• **Channel** : {after.channel.name}", color=discord.Color.blue(), timestamp=discord.utils.utcnow())
             await channel.send(embed=embed)
     elif before.channel is not None and after.channel is None:
         if user_id in voice_join_timestamps:
@@ -173,7 +172,7 @@ async def on_voice_state_update(member, before, after):
             user_voice_time[user_id] = user_voice_time.get(user_id, 0) + duration
             del voice_join_timestamps[user_id]
         if channel:
-            embed = discord.Embed(title="Voice Leave", description=f"• **User** : {member.mention}\n• **Channel** : {before.channel.name}", color=discord.Color.from_rgb(40, 40, 40), timestamp=discord.utils.utcnow())
+            embed = discord.Embed(title="Voice Leave", description=f"• **User** : {member.mention}\n• **Channel** : {before.channel.name}", color=discord.Color.orange(), timestamp=discord.utils.utcnow())
             await channel.send(embed=embed)
 
 
@@ -220,11 +219,11 @@ async def setup(ctx):
                 f"• **Status** : All channels created successfully.\n"
                 f"• **Channels** : {member_ch.mention}, {msg_ch.mention}, {mod_ch.mention}, {channel_ch.mention}, {role_ch.mention}, {voice_ch.mention}, {logs_ch.mention}, {nick_ch.mention}"
             ),
-            color=discord.Color.from_rgb(40, 40, 40)
+            color=discord.Color.green()
         )
         await ctx.reply(embed=embed)
     except Exception as e:
-        await ctx.reply(embed=discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.from_rgb(200, 50, 50)))
+        await ctx.reply(embed=discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.red()))
 
 
 # --- NICKNAMESETUP COMMAND ---
@@ -246,14 +245,14 @@ async def nicknamesetup(ctx):
         embed = discord.Embed(
             title="Nickname Setup Complete",
             description=f"• **Channel Created** : {nick_ch.mention}\n• **Usage** : Type your new nickname here directly.",
-            color=discord.Color.from_rgb(40, 40, 40)
+            color=discord.Color.blue()
         )
         await ctx.reply(embed=embed)
     except Exception as e:
-        await ctx.reply(embed=discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.from_rgb(200, 50, 50)))
+        await ctx.reply(embed=discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.red()))
 
 
-# --- MENU & SERVERINFO COMMANDS (Clean Theme) ---
+# --- MENU & SERVERINFO COMMANDS ---
 
 @bot.command(name='menu')
 async def menu(ctx):
@@ -267,7 +266,7 @@ async def menu(ctx):
             f"• **Moderation** : `&timeout`, `&kick`, `&ban`, `&unban`, `&clear`\n"
             f"• **Utility** : `&afk`, `&say`, `&reply`"
         ),
-        color=discord.Color.from_rgb(40, 40, 40)
+        color=discord.Color.blurple()
     )
     await ctx.reply(embed=embed)
 
@@ -283,7 +282,7 @@ async def serverinfo(ctx):
             f"• **Total Members** : `{guild.member_count}`\n"
             f"• **Verification Level** : `{str(guild.verification_level).capitalize()}`"
         ),
-        color=discord.Color.from_rgb(40, 40, 40),
+        color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow()
     )
     if guild.icon:
@@ -300,7 +299,7 @@ async def check_messages(ctx, member: discord.Member = None):
     embed = discord.Embed(
         title="Message Statistics",
         description=f"• **User** : {target.mention}\n• **Total Messages** : `{count}`",
-        color=discord.Color.from_rgb(40, 40, 40)
+        color=discord.Color.blurple()
     )
     await ctx.reply(embed=embed)
 
@@ -311,7 +310,7 @@ async def check_invites(ctx, member: discord.Member = None):
     embed = discord.Embed(
         title="Invite Statistics",
         description=f"• **User** : {target.mention}\n• **Total Invites** : `{count}`",
-        color=discord.Color.from_rgb(40, 40, 40)
+        color=discord.Color.green()
     )
     await ctx.reply(embed=embed)
 
@@ -325,7 +324,7 @@ async def check_voice(ctx, member: discord.Member = None):
     embed = discord.Embed(
         title="Voice Time Statistics",
         description=f"• **User** : {target.mention}\n• **Time Spent** : `{hours}h {minutes}m`",
-        color=discord.Color.from_rgb(40, 40, 40)
+        color=discord.Color.gold()
     )
     await ctx.reply(embed=embed)
 
@@ -336,14 +335,14 @@ async def check_voice(ctx, member: discord.Member = None):
 @commands.has_permissions(administrator=True)
 async def reset_messages(ctx, member: discord.Member):
     user_messages[member.id] = 0
-    embed = discord.Embed(title="Message Reset", description=f"• **User** : {member.mention}\n• **Status** : Count reset to 0.", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="Message Reset", description=f"• **User** : {member.mention}\n• **Status** : Count reset to 0.", color=discord.Color.orange())
     await ctx.reply(embed=embed)
 
 @bot.command(name='ri')
 @commands.has_permissions(administrator=True)
 async def reset_invites(ctx, member: discord.Member):
     user_invites[member.id] = 0
-    embed = discord.Embed(title="Invite Reset", description=f"• **User** : {member.mention}\n• **Status** : Count reset to 0.", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="Invite Reset", description=f"• **User** : {member.mention}\n• **Status** : Count reset to 0.", color=discord.Color.orange())
     await ctx.reply(embed=embed)
 
 @bot.command(name='rv')
@@ -352,7 +351,7 @@ async def reset_voice(ctx, member: discord.Member):
     user_voice_time[member.id] = 0
     if member.id in voice_join_timestamps:
         voice_join_timestamps[member.id] = time.time()
-    embed = discord.Embed(title="Voice Time Reset", description=f"• **User** : {member.mention}\n• **Status** : Time reset to 0.", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="Voice Time Reset", description=f"• **User** : {member.mention}\n• **Status** : Time reset to 0.", color=discord.Color.orange())
     await ctx.reply(embed=embed)
 
 
@@ -361,7 +360,7 @@ async def reset_voice(ctx, member: discord.Member):
 @bot.command(name='say')
 async def say(ctx, *, message: str):
     await ctx.message.delete()
-    embed = discord.Embed(description=f"• **Announcement** :\n{message}", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(description=f"• **Announcement** :\n{message}", color=discord.Color.blurple())
     await ctx.send(embed=embed)
 
 @bot.command(name='reply')
@@ -370,11 +369,11 @@ async def reply_msg(ctx, message_link: str, *, message: str):
         parts = message_link.split('/')
         channel = bot.get_channel(int(parts[-2])) or await bot.fetch_channel(int(parts[-2]))
         target_message = await channel.fetch_message(int(parts[-1]))
-        embed = discord.Embed(description=f"• **Reply** :\n{message}", color=discord.Color.from_rgb(40, 40, 40))
+        embed = discord.Embed(description=f"• **Reply** :\n{message}", color=discord.Color.blurple())
         await target_message.reply(embed=embed)
         await ctx.message.delete()
     except Exception as e:
-        embed = discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.from_rgb(200, 50, 50))
+        embed = discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         await ctx.reply(embed=embed)
 
 @bot.command(name='timeout')
@@ -382,47 +381,47 @@ async def reply_msg(ctx, message_link: str, *, message: str):
 async def timeout_member(ctx, member: discord.Member, minutes: int, *, reason="No reason provided"):
     duration = discord.utils.utcnow() + discord.utils.timedelta(minutes=minutes)
     await member.timeout(duration, reason=reason)
-    embed = discord.Embed(title="Member Timed Out", description=f"• **User** : {member.mention}\n• **Duration** : `{minutes} minutes`\n• **Reason** : {reason}", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="Member Timed Out", description=f"• **User** : {member.mention}\n• **Duration** : `{minutes} minutes`\n• **Reason** : {reason}", color=discord.Color.red())
     await ctx.reply(embed=embed)
 
 @bot.command(name='afk')
 async def afk(ctx, *, reason="AFK"):
     afk_users[ctx.author.id] = reason
-    embed = discord.Embed(title="AFK Mode Activated", description=f"• **User** : {ctx.author.mention}\n• **Reason** : {reason}", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="AFK Mode Activated", description=f"• **User** : {ctx.author.mention}\n• **Reason** : {reason}", color=discord.Color.blue())
     await ctx.reply(embed=embed)
 
 @bot.command(name='kick')
 @commands.has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason=None):
     await member.kick(reason=reason)
-    embed = discord.Embed(title="Member Kicked", description=f"• **User** : {member.mention}\n• **Reason** : {reason or 'None'}", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="Member Kicked", description=f"• **User** : {member.mention}\n• **Reason** : {reason or 'None'}", color=discord.Color.orange())
     await ctx.reply(embed=embed)
 
 @bot.command(name='ban')
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason=None):
     await member.ban(reason=reason)
-    embed = discord.Embed(title="Member Banned", description=f"• **User** : {member.mention}\n• **Reason** : {reason or 'None'}", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="Member Banned", description=f"• **User** : {member.mention}\n• **Reason** : {reason or 'None'}", color=discord.Color.dark_red())
     await ctx.reply(embed=embed)
 
 @bot.command(name='unban')
 @commands.has_permissions(ban_members=True)
 async def unban(ctx, *, member_name):
-    banned_users = await ctx.guild.ans() if hasattr(ctx.guild, 'bans') else await ctx.guild.bans()
+    banned_users = await ctx.guild.bans()
     for ban_entry in banned_users:
         if ban_entry.user.name == member_name:
             await ctx.guild.unban(ban_entry.user)
-            embed = discord.Embed(title="Member Unbanned", description=f"• **User** : {ban_entry.user.mention}", color=discord.Color.from_rgb(40, 40, 40))
+            embed = discord.Embed(title="Member Unbanned", description=f"• **User** : {ban_entry.user.mention}", color=discord.Color.green())
             await ctx.reply(embed=embed)
             return
-    embed = discord.Embed(title="Warning", description="• **Status** : User not found in ban list.", color=discord.Color.from_rgb(200, 50, 50))
+    embed = discord.Embed(title="Warning", description="• **Status** : User not found in ban list.", color=discord.Color.orange())
     await ctx.reply(embed=embed)
 
 @bot.command(name='clear')
 @commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount: int = 5):
     await ctx.channel.purge(limit=amount + 1)
-    embed = discord.Embed(title="Messages Cleared", description=f"• **Deleted** : `{amount}` messages.", color=discord.Color.from_rgb(40, 40, 40))
+    embed = discord.Embed(title="Messages Cleared", description=f"• **Deleted** : `{amount}` messages.", color=discord.Color.green())
     await ctx.send(embed=embed, delete_after=5)
 
 
