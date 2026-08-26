@@ -63,18 +63,20 @@ async def on_message(message):
 
     guild_id = message.guild.id if message.guild else None
 
-    # Nickname channel feature: If someone types in nickname channel, change their nickname
+    # Nickname change channel: If someone types in nickname channel, change their nickname using .edit()
     if guild_id and guild_id in guild_logs and 'nickname' in guild_logs[guild_id]:
         if message.channel.id == guild_logs[guild_id]['nickname']:
             try:
                 new_nick = message.content
-                await message.author.change_nickname(new_nick)
+                await message.author.edit(nick=new_nick)
                 await message.delete()
-                temp_msg = await message.channel.send(embed=discord.Embed(title="✅ Nickname Updated", description=f"Successfully changed your nickname to **{new_nick}**", color=discord.Color.green()))
+                embed = discord.Embed(title="✅ Nickname Updated", description=f"Successfully changed your nickname to **{new_nick}**", color=discord.Color.green())
+                temp_msg = await message.channel.send(embed=embed)
                 await temp_msg.delete(delay=5)
                 return
             except Exception as e:
-                temp_msg = await message.channel.send(embed=discord.Embed(title="❌ Error", description=f"Could not change nickname: {e}", color=discord.Color.red()))
+                embed = discord.Embed(title="❌ Error", description=f"Could not change nickname: {e}", color=discord.Color.red())
+                temp_msg = await message.channel.send(embed=embed)
                 await temp_msg.delete(delay=5)
                 return
 
@@ -160,7 +162,7 @@ async def on_voice_state_update(member, before, after):
             await channel.send(embed=embed)
 
 
-# --- SETUP COMMAND ---
+# --- SETUP COMMAND (Logs Channels) ---
 
 @bot.command(name='setup')
 @commands.has_permissions(administrator=True)
@@ -178,8 +180,9 @@ async def setup(ctx):
         channel_ch = await guild.create_text_channel('channel-logs', overwrites=overwrites)
         role_ch = await guild.create_text_channel('role-logs', overwrites=overwrites)
         voice_ch = await guild.create_text_channel('voice-logs', overwrites=overwrites)
+        logs_ch = await guild.create_text_channel('logs', overwrites=overwrites)
         
-        # Nickname change channel (everyone can view & send messages here so they can type their nickname)
+        # Nickname change channel setup
         nick_overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=True),
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_nicknames=True)
@@ -193,22 +196,50 @@ async def setup(ctx):
             'channel': channel_ch.id,
             'role': role_ch.id,
             'voice': voice_ch.id,
+            'logs': logs_ch.id,
             'nickname': nick_ch.id
         }
 
         embed = discord.Embed(
             title="⚙️ Setup Complete Successfully!",
             description=(
-                f"✅ Created all channels:\n"
+                f"✅ Created all log channels & features:\n"
                 f"• {member_ch.mention}\n"
                 f"• {msg_ch.mention}\n"
                 f"• {mod_ch.mention}\n"
                 f"• {channel_ch.mention}\n"
                 f"• {role_ch.mention}\n"
                 f"• {voice_ch.mention}\n"
+                f"• {logs_ch.mention}\n"
                 f"• {nick_ch.mention} (Type nickname here to change it)"
             ),
             color=discord.Color.green()
+        )
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        await ctx.reply(embed=discord.Embed(title="❌ Error", description=str(e), color=discord.Color.red()))
+
+
+# --- NICKNAMESETUP COMMAND (Separate Command) ---
+
+@bot.command(name='nicknamesetup')
+@commands.has_permissions(administrator=True)
+async def nicknamesetup(ctx):
+    guild = ctx.guild
+    nick_overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_nicknames=True)
+    }
+    try:
+        nick_ch = await guild.create_text_channel('nickname-change', overwrites=nick_overwrites)
+        if guild.id not in guild_logs:
+            guild_logs[guild.id] = {}
+        guild_logs[guild.id]['nickname'] = nick_ch.id
+
+        embed = discord.Embed(
+            title="🛠️ Nickname Setup Complete",
+            description=f"Successfully created {nick_ch.mention} channel! Users can now type their desired nickname there.",
+            color=discord.Color.blue()
         )
         await ctx.reply(embed=embed)
     except Exception as e:
@@ -220,7 +251,7 @@ async def setup(ctx):
 @bot.command(name='menu')
 async def menu(ctx):
     embed = discord.Embed(title="📋 Ultimate Bot Menu", color=discord.Color.green())
-    embed.add_field(name="⚙️ Setup", value="`&setup` (Auto creates log & nickname channels)", inline=False)
+    embed.add_field(name="⚙️ Setups", value="`&setup` (All logs), `&nicknamesetup` (Nickname channel)", inline=False)
     embed.add_field(name="🏰 Server Info", value="`&si`", inline=False)
     embed.add_field(name="📊 Stats", value="`&m`, `&i`, `&v`", inline=False)
     embed.add_field(name="🔄 Resets (Admin)", value="`&rm`, `&ri`, `&rv`", inline=False)
