@@ -1,9 +1,10 @@
 import os
 import time
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from flask import Flask
 from threading import Thread
+from datetime import datetime
 
 # 1. Flask server to keep bot alive on Render 24/7
 app = Flask('')
@@ -38,6 +39,7 @@ user_voice_time = {}
 voice_join_timestamps = {}
 afk_users = {}
 guild_logs = {}
+guild_birthdays = {}  # {guild_id: {'channel': channel_id, 'users': {user_id: 'DD-MM'}}}
 
 def get_log_channel(guild_id, log_type):
     if guild_id in guild_logs and log_type in guild_logs[guild_id]:
@@ -48,13 +50,41 @@ def get_log_channel(guild_id, log_type):
 
 @bot.event
 async def on_ready():
+    if not daily_birthday_check.is_running():
+        daily_birthday_check.start()
     print(f"----------------------------------------")
     print(f"Logged in as: {bot.user.name} (ID: {bot.user.id})")
     print(f"Status: Online & Ready!")
     print(f"----------------------------------------")
 
 
-# --- EVENTS & NICKNAME CHANNEL LOGIC (No Deletion at all) ---
+# --- BACKGROUND TASK FOR BIRTHDAYS ---
+@tasks.loop(hours=24)
+async def daily_birthday_check():
+    today = datetime.now().strftime("%d-%m")
+    for guild_id, data in guild_birthdays.items():
+        channel_id = data.get('channel')
+        users_bday = data.get('users', {})
+        guild = bot.get_guild(guild_id)
+        if not guild or not channel_id:
+            continue
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            continue
+        
+        for user_id, bday in users_bday.items():
+            if bday == today:
+                member = guild.get_member(user_id) or await guild.fetch_member(user_id)
+                if member:
+                    embed = discord.Embed(
+                        title="🎉 Happy Birthday! 🎂",
+                        description=f"• **User** : {member.mention}\n• **Status** : Wishing you a wonderful birthday today! 🥳✨",
+                        color=discord.Color.from_rgb(255, 105, 180)
+                    )
+                    await channel.send(content="@everyone", embed=embed)
+
+
+# --- EVENTS & CHANNELS LOGIC ---
 
 @bot.event
 async def on_message(message):
@@ -63,13 +93,12 @@ async def on_message(message):
 
     guild_id = message.guild.id if message.guild else None
 
-    # Nickname change channel: User message stays, bot replies nicely with a permanent embed
+    # Nickname change channel logic (No deletion, clean permanent reply)
     if guild_id and guild_id in guild_logs and 'nickname' in guild_logs[guild_id]:
         if message.channel.id == guild_logs[guild_id]['nickname']:
             try:
                 new_nick = message.content
                 await message.author.edit(nick=new_nick)
-                
                 embed = discord.Embed(
                     title="Nickname Updated",
                     description=(
@@ -79,7 +108,7 @@ async def on_message(message):
                     ),
                     color=discord.Color.blurple()
                 )
-                await message.reply(embed=embed) # No delete_after, message will stay permanently!
+                await message.reply(embed=embed)
                 return
             except Exception as e:
                 embed = discord.Embed(
@@ -89,6 +118,26 @@ async def on_message(message):
                 )
                 await message.reply(embed=embed)
                 return
+
+    # Birthday channel logic: If someone writes their DOB (e.g. DD-MM or DD/MM)
+    if guild_id and guild_id in guild_birthdays and guild_birthdays[guild_id]['channel'] == message.channel.id:
+        content = message.content.strip().replace('/', '-')
+        # Simple validation check for DD-MM format
+        parts = content.split('-')
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            day, month = parts[0].zfill(2), parts[1].zfill(2)]
+            formatted_bday = f"{day}-{month}"
+            if guild_id not in guild_birthdays:
+                guild_birthdays[guild_id] = {'channel': message.channel.id, 'users': {}}
+            guild_birthdays[guild_id]['users'][message.author.id] = formatted_bday
+            
+            embed = discord.Embed(
+                title="Birthday Saved",
+                description=f"• **User** : {message.author.mention}\n• **Birthday** : `{formatted_bday}`\n• **Status** : I have remembered your birthday! 🎉",
+                color=discord.Color.green()
+            )
+            await message.reply(embed=embed, delete_after=10)
+            return
 
     author_id = message.author.id
     user_messages[author_id] = user_messages.get(author_id, 0) + 1
@@ -176,7 +225,7 @@ async def on_voice_state_update(member, before, after):
             await channel.send(embed=embed)
 
 
-# --- SETUP COMMAND ---
+# --- SETUP COMMANDS ---
 
 @bot.command(name='setup')
 @commands.has_permissions(administrator=True)
@@ -216,7 +265,7 @@ async def setup(ctx):
         embed = discord.Embed(
             title="Setup Complete",
             description=(
-                f"• **Status** : All channels created successfully.\n"
+                f"• **Status** : All log channels created successfully.\n"
                 f"• **Channels** : {member_ch.mention}, {msg_ch.mention}, {mod_ch.mention}, {channel_ch.mention}, {role_ch.mention}, {voice_ch.mention}, {logs_ch.mention}, {nick_ch.mention}"
             ),
             color=discord.Color.green()
@@ -225,8 +274,6 @@ async def setup(ctx):
     except Exception as e:
         await ctx.reply(embed=discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.red()))
 
-
-# --- NICKNAMESETUP COMMAND ---
 
 @bot.command(name='nicknamesetup')
 @commands.has_permissions(administrator=True)
@@ -252,6 +299,32 @@ async def nicknamesetup(ctx):
         await ctx.reply(embed=discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.red()))
 
 
+@bot.command(name='birthdaysetup')
+@commands.has_permissions(administrator=True)
+async def birthdaysetup(ctx):
+    guild = ctx.guild
+    bday_overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+    }
+    try:
+        bday_ch = await guild.create_text_channel('birthday-wishes', overwrites=bday_overwrites)
+        if guild.id not in guild_birthdays:
+            guild_birthdays[guild.id] = {}
+        guild_birthdays[guild.id]['channel'] = bday_ch.id
+        if 'users' not in guild_birthdays[guild.id]:
+            guild_birthdays[guild.id]['users'] = {}
+
+        embed = discord.Embed(
+            title="Birthday Setup Complete",
+            description=f"• **Channel Created** : {bday_ch.mention}\n• **Usage** : Type your Date of Birth here (e.g. `15-08` or `15/08`) to save it!",
+            color=discord.Color.from_rgb(255, 105, 180)
+        )
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        await ctx.reply(embed=discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.red()))
+
+
 # --- MENU & SERVERINFO COMMANDS ---
 
 @bot.command(name='menu')
@@ -259,7 +332,7 @@ async def menu(ctx):
     embed = discord.Embed(
         title="Bot Command Menu",
         description=(
-            f"• **Setups** : `&setup`, `&nicknamesetup`\n"
+            f"• **Setups** : `&setup`, `&nicknamesetup`, `&birthdaysetup`\n"
             f"• **Information** : `&si`\n"
             f"• **Statistics** : `&m`, `&i`, `&v`\n"
             f"• **Admin Resets** : `&rm`, `&ri`, `&rv`\n"
@@ -355,13 +428,13 @@ async def reset_voice(ctx, member: discord.Member):
     await ctx.reply(embed=embed)
 
 
-# --- UTILITY & MODERATION COMMANDS ---
+# --- UTILITY & MODERATION COMMANDS (Fixed say & reply) ---
 
 @bot.command(name='say')
 async def say(ctx, *, message: str):
     await ctx.message.delete()
-    embed = discord.Embed(description=f"• **Announcement** :\n{message}", color=discord.Color.blurple())
-    await ctx.send(embed=embed)
+    # Fixed: sending normal clean text directly instead of an annoying announcement box embed
+    await ctx.send(message)
 
 @bot.command(name='reply')
 async def reply_msg(ctx, message_link: str, *, message: str):
@@ -369,8 +442,8 @@ async def reply_msg(ctx, message_link: str, *, message: str):
         parts = message_link.split('/')
         channel = bot.get_channel(int(parts[-2])) or await bot.fetch_channel(int(parts[-2]))
         target_message = await channel.fetch_message(int(parts[-1]))
-        embed = discord.Embed(description=f"• **Reply** :\n{message}", color=discord.Color.blurple())
-        await target_message.reply(embed=embed)
+        # Fixed: replying with clean plain text instead of forced reply embed box
+        await target_message.reply(message)
         await ctx.message.delete()
     except Exception as e:
         embed = discord.Embed(title="Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
