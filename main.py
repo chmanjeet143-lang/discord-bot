@@ -54,7 +54,7 @@ async def on_ready():
         daily_birthday_check.start()
     print(f"----------------------------------------")
     print(f"Logged in as: {bot.user.name} (ID: {bot.user.id})")
-    print(f"Status: Online & Ready!")
+    print(f"Status: Online & Ready (Ultimate Edition)!")
     print(f"----------------------------------------")
 
 
@@ -119,7 +119,7 @@ async def on_message(message):
                 await message.reply(embed=embed)
                 return
 
-    # Birthday channel logic
+    # Birthday channel logic (Yahan delete_after hata diya hai taaki messages delete na ho)
     if guild_id and guild_id in guild_birthdays and guild_birthdays[guild_id]['channel'] == message.channel.id:
         content = message.content.strip().replace('/', '-')
         parts = content.split('-')
@@ -135,7 +135,7 @@ async def on_message(message):
                 description=f"• **User** : {message.author.mention}\n• **Birthday** : `{formatted_bday}`\n• **Status** : I have remembered your birthday! 🎉",
                 color=discord.Color.from_rgb(255, 105, 180)
             )
-            await message.reply(embed=embed, delete_after=10)
+            await message.reply(embed=embed) # Delete nahi hoga ab!
             return
 
     author_id = message.author.id
@@ -362,7 +362,7 @@ async def serverinfo(ctx):
     await ctx.reply(embed=embed)
 
 
-# --- STATS COMMANDS (Stylish Look matching Screenshot) ---
+# --- STATS COMMANDS ---
 
 @bot.command(name='m')
 async def check_messages(ctx, member: discord.Member = None):
