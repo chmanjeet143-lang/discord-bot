@@ -133,7 +133,9 @@ class MenuSelect(discord.ui.Select):
                     "• `&m [user]` - Check message count\n"
                     "• `&i [user]` - Check invite count\n"
                     "• `&v [user]` - Check voice channel time\n"
-                    "• `&rm / &ri / &rv` - Reset stats (Admin only)"
+                    "• `&rm [user/all]` - Reset messages\n"
+                    "• `&ri [user]` - Reset invites\n"
+                    "• `&rv [user/all]` - Reset voice time"
                 ),
                 color=discord.Color.blurple()
             )
@@ -209,7 +211,7 @@ async def on_message(message):
                 await message.reply(embed=embed)
                 return
 
-    # Birthday channel logic (Messages preserved, not deleted)
+    # Birthday channel logic
     if guild_id and guild_id in guild_birthdays and guild_birthdays[guild_id]['channel'] == message.channel.id:
         content = message.content.strip().replace('/', '-')
         parts = content.split('-')
@@ -431,7 +433,7 @@ async def birthdaysetup(ctx):
         await ctx.reply(embed=err_embed)
 
 
-# --- MENU & SERVERINFO COMMANDS (With Screenshot Matching Dropdown Design) ---
+# --- MENU & SERVERINFO COMMANDS ---
 
 @bot.command(name='menu', aliases=['help'])
 async def menu(ctx):
@@ -528,13 +530,22 @@ async def check_voice(ctx, member: discord.Member = None):
     await ctx.reply(embed=embed)
 
 
-# --- RESET COMMANDS ---
+# --- RESET COMMANDS (Support for User or 'all') ---
 
 @bot.command(name='rm')
 @commands.has_permissions(administrator=True)
-async def reset_messages(ctx, member: discord.Member):
-    user_messages[member.id] = 0
-    embed = discord.Embed(title="🔄 Message Reset", description=f"• **User** : {member.mention}\n• **Status** : Count successfully reset to 0.", color=discord.Color.orange())
+async def reset_messages(ctx, target: str):
+    if target.lower() == "all":
+        user_messages.clear()
+        embed = discord.Embed(title="🔄 All Messages Reset", description="• **Status** : Message count for all members has been reset to 0.", color=discord.Color.orange())
+    else:
+        try:
+            member = await commands.MemberConverter().convert(ctx, target)
+            user_messages[member.id] = 0
+            embed = discord.Embed(title="🔄 Message Reset", description=f"• **User** : {member.mention}\n• **Status** : Count successfully reset to 0.", color=discord.Color.orange())
+        except Exception:
+            embed = discord.Embed(title="❌ Error", description="• **Details** : Please specify a valid member or type `all`.", color=discord.Color.red())
+    
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
     await ctx.reply(embed=embed)
 
@@ -548,11 +559,26 @@ async def reset_invites(ctx, member: discord.Member):
 
 @bot.command(name='rv')
 @commands.has_permissions(administrator=True)
-async def reset_voice(ctx, member: discord.Member):
-    user_voice_time[member.id] = 0
-    if member.id in voice_join_timestamps:
-        voice_join_timestamps[member.id] = time.time()
-    embed = discord.Embed(title="🔄 Voice Time Reset", description=f"• **User** : {member.mention}\n• **Status** : Time successfully reset to 0.", color=discord.Color.orange())
+async def reset_voice(ctx, target: str):
+    if target.lower() == "all":
+        user_voice_time.clear()
+        voice_join_timestamps.clear()
+        # Active users ko wapas timestamp de do taaki current session track hota rahe
+        for vc_channel in ctx.guild.voice_channels:
+            for member in vc_channel.members:
+                if not member.bot:
+                    voice_join_timestamps[member.id] = time.time()
+        embed = discord.Embed(title="🔄 All Voice Time Reset", description="• **Status** : Voice time for all members has been reset to 0.", color=discord.Color.orange())
+    else:
+        try:
+            member = await commands.MemberConverter().convert(ctx, target)
+            user_voice_time[member.id] = 0
+            if member.id in voice_join_timestamps:
+                voice_join_timestamps[member.id] = time.time()
+            embed = discord.Embed(title="🔄 Voice Time Reset", description=f"• **User** : {member.mention}\n• **Status** : Time successfully reset to 0.", color=discord.Color.orange())
+        except Exception:
+            embed = discord.Embed(title="❌ Error", description="• **Details** : Please specify a valid member or type `all`.", color=discord.Color.red())
+            
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
     await ctx.reply(embed=embed)
 
