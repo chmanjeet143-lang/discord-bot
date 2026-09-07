@@ -1,4 +1,4 @@
-import os
+Import os
 import time
 import json
 import discord
@@ -745,7 +745,7 @@ async def removerole(ctx, member: discord.Member, role: discord.Role):
 @commands.has_permissions(manage_channels=True)
 async def hide(ctx, channel: discord.TextChannel = None):
     target_channel = channel or ctx.channel
-    try:pi
+    try:
         await target_channel.set_permissions(ctx.guild.default_role, read_messages=False)
         embed = discord.Embed(title="🔒 Channel Hidden", description=f"• **Channel** : {target_channel.mention}\n• **Status** : Hidden from `@everyone`.", color=discord.Color.orange())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
@@ -878,3 +878,5 @@ async def clear(ctx, amount: int = 5):
 if __name__ == "__main__":
     keep_alive()
     bot.run(os.environ.get("TOKEN"))
+
+Ye sb
