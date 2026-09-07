@@ -30,7 +30,13 @@ intents.guilds = True
 intents.bans = True
 intents.invites = True
 
-bot = commands.Bot(command_prefix="&", intents=intents)
+# Dynamic prefix function
+def get_prefix(bot, message):
+    if not message.guild:
+        return "&"
+    return guild_prefixes.get(message.guild.id, "&")
+
+bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 bot.remove_command("help")
 
 # --- Persistent Storage Functions (JSON Based) ---
@@ -43,13 +49,14 @@ def load_data():
                 return json.load(f)
         except:
             pass
-    return {"logs": {}, "birthdays": {}, "backups": {}}
+    return {"logs": {}, "birthdays": {}, "backups": {}, "prefixes": {}}
 
 def save_data():
     data = {
         "logs": guild_logs,
         "birthdays": guild_birthdays,
-        "backups": server_backups
+        "backups": server_backups,
+        "prefixes": guild_prefixes
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -59,6 +66,7 @@ db = load_data()
 guild_logs = {int(k): v for k, v in db.get("logs", {}).items()}
 guild_birthdays = {int(k): v for k, v in db.get("birthdays", {}).items()}
 server_backups = {int(k): v for k, v in db.get("backups", {}).items()}
+guild_prefixes = {int(k): v for k, v in db.get("prefixes", {}).items()}
 
 # Data Storage for runtime
 user_messages = {}
@@ -146,7 +154,8 @@ async def auto_backup_task():
 # --- DROPDOWN SELECT MENU VIEW FOR &MENU ---
 
 class MenuSelect(discord.ui.Select):
-    def __init__(self):
+    def __init__(self, prefix):
+        self.prefix = prefix
         options = [
             discord.SelectOption(label="Command Center", description="Overview and quick-start guide", emoji="📊"),
             discord.SelectOption(label="Setups & Configuration", description="Server logs, backup & channels", emoji="⚙️"),
@@ -157,6 +166,7 @@ class MenuSelect(discord.ui.Select):
         super().__init__(placeholder="Select a category to view commands...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
+        p = self.prefix
         if self.values[0] == "Command Center":
             embed = discord.Embed(
                 title="Moonlight Heaven",
@@ -164,9 +174,9 @@ class MenuSelect(discord.ui.Select):
                     "**Command Center**\n"
                     "Clean, reliable server management and interactive utility.\n\n"
                     "**Quick Start:**\n"
-                    "• **View Menu** : Type `&menu`\n"
-                    "• **Server Info** : Type `&si`\n"
-                    "• **Check Stats** : Type `&m`, `&i`, `&v`\n"
+                    f"• **View Menu** : Type `{p}menu`\n"
+                    f"• **Server Info** : Type `{p}si`\n"
+                    f"• **Check Stats** : Type `{p}m`, `{p}i`, `{p}v`\n"
                     "• **Developer** : Created by **Zeus** ✨"
                 ),
                 color=discord.Color.blurple()
@@ -176,11 +186,12 @@ class MenuSelect(discord.ui.Select):
                 title="⚙️ Setups & Configuration",
                 description=(
                     "Manage your server logging and custom features seamlessly.\n\n"
-                    "• `&setup` - Create all automated log channels\n"
-                    "• `&nicknamesetup` - Create instant nickname change channel\n"
-                    "• `&birthdaysetup` - Create birthday collection channel\n"
-                    "• `&backup` - Take manual server layout backup\n"
-                    "• `&restore` - Restore server structure from backup"
+                    f"• `{p}setup` - Create all automated log channels\n"
+                    f"• `{p}nicknamesetup` - Create instant nickname change channel\n"
+                    f"• `{p}birthdaysetup` - Create birthday collection channel\n"
+                    f"• `{p}backup` - Take manual server layout backup\n"
+                    f"• `{p}restore` - Restore server structure from backup\n"
+                    f"• `{p}setprefix [prefix]` - Change server prefix"
                 ),
                 color=discord.Color.blurple()
             )
@@ -189,12 +200,12 @@ class MenuSelect(discord.ui.Select):
                 title="📈 Statistics & Tracking",
                 description=(
                     "Keep track of member activity in real time.\n\n"
-                    "• `&m [user]` - Check message count\n"
-                    "• `&i [user]` - Check invite count\n"
-                    "• `&v [user]` - Check voice channel time\n"
-                    "• `&rm [user/all]` - Reset messages\n"
-                    "• `&ri [user]` - Reset invites\n"
-                    "• `&rv [user/all]` - Reset voice time"
+                    f"• `{p}m [user]` - Check message count\n"
+                    f"• `{p}i [user]` - Check invite count\n"
+                    f"• `{p}v [user]` - Check voice channel time\n"
+                    f"• `{p}rm [user/all]` - Reset messages\n"
+                    f"• `{p}ri [user]` - Reset invites\n"
+                    f"• `{p}rv [user/all]` - Reset voice time"
                 ),
                 color=discord.Color.blurple()
             )
@@ -203,16 +214,16 @@ class MenuSelect(discord.ui.Select):
                 title="🛡️ Moderation & Admin",
                 description=(
                     "Powerful tools to maintain order and discipline.\n\n"
-                    "• `&addrole [user] [role]` - Add a role to user\n"
-                    "• `&removerole [user] [role]` - Remove a role from user\n"
-                    "• `&hide [channel]` - Hide a channel\n"
-                    "• `&show [channel]` - Show a channel\n"
-                    "• `&lock [channel]` - Lock a channel\n"
-                    "• `&unlock [channel]` - Unlock a channel\n"
-                    "• `&timeout [user] [mins]` - Timeout a member\n"
-                    "• `&kick [user]` - Kick a member\n"
-                    "• `&ban [user]` - Ban a member\n"
-                    "• `&clear [amount]` - Purge messages"
+                    f"• `{p}addrole [user] [role]` - Add a role to user\n"
+                    f"• `{p}removerole [user] [role]` - Remove a role from user\n"
+                    f"• `{p}hide [channel]` - Hide a channel\n"
+                    f"• `{p}show [channel]` - Show a channel\n"
+                    f"• `{p}lock [channel]` - Lock a channel\n"
+                    f"• `{p}unlock [channel]` - Unlock a channel\n"
+                    f"• `{p}timeout [user] [mins]` - Timeout a member\n"
+                    f"• `{p}kick [user]` - Kick a member\n"
+                    f"• `{p}ban [user]` - Ban a member\n"
+                    f"• `{p}clear [amount]` - Purge messages"
                 ),
                 color=discord.Color.blurple()
             )
@@ -221,10 +232,10 @@ class MenuSelect(discord.ui.Select):
                 title="🛠️ Utility & Tools",
                 description=(
                     "Handy utilities for everyday engagement.\n\n"
-                    "• `&afk [reason]` - Set custom AFK status\n"
-                    "• `&say [msg]` - Send anonymous bot message\n"
-                    "• `&reply [link] [msg]` - Reply directly to message link\n"
-                    "• `&si` - View detailed server information"
+                    f"• `{p}afk [reason]` - Set custom AFK status\n"
+                    f"• `{p}say [msg]` - Send anonymous bot message\n"
+                    f"• `{p}reply [link] [msg]` - Reply directly to message link\n"
+                    f"• `{p}si` - View detailed server information"
                 ),
                 color=discord.Color.blurple()
             )
@@ -233,9 +244,9 @@ class MenuSelect(discord.ui.Select):
         await interaction.response.edit_message(embed=embed)
 
 class MenuView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, prefix):
         super().__init__(timeout=180)
-        self.add_item(MenuSelect())
+        self.add_item(MenuSelect(prefix))
 
 
 # --- EVENTS & CHANNELS LOGIC ---
@@ -564,26 +575,48 @@ async def restore_server(ctx):
         await msg.edit(content=None, embed=discord.Embed(title="❌ Restore Failed", description=f"• **Details** : `{e}`", color=discord.Color.red()).set_footer(text="Moonlight Heaven • Developed by Zeus"))
 
 
+@bot.command(name='setprefix')
+@commands.has_permissions(administrator=True)
+async def setprefix(ctx, new_prefix: str):
+    if len(new_prefix) > 5:
+        embed = discord.Embed(title="❌ Error", description="• **Details** : Prefix 5 characters se lamba nahi ho sakta.", color=discord.Color.red())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+        return
+        
+    guild_prefixes[ctx.guild.id] = new_prefix
+    save_data()
+    
+    embed = discord.Embed(
+        title="✨ Prefix Updated",
+        description=f"• **New Prefix** : `{new_prefix}`\n• **Status** : Ab aap is server mein `{new_prefix}` use kar sakte hain!",
+        color=discord.Color.green()
+    )
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
+
 # --- MENU & SERVERINFO COMMANDS ---
 
 @bot.command(name='menu', aliases=['help'])
 async def menu(ctx):
+    p = guild_prefixes.get(ctx.guild.id, "&") if ctx.guild else "&"
     embed = discord.Embed(
         title="Moonlight Heaven",
         description=(
             "**Command Center**\n"
             "Clean, reliable server management and interactive utility.\n\n"
             "**Quick Start:**\n"
-            "• **View Menu** : Type `&menu`\n"
-            "• **Server Info** : Type `&si`\n"
-            "• **Check Stats** : Type `&m`, `&i`, `&v`\n"
+            f"• **View Menu** : Type `{p}menu`\n"
+            f"• **Server Info** : Type `{p}si`\n"
+            f"• **Check Stats** : Type `{p}m`, `{p}i`, `{p}v`\n"
             "• **Developer** : Created by **Zeus** ✨\n\n"
             "*Select a category below to explore specific commands and permissions.*"
         ),
         color=discord.Color.blurple()
     )
     embed.set_footer(text="Moonlight Heaven • Command Center")
-    view = MenuView()
+    view = MenuView(p)
     await ctx.reply(embed=embed, view=view)
 
 @bot.command(name='si')
@@ -726,7 +759,7 @@ async def addrole(ctx, member: discord.Member, role: discord.Role):
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.reply(err_embed)
 
 @bot.command(name='removerole')
 @commands.has_permissions(manage_roles=True)
@@ -739,7 +772,7 @@ async def removerole(ctx, member: discord.Member, role: discord.Role):
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.reply(err_embed)
 
 @bot.command(name='hide')
 @commands.has_permissions(manage_channels=True)
@@ -753,7 +786,7 @@ async def hide(ctx, channel: discord.TextChannel = None):
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.reply(err_embed)
 
 @bot.command(name='show')
 @commands.has_permissions(manage_channels=True)
@@ -767,7 +800,7 @@ async def show(ctx, channel: discord.TextChannel = None):
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.reply(err_embed)
 
 @bot.command(name='lock')
 @commands.has_permissions(manage_channels=True)
@@ -781,7 +814,7 @@ async def lock(ctx, channel: discord.TextChannel = None):
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.reply(err_embed)
 
 @bot.command(name='unlock')
 @commands.has_permissions(manage_channels=True)
@@ -795,7 +828,7 @@ async def unlock(ctx, channel: discord.TextChannel = None):
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.reply(err_embed)
 
 
 # --- UTILITY & MODERATION COMMANDS ---
