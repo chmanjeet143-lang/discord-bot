@@ -1,5 +1,6 @@
-import os
+os
 import time
+import json
 import discord
 from discord.ext import commands, tasks
 from flask import Flask
@@ -32,14 +33,39 @@ intents.invites = True
 bot = commands.Bot(command_prefix="&", intents=intents)
 bot.remove_command("help")
 
-# Data Storage
+# --- Persistent Storage Functions (JSON Based) ---
+DATA_FILE = "bot_database.json"
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return {"logs": {}, "birthdays": {}, "backups": {}}
+
+def save_data():
+    data = {
+        "logs": guild_logs,
+        "birthdays": guild_birthdays,
+        "backups": server_backups
+    }
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+# Load data into memory on startup
+db = load_data()
+guild_logs = {int(k): v for k, v in db.get("logs", {}).items()}
+guild_birthdays = {int(k): v for k, v in db.get("birthdays", {}).items()}
+server_backups = {int(k): v for k, v in db.get("backups", {}).items()}
+
+# Data Storage for runtime
 user_messages = {}
 user_invites = {}
 user_voice_time = {}
 voice_join_timestamps = {}
 afk_users = {}
-guild_logs = {}
-guild_birthdays = {}
 
 def get_log_channel(guild_id, log_type):
     if guild_id in guild_logs and log_type in guild_logs[guild_id]:
@@ -52,14 +78,16 @@ def get_log_channel(guild_id, log_type):
 async def on_ready():
     if not daily_birthday_check.is_running():
         daily_birthday_check.start()
+    if not auto_backup_task.is_running():
+        auto_backup_task.start()
     print(f"----------------------------------------")
     print(f"Bot Name: Moonlight Heaven")
     print(f"Developer: Zeus")
-    print(f"Status: Online & Ready!")
+    print(f"Status: Online & Ready (Database Connected)!")
     print(f"----------------------------------------")
 
 
-# --- BACKGROUND TASK FOR BIRTHDAYS ---
+# --- BACKGROUND TASKS ---
 @tasks.loop(hours=24)
 async def daily_birthday_check():
     today = datetime.now().strftime("%d-%m")
@@ -73,8 +101,9 @@ async def daily_birthday_check():
         if not channel:
             continue
         
-        for user_id, bday in users_bday.items():
+        for user_id_str, bday in users_bday.items():
             if bday == today:
+                user_id = int(user_id_str)
                 member = guild.get_member(user_id) or await guild.fetch_member(user_id)
                 if member:
                     embed = discord.Embed(
@@ -85,6 +114,34 @@ async def daily_birthday_check():
                     embed.set_footer(text="Moonlight Heaven • Birthday Special")
                     await channel.send(content="@everyone", embed=embed)
 
+@tasks.loop(hours=6)
+async def auto_backup_task():
+    for guild in bot.guilds:
+        try:
+            backup_data = {
+                "categories": [],
+                "channels_without_category": []
+            }
+            for category in guild.categories:
+                cat_info = {
+                    "name": category.name,
+                    "position": category.position,
+                    "channels": [ch.name for ch in category.channels]
+                }
+                backup_data["categories"].append(cat_info)
+            
+            for channel in guild.text_channels:
+                if channel.category is None:
+                    backup_data["channels_without_category"].append(channel.name)
+            for channel in guild.voice_channels:
+                if channel.category is None:
+                    backup_data["channels_without_category"].append(channel.name)
+
+            server_backups[guild.id] = backup_data
+            save_data()
+        except Exception as e:
+            print(f"Auto backup failed for {guild.name}: {e}")
+
 
 # --- DROPDOWN SELECT MENU VIEW FOR &MENU ---
 
@@ -92,7 +149,7 @@ class MenuSelect(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(label="Command Center", description="Overview and quick-start guide", emoji="📊"),
-            discord.SelectOption(label="Setups & Configuration", description="Server logs, nickname & birthday setup", emoji="⚙️"),
+            discord.SelectOption(label="Setups & Configuration", description="Server logs, backup & channels", emoji="⚙️"),
             discord.SelectOption(label="Statistics & Tracking", description="Messages, invites, voice time & resets", emoji="📈"),
             discord.SelectOption(label="Moderation / Admin", description="Server activation, moderation & cleanup", emoji="🛡️"),
             discord.SelectOption(label="Utility & Tools", description="AFK, say, reply, server info", emoji="🛠️")
@@ -121,7 +178,9 @@ class MenuSelect(discord.ui.Select):
                     "Manage your server logging and custom features seamlessly.\n\n"
                     "• `&setup` - Create all automated log channels\n"
                     "• `&nicknamesetup` - Create instant nickname change channel\n"
-                    "• `&birthdaysetup` - Create birthday collection channel"
+                    "• `&birthdaysetup` - Create birthday collection channel\n"
+                    "• `&backup` - Take manual server layout backup\n"
+                    "• `&restore` - Restore server structure from backup"
                 ),
                 color=discord.Color.blurple()
             )
@@ -221,6 +280,7 @@ async def on_message(message):
             if guild_id not in guild_birthdays:
                 guild_birthdays[guild_id] = {'channel': message.channel.id, 'users': {}}
             guild_birthdays[guild_id]['users'][message.author.id] = formatted_bday
+            save_data() # Save permanently
             
             embed = discord.Embed(
                 title="🎂 Birthday Saved",
@@ -324,7 +384,7 @@ async def on_voice_state_update(member, before, after):
             await channel.send(embed=embed)
 
 
-# --- SETUP COMMANDS ---
+# --- SETUP & BACKUP COMMANDS ---
 
 @bot.command(name='setup')
 @commands.has_permissions(administrator=True)
@@ -360,6 +420,7 @@ async def setup(ctx):
             'logs': logs_ch.id,
             'nickname': nick_ch.id
         }
+        save_data() # Save permanently
 
         embed = discord.Embed(
             title="⚡ Setup Complete",
@@ -390,6 +451,7 @@ async def nicknamesetup(ctx):
         if guild.id not in guild_logs:
             guild_logs[guild.id] = {}
         guild_logs[guild.id]['nickname'] = nick_ch.id
+        save_data() # Save permanently
 
         embed = discord.Embed(
             title="✨ Nickname Setup Complete",
@@ -419,6 +481,7 @@ async def birthdaysetup(ctx):
         guild_birthdays[guild.id]['channel'] = bday_ch.id
         if 'users' not in guild_birthdays[guild.id]:
             guild_birthdays[guild.id]['users'] = {}
+        save_data() # Save permanently
 
         embed = discord.Embed(
             title="🎂 Birthday Setup Complete",
@@ -431,6 +494,69 @@ async def birthdaysetup(ctx):
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
         await ctx.reply(embed=err_embed)
+
+
+@bot.command(name='backup')
+@commands.has_permissions(administrator=True)
+async def backup_server(ctx):
+    guild = ctx.guild
+    try:
+        backup_data = {
+            "categories": [],
+            "channels_without_category": []
+        }
+        for category in guild.categories:
+            cat_info = {
+                "name": category.name,
+                "position": category.position,
+                "channels": [ch.name for ch in category.channels]
+            }
+            backup_data["categories"].append(cat_info)
+        
+        for channel in guild.text_channels:
+            if channel.category is None:
+                backup_data["channels_without_category"].append(channel.name)
+        for channel in guild.voice_channels:
+            if channel.category is None:
+                backup_data["channels_without_category"].append(channel.name)
+
+        server_backups[guild.id] = backup_data
+        save_data() # Save permanently
+        
+        embed = discord.Embed(title="💾 Backup Successful", description="• **Status** : Server layout backup saved successfully! (Also runs automatically every 6 hours).", color=discord.Color.green())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=err_embed)
+
+
+@bot.command(name='restore')
+@commands.has_permissions(administrator=True)
+async def restore_server(ctx):
+    guild = ctx.guild
+    if guild.id not in server_backups:
+        embed = discord.Embed(title="⚠️ No Backup Found", description="• **Status** : Please run `&backup` first or wait for the automatic 6-hour backup.", color=discord.Color.orange())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+        return
+
+    backup = server_backups[guild.id]
+    msg = await ctx.reply("🔄 Restoring server categories and channels from backup...")
+
+    try:
+        for cat_data in backup["categories"]:
+            category = await guild.create_category(cat_data["name"])
+            for ch_name in cat_data["channels"]:
+                await guild.create_text_channel(ch_name, category=category)
+        
+        for ch_name in backup["channels_without_category"]:
+            await guild.create_text_channel(ch_name)
+
+        await msg.edit(content=None, embed=discord.Embed(title="✅ Restore Complete", description="• **Status** : Server categories and channels have been restored from backup structure!", color=discord.Color.green()).set_footer(text="Moonlight Heaven • Developed by Zeus"))
+    except Exception as e:
+        await msg.edit(content=None, embed=discord.Embed(title="❌ Restore Failed", description=f"• **Details** : `{e}`", color=discord.Color.red()).set_footer(text="Moonlight Heaven • Developed by Zeus"))
 
 
 # --- MENU & SERVERINFO COMMANDS ---
@@ -530,7 +656,7 @@ async def check_voice(ctx, member: discord.Member = None):
     await ctx.reply(embed=embed)
 
 
-# --- RESET COMMANDS (Support for User or 'all') ---
+# --- RESET COMMANDS ---
 
 @bot.command(name='rm')
 @commands.has_permissions(administrator=True)
@@ -563,7 +689,6 @@ async def reset_voice(ctx, target: str):
     if target.lower() == "all":
         user_voice_time.clear()
         voice_join_timestamps.clear()
-        # Active users ko wapas timestamp de do taaki current session track hota rahe
         for vc_channel in ctx.guild.voice_channels:
             for member in vc_channel.members:
                 if not member.bot:
