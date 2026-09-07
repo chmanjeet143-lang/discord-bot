@@ -151,7 +151,7 @@ class MenuSelect(discord.ui.Select):
             discord.SelectOption(label="Command Center", description="Overview and quick-start guide", emoji="📊"),
             discord.SelectOption(label="Setups & Configuration", description="Server logs, backup & channels", emoji="⚙️"),
             discord.SelectOption(label="Statistics & Tracking", description="Messages, invites, voice time & resets", emoji="📈"),
-            discord.SelectOption(label="Moderation / Admin", description="Server activation, moderation & cleanup", emoji="🛡️"),
+            discord.SelectOption(label="Moderation / Admin", description="Server activation, roles & cleanup", emoji="🛡️"),
             discord.SelectOption(label="Utility & Tools", description="AFK, say, reply, server info", emoji="🛠️")
         ]
         super().__init__(placeholder="Select a category to view commands...", min_values=1, max_values=1, options=options)
@@ -203,11 +203,16 @@ class MenuSelect(discord.ui.Select):
                 title="🛡️ Moderation & Admin",
                 description=(
                     "Powerful tools to maintain order and discipline.\n\n"
+                    "• `&addrole [user] [role]` - Add a role to user\n"
+                    "• `&removerole [user] [role]` - Remove a role from user\n"
+                    "• `&hide [channel]` - Hide a channel\n"
+                    "• `&show [channel]` - Show a channel\n"
+                    "• `&lock [channel]` - Lock a channel\n"
+                    "• `&unlock [channel]` - Unlock a channel\n"
                     "• `&timeout [user] [mins]` - Timeout a member\n"
-                    "• `&kick [user]` - Kick a member from server\n"
-                    "• `&ban [user]` - Ban a member permanently\n"
-                    "• `&unban [username]` - Unban a member\n"
-                    "• `&clear [amount]` - Purge chat messages"
+                    "• `&kick [user]` - Kick a member\n"
+                    "• `&ban [user]` - Ban a member\n"
+                    "• `&clear [amount]` - Purge messages"
                 ),
                 color=discord.Color.blurple()
             )
@@ -218,7 +223,7 @@ class MenuSelect(discord.ui.Select):
                     "Handy utilities for everyday engagement.\n\n"
                     "• `&afk [reason]` - Set custom AFK status\n"
                     "• `&say [msg]` - Send anonymous bot message\n"
-                    "• `&reply [link] [msg]` - Reply directly to any message link\n"
+                    "• `&reply [link] [msg]` - Reply directly to message link\n"
                     "• `&si` - View detailed server information"
                 ),
                 color=discord.Color.blurple()
@@ -280,7 +285,7 @@ async def on_message(message):
             if guild_id not in guild_birthdays:
                 guild_birthdays[guild_id] = {'channel': message.channel.id, 'users': {}}
             guild_birthdays[guild_id]['users'][message.author.id] = formatted_bday
-            save_data() # Save permanently
+            save_data()
             
             embed = discord.Embed(
                 title="🎂 Birthday Saved",
@@ -420,7 +425,7 @@ async def setup(ctx):
             'logs': logs_ch.id,
             'nickname': nick_ch.id
         }
-        save_data() # Save permanently
+        save_data()
 
         embed = discord.Embed(
             title="⚡ Setup Complete",
@@ -451,7 +456,7 @@ async def nicknamesetup(ctx):
         if guild.id not in guild_logs:
             guild_logs[guild.id] = {}
         guild_logs[guild.id]['nickname'] = nick_ch.id
-        save_data() # Save permanently
+        save_data()
 
         embed = discord.Embed(
             title="✨ Nickname Setup Complete",
@@ -481,7 +486,7 @@ async def birthdaysetup(ctx):
         guild_birthdays[guild.id]['channel'] = bday_ch.id
         if 'users' not in guild_birthdays[guild.id]:
             guild_birthdays[guild.id]['users'] = {}
-        save_data() # Save permanently
+        save_data()
 
         embed = discord.Embed(
             title="🎂 Birthday Setup Complete",
@@ -521,7 +526,7 @@ async def backup_server(ctx):
                 backup_data["channels_without_category"].append(channel.name)
 
         server_backups[guild.id] = backup_data
-        save_data() # Save permanently
+        save_data()
         
         embed = discord.Embed(title="💾 Backup Successful", description="• **Status** : Server layout backup saved successfully! (Also runs automatically every 6 hours).", color=discord.Color.green())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
@@ -706,6 +711,91 @@ async def reset_voice(ctx, target: str):
             
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
     await ctx.reply(embed=embed)
+
+
+# --- NEW ROLE & CHANNEL CONTROL COMMANDS ---
+
+@bot.command(name='addrole')
+@commands.has_permissions(manage_roles=True)
+async def addrole(ctx, member: discord.Member, role: discord.Role):
+    try:
+        await member.add_roles(role)
+        embed = discord.Embed(title="✅ Role Added", description=f"• **User** : {member.mention}\n• **Role** : {role.mention}\n• **Status** : Successfully added!", color=discord.Color.green())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=err_embed)
+
+@bot.command(name='removerole')
+@commands.has_permissions(manage_roles=True)
+async def removerole(ctx, member: discord.Member, role: discord.Role):
+    try:
+        await member.remove_roles(role)
+        embed = discord.Embed(title="✅ Role Removed", description=f"• **User** : {member.mention}\n• **Role** : {role.mention}\n• **Status** : Successfully removed!", color=discord.Color.orange())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=err_embed)
+
+@bot.command(name='hide')
+@commands.has_permissions(manage_channels=True)
+async def hide(ctx, channel: discord.TextChannel = None):
+    target_channel = channel or ctx.channel
+    try:
+        await target_channel.set_permissions(ctx.guild.default_role, read_messages=False)
+        embed = discord.Embed(title="🔒 Channel Hidden", description=f"• **Channel** : {target_channel.mention}\n• **Status** : Hidden from `@everyone`.", color=discord.Color.orange())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=err_embed)
+
+@bot.command(name='show')
+@commands.has_permissions(manage_channels=True)
+async def show(ctx, channel: discord.TextChannel = None):
+    target_channel = channel or ctx.channel
+    try:
+        await target_channel.set_permissions(ctx.guild.default_role, read_messages=True)
+        embed = discord.Embed(title="🔓 Channel Visible", description=f"• **Channel** : {target_channel.mention}\n• **Status** : Visible to `@everyone`.", color=discord.Color.green())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=err_embed)
+
+@bot.command(name='lock')
+@commands.has_permissions(manage_channels=True)
+async def lock(ctx, channel: discord.TextChannel = None):
+    target_channel = channel or ctx.channel
+    try:
+        await target_channel.set_permissions(ctx.guild.default_role, send_messages=False)
+        embed = discord.Embed(title="🔒 Channel Locked", description=f"• **Channel** : {target_channel.mention}\n• **Status** : Locked for `@everyone`.", color=discord.Color.orange())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=err_embed)
+
+@bot.command(name='unlock')
+@commands.has_permissions(manage_channels=True)
+async def unlock(ctx, channel: discord.TextChannel = None):
+    target_channel = channel or ctx.channel
+    try:
+        await target_channel.set_permissions(ctx.guild.default_role, send_messages=True)
+        embed = discord.Embed(title="🔓 Channel Unlocked", description=f"• **Channel** : {target_channel.mention}\n• **Status** : Unlocked for `@everyone`.", color=discord.Color.green())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=err_embed)
 
 
 # --- UTILITY & MODERATION COMMANDS ---
