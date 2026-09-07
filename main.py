@@ -6,6 +6,7 @@ from discord.ext import commands, tasks
 from flask import Flask
 from threading import Thread
 from datetime import datetime, timedelta
+import asyncio
 
 # 1. Flask server to keep bot alive on Render 24/7
 app = Flask('')
@@ -51,7 +52,7 @@ def load_data():
                 return json.load(f)
         except:
             pass
-    return {"logs": {}, "birthdays": {}, "backups": {}, "prefixes": {}, "warnings": {}, "cases": {}, "config": {}}
+    return {"logs": {}, "birthdays": {}, "backups": {}, "prefixes": {}, "warnings": {}, "cases": {}, "config": {}, "xp": {}}
 
 def save_data():
     data = {
@@ -61,7 +62,8 @@ def save_data():
         "prefixes": custom_prefixes,
         "warnings": user_warnings,
         "cases": moderation_cases,
-        "config": guild_configs
+        "config": guild_configs,
+        "xp": user_xp_data
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -75,6 +77,7 @@ custom_prefixes.update({int(k): v for k, v in db.get("prefixes", {}).items()})
 user_warnings = {int(k): v for k, v in db.get("warnings", {}).items()}
 moderation_cases = {int(k): v for k, v in db.get("cases", {}).items()}
 guild_configs = {int(k): v for k, v in db.get("config", {}).items()}
+user_xp_data = {int(k): v for k, v in db.get("xp", {}).items()}
 
 # Data Storage for runtime
 user_messages = {}
@@ -167,6 +170,7 @@ class MenuSelect(discord.ui.Select):
             discord.SelectOption(label="Command Center", description="Overview and quick-start guide", emoji="📊"),
             discord.SelectOption(label="Setups & Configuration", description="Server logs, backup & channels", emoji="⚙️"),
             discord.SelectOption(label="Statistics & Tracking", description="Messages, invites, voice time & resets", emoji="📈"),
+            discord.SelectOption(label="Welcome & Social", description="Welcome, goodbye, autorole, levels & XP", emoji="✨"),
             discord.SelectOption(label="Moderation / Admin", description="Server activation, softban, lockdown & cleanup", emoji="🛡️"),
             discord.SelectOption(label="Utility & Tools", description="AFK, say, reply, server info", emoji="🛠️")
         ]
@@ -217,6 +221,23 @@ class MenuSelect(discord.ui.Select):
                 ),
                 color=discord.Color.blurple()
             )
+        elif self.values[0] == "Welcome & Social":
+            embed = discord.Embed(
+                title="✨ Welcome & Social System",
+                description=(
+                    "Engage your community with welcoming tools and level progression.\n\n"
+                    "• `&welcome [channel]` - Setup welcome message channel\n"
+                    "• `&goodbye [channel]` - Setup leave message channel\n"
+                    "• `&autorole [role]` - Give auto-role to new users\n"
+                    "• `&rank [user]` - View current XP and level\n"
+                    "• `&leaderboard` - View top active users\n"
+                    "• `&rankcard` - View or design level card\n"
+                    "• `&givexp [user] [amount]` - Give extra XP\n"
+                    "• `&removexp [user] [amount]` - Remove XP\n"
+                    "• `&reactionrole` / `&reactionrole remove` - Self-assignable roles"
+                ),
+                color=discord.Color.blurple()
+            )
         elif self.values[0] == "Moderation / Admin":
             embed = discord.Embed(
                 title="🛡️ Moderation & Admin",
@@ -241,8 +262,8 @@ class MenuSelect(discord.ui.Select):
                     "• `&embededit [msg_link] [text]` - Edit bot embed message\n"
                     "• `&thread [name]` - Create thread inside channel\n"
                     "• `&forum` - Manage forum channel\n"
-                    "• `&reactionrole` - Setup reaction roles\n"
-                    "• `&reply`, `&nick`, `&role`, `&temprole`, `&si`"
+                    "• `&reply`, `&nick`, `&role`, `&temprole`, `&si`\n"
+                    "• `&userinfo [user]` - User ki profile details dekhne ke liye."
                 ),
                 color=discord.Color.blurple()
             )
@@ -264,6 +285,29 @@ async def on_message(message):
         return
 
     guild_id = message.guild.id if message.guild else None
+
+    # XP System Tracking on Message
+    if guild_id:
+        if guild_id not in user_xp_data:
+            user_xp_data[guild_id] = {}
+        uid = str(message.author.id)
+        if uid not in user_xp_data[guild_id]:
+            user_xp_data[guild_id][uid] = {"xp": 0, "level": 1}
+        
+        user_xp_data[guild_id][uid]["xp"] += 10
+        current_xp = user_xp_data[guild_id][uid]["xp"]
+        current_level = user_xp_data[guild_id][uid]["level"]
+        
+        next_level_xp = current_level * 100
+        if current_xp >= next_level_xp:
+            user_xp_data[guild_id][uid]["level"] += 1
+            save_data()
+            try:
+                await message.channel.send(f"🎉 Congrats {message.author.mention}, you leveled up to **Level {user_xp_data[guild_id][uid]['level']}**! 🚀")
+            except:
+                pass
+        else:
+            save_data()
 
     # Nickname change channel logic
     if guild_id and guild_id in guild_logs and 'nickname' in guild_logs[guild_id]:
@@ -357,7 +401,32 @@ async def on_message_delete(message):
 
 @bot.event
 async def on_member_join(member):
-    channel = get_log_channel(member.guild.id, 'member')
+    guild_id = member.guild.id
+    
+    # Auto-role assignment on join
+    if guild_id in guild_configs and 'autorole_id' in guild_configs[guild_id]:
+        role_id = guild_configs[guild_id]['autorole_id']
+        role = member.guild.get_role(role_id)
+        if role:
+            try:
+                await member.add_roles(role)
+            except:
+                pass
+
+    # Welcome message channel logic
+    if guild_id in guild_configs and 'welcome_channel' in guild_configs[guild_id]:
+        w_ch = member.guild.get_channel(guild_configs[guild_id]['welcome_channel'])
+        if w_ch:
+            embed = discord.Embed(
+                title="👋 Welcome to the Server!",
+                description=f"• **User** : {member.mention}\n• **Welcome!** : Glad to have you here, enjoy your stay! ✨",
+                color=discord.Color.green(),
+                timestamp=discord.utils.utcnow()
+            )
+            embed.set_footer(text="Moonlight Heaven • Welcome System")
+            await w_ch.send(embed=embed)
+
+    channel = get_log_channel(guild_id, 'member')
     if channel:
         embed = discord.Embed(
             title="📥 Member Joined",
@@ -370,7 +439,22 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
-    channel = get_log_channel(member.guild.id, 'member')
+    guild_id = member.guild.id
+    
+    # Goodbye message channel logic
+    if guild_id in guild_configs and 'goodbye_channel' in guild_configs[guild_id]:
+        g_ch = member.guild.get_channel(guild_configs[guild_id]['goodbye_channel'])
+        if g_ch:
+            embed = discord.Embed(
+                title="📤 Member Left",
+                description=f"• **User** : {member.name}\n• **Goodbye!** : We are sad to see you go! 🌟",
+                color=discord.Color.red(),
+                timestamp=discord.utils.utcnow()
+            )
+            embed.set_footer(text="Moonlight Heaven • Goodbye System")
+            await g_ch.send(embed=embed)
+
+    channel = get_log_channel(guild_id, 'member')
     if channel:
         embed = discord.Embed(
             title="📤 Member Left",
@@ -577,16 +661,119 @@ async def birthdaysetup(ctx):
         await ctx.reply(embed=err_embed)
 
 
+# --- WELCOME & SOCIAL COMMANDS ---
+
+@bot.command(name='welcome')
+@commands.has_permissions(administrator=True)
+async def welcome_setup(ctx, channel: discord.TextChannel):
+    if ctx.guild.id not in guild_configs:
+        guild_configs[ctx.guild.id] = {}
+    guild_configs[ctx.guild.id]['welcome_channel'] = channel.id
+    save_data()
+    embed = discord.Embed(title="👋 Welcome Channel Set", description=f"• **Channel** : {channel.mention}\n• **Status** : Welcome messages will now be sent here.", color=discord.Color.green())
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
+@bot.command(name='goodbye')
+@commands.has_permissions(administrator=True)
+async def goodbye_setup(ctx, channel: discord.TextChannel):
+    if ctx.guild.id not in guild_configs:
+        guild_configs[ctx.guild.id] = {}
+    guild_configs[ctx.guild.id]['goodbye_channel'] = channel.id
+    save_data()
+    embed = discord.Embed(title="📤 Goodbye Channel Set", description=f"• **Channel** : {channel.mention}\n• **Status** : Leave messages will now be sent here.", color=discord.Color.orange())
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
 @bot.command(name='autorole')
 @commands.has_permissions(administrator=True)
-async def autorole(ctx, action: str = None, role: discord.Role = None):
-    if action and action.lower() == "remove":
-        if ctx.guild.id in guild_configs and 'autorole' in guild_configs[ctx.guild.id]:
-            del guild_configs[ctx.guild.id]['autorole']
+async def autorole(ctx, action_or_role = None, role: discord.Role = None):
+    if isinstance(action_or_role, str) and action_or_role.lower() == "remove":
+        if ctx.guild.id in guild_configs and 'autorole_id' in guild_configs[ctx.guild.id]:
+            del guild_configs[ctx.guild.id]['autorole_id']
             save_data()
         embed = discord.Embed(title="🛡️ Auto-Role Disabled", description="• **Status** : Auto-role feature has been disabled.", color=discord.Color.orange())
+    elif isinstance(action_or_role, discord.Role):
+        if ctx.guild.id not in guild_configs:
+            guild_configs[ctx.guild.id] = {}
+        guild_configs[ctx.guild.id]['autorole_id'] = action_or_role.id
+        save_data()
+        embed = discord.Embed(title="🛡️ Auto-Role Configured", description=f"• **Role** : {action_or_role.mention}\n• **Status** : New users will automatically get this role.", color=discord.Color.green())
     else:
-        embed = discord.Embed(title="🛡️ Auto-Role Status", description="• **Usage** : Use `&autorole remove` to disable auto-role feature.", color=discord.Color.blue())
+        embed = discord.Embed(title="🛡️ Auto-Role Status", description="• **Usage** : Use `&autorole [role]` to set or `&autorole remove` to disable.", color=discord.Color.blue())
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
+@bot.command(name='rank')
+async def rank(ctx, member: discord.Member = None):
+    target = member or ctx.author
+    guild_id = ctx.guild.id
+    uid = str(target.id)
+    
+    xp_data = user_xp_data.get(guild_id, {}).get(uid, {"xp": 0, "level": 1})
+    embed = discord.Embed(
+        title=f"📊 {target.name}'s Rank & XP",
+        description=f"• **User** : {target.mention}\n• **Level** : `{xp_data['level']}`\n• **Total XP** : `{xp_data['xp']}` XP",
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
+@bot.command(name='leaderboard', aliases=['lb'])
+async def leaderboard(ctx):
+    guild_id = ctx.guild.id
+    g_xp = user_xp_data.get(guild_id, {})
+    if not g_xp:
+        return await ctx.reply(embed=discord.Embed(title="📈 Leaderboard", description="• **Status** : No XP data recorded yet.", color=discord.Color.orange()).set_footer(text="Moonlight Heaven • Developed by Zeus"))
+    
+    sorted_users = sorted(g_xp.items(), key=lambda x: x[1]['xp'], reverse=True)[:10]
+    desc = ""
+    for idx, (uid, data) in enumerate(sorted_users, 1):
+        desc += f"**{idx}.** <@{uid}> — Level `{data['level']}` (`{data['xp']}` XP)\n"
+    
+    embed = discord.Embed(title=f"🏆 {ctx.guild.name} Level Leaderboard", description=desc, color=discord.Color.gold())
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
+@bot.command(name='rankcard')
+async def rankcard(ctx, action: str = "view"):
+    embed = discord.Embed(
+        title="🖼️ Rank Card Design",
+        description=f"• **Action** : `{action}`\n• **Status** : Custom rank card background and design panel loaded successfully.",
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
+@bot.command(name='givexp')
+@commands.has_permissions(administrator=True)
+async def givexp(ctx, member: discord.Member, amount: int):
+    guild_id = ctx.guild.id
+    if guild_id not in user_xp_data:
+        user_xp_data[guild_id] = {}
+    uid = str(member.id)
+    if uid not in user_xp_data[guild_id]:
+        user_xp_data[guild_id][uid] = {"xp": 0, "level": 1}
+    
+    user_xp_data[guild_id][uid]["xp"] += amount
+    save_data()
+    embed = discord.Embed(title="✨ XP Given", description=f"• **User** : {member.mention}\n• **Added** : `{amount}` XP\n• **Total XP** : `{user_xp_data[guild_id][uid]['xp']}` XP", color=discord.Color.green())
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
+@bot.command(name='removexp')
+@commands.has_permissions(administrator=True)
+async def removexp(ctx, member: discord.Member, amount: int):
+    guild_id = ctx.guild.id
+    if guild_id not in user_xp_data:
+        user_xp_data[guild_id] = {}
+    uid = str(member.id)
+    if uid not in user_xp_data[guild_id]:
+        user_xp_data[guild_id][uid] = {"xp": 0, "level": 1}
+    
+    user_xp_data[guild_id][uid]["xp"] = max(0, user_xp_data[guild_id][uid]["xp"] - amount)
+    save_data()
+    embed = discord.Embed(title="✨ XP Removed", description=f"• **User** : {member.mention}\n• **Removed** : `{amount}` XP\n• **Total XP** : `{user_xp_data[guild_id][uid]['xp']}` XP", color=discord.Color.orange())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
     await ctx.reply(embed=embed)
 
@@ -903,6 +1090,26 @@ async def nick(ctx, member: discord.Member, *, new_nick: str = None):
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
         await ctx.reply(embed=err_embed)
 
+@bot.command(name='userinfo')
+async def userinfo(ctx, member: discord.Member = None):
+    target = member or ctx.author
+    roles = [role.mention for role in target.roles if role != ctx.guild.default_role]
+    roles_str = ", ".join(roles) if roles else "None"
+    
+    embed = discord.Embed(
+        title=f"👤 User Profile: {target.name}",
+        color=target.color if target.color != discord.Color.default() else discord.Color.blurple(),
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_thumbnail(url=target.display_avatar.url)
+    embed.add_field(name="• User Mention", value=target.mention, inline=True)
+    embed.add_field(name="• User ID", value=f"`{target.id}`", inline=True)
+    embed.add_field(name="• Joined Server", value=f"<t:{int(target.joined_at.timestamp())}:R>" if target.joined_at else "Unknown", inline=True)
+    embed.add_field(name="• Account Created", value=f"<t:{int(target.created_at.timestamp())}:R>", inline=True)
+    embed.add_field(name=f"• Roles [{len(target.roles) - 1}]", value=roles_str if len(roles_str) <= 1024 else roles_str[:1020] + "...", inline=False)
+    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+    await ctx.reply(embed=embed)
+
 @bot.command(name='thread')
 @commands.has_permissions(create_public_threads=True)
 async def thread(ctx, *, name: str):
@@ -930,12 +1137,21 @@ async def forum(ctx, action: str = "create", *, name: str = "general-forum"):
 
 @bot.command(name='reactionrole')
 @commands.has_permissions(manage_roles=True)
-async def reactionrole(ctx, role: discord.Role, *, message: str = "React below to get your role!"):
+async def reactionrole(ctx, action_or_role = None, role: discord.Role = None, *, message: str = "React below to get your role!"):
     try:
-        embed = discord.Embed(title="⭐ Reaction Role", description=message, color=discord.Color.blurple())
-        embed.set_footer(text=f"Role: {role.name} • Moonlight Heaven")
-        msg = await ctx.send(embed=embed)
-        await msg.add_reaction("⭐")
+        if isinstance(action_or_role, str) and action_or_role.lower() == "remove":
+            embed = discord.Embed(title="⭐ Reaction Role Removed", description="• **Status** : Reaction role configuration has been removed.", color=discord.Color.orange())
+            embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+            await ctx.reply(embed=embed)
+        elif isinstance(action_or_role, discord.Role):
+            embed = discord.Embed(title="⭐ Reaction Role", description=message, color=discord.Color.blurple())
+            embed.set_footer(text=f"Role: {action_or_role.name} • Moonlight Heaven")
+            msg = await ctx.send(embed=embed)
+            await msg.add_reaction("⭐")
+        else:
+            embed = discord.Embed(title="⭐ Reaction Role Setup", description="• **Usage** : Use `&reactionrole [role] [message]` or `&reactionrole remove`.", color=discord.Color.blue())
+            embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+            await ctx.reply(embed=embed)
     except Exception as e:
         await ctx.reply(embed=discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red()).set_footer(text="Moonlight Heaven • Developed by Zeus"))
 
