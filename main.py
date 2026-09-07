@@ -1,11 +1,11 @@
-Import os
+import os
 import time
 import json
 import discord
 from discord.ext import commands, tasks
 from flask import Flask
 from threading import Thread
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 1. Flask server to keep bot alive on Render 24/7
 app = Flask('')
@@ -821,7 +821,7 @@ async def reply_msg(ctx, message_link: str, *, message: str):
 @bot.command(name='timeout')
 @commands.has_permissions(moderate_members=True)
 async def timeout_member(ctx, member: discord.Member, minutes: int, *, reason="No reason provided"):
-    duration = discord.utils.utcnow() + discord.utils.timedelta(minutes=minutes)
+    duration = discord.utils.utcnow() + timedelta(minutes=minutes)
     await member.timeout(duration, reason=reason)
     embed = discord.Embed(title="⏳ Member Timed Out", description=f"• **User** : {member.mention}\n• **Duration** : `{minutes} minutes`\n• **Reason** : `{reason}`", color=discord.Color.red())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
@@ -852,18 +852,17 @@ async def ban(ctx, member: discord.Member, *, reason=None):
 
 @bot.command(name='unban')
 @commands.has_permissions(ban_members=True)
-async def unban(ctx, *, member_name):
-    banned_users = await ctx.guild.bans()
-    for ban_entry in banned_users:
-        if ban_entry.user.name == member_name:
-            await ctx.guild.unban(ban_entry.user)
-            embed = discord.Embed(title="🔓 Member Unbanned", description=f"• **User** : {ban_entry.user.mention}", color=discord.Color.green())
-            embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-            await ctx.reply(embed=embed)
-            return
-    embed = discord.Embed(title="⚠️ Warning", description="• **Status** : User not found in ban list.", color=discord.Color.orange())
-    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+async def unban(ctx, user_id: int):
+    try:
+        user = await bot.fetch_user(user_id)
+        await ctx.guild.unban(user)
+        embed = discord.Embed(title="🔓 Member Unbanned", description=f"• **User** : {user.mention}", color=discord.Color.green())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        embed = discord.Embed(title="⚠️ Warning", description=f"• **Status** : User not found or invalid ID. ({e})", color=discord.Color.orange())
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
 
 @bot.command(name='clear')
 @commands.has_permissions(manage_messages=True)
@@ -878,5 +877,3 @@ async def clear(ctx, amount: int = 5):
 if __name__ == "__main__":
     keep_alive()
     bot.run(os.environ.get("TOKEN"))
-
-Ye sb
