@@ -113,6 +113,51 @@ async def on_ready():
     print(f"----------------------------------------")
 
 
+# --- GLOBAL ERROR HANDLER ---
+@bot.event
+async def on_command_error(ctx, error):
+    p = ctx.prefix
+    
+    if isinstance(error, commands.CommandNotFound):
+        return
+
+    elif isinstance(error, commands.MissingRequiredArgument):
+        embed = discord.Embed(
+            title="⚠️ Missing Argument",
+            description=f"• **Error** : Kuch zaroori details gayab hain!\n• **Usage** : Is command ko use karne ka sahi tarika dekhein ya `{p}menu` check karein.",
+            color=discord.Color.orange()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+
+    elif isinstance(error, commands.MissingPermissions):
+        embed = discord.Embed(
+            title="🚫 Access Denied",
+            description="• **Error** : Aapke paas yeh command chalane ki permission nahi hai!",
+            color=discord.Color.red()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+
+    elif isinstance(error, commands.BotMissingPermissions):
+        embed = discord.Embed(
+            title="❌ Bot Missing Permissions",
+            description="• **Error** : Mere paas yeh action lene ke liye zaroori permissions nahi hain!",
+            color=discord.Color.red()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+
+    else:
+        embed = discord.Embed(
+            title="❌ Command Error",
+            description=f"• **Details** : `{error}`",
+            color=discord.Color.red()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+
+
 # --- BACKGROUND TASKS ---
 @tasks.loop(hours=24)
 async def daily_birthday_check():
@@ -446,7 +491,6 @@ async def on_message_delete(message):
 
 @bot.event
 async def on_member_join(member):
-    # Autorole logic
     guild_id = member.guild.id
     if guild_id in guild_autoroles:
         role_id = guild_autoroles[guild_id]
@@ -1138,12 +1182,34 @@ async def reply_msg(ctx, message_link: str, *, message: str):
 
 @bot.command(name='timeout')
 @commands.has_permissions(moderate_members=True)
-async def timeout_member(ctx, member: discord.Member, minutes: int, *, reason="No reason provided"):
-    duration = discord.utils.utcnow() + timedelta(minutes=minutes)
-    await member.timeout(duration, reason=reason)
-    embed = discord.Embed(title="⏳ Member Timed Out", description=f"• **User** : {member.mention}\n• **Duration** : `{minutes} minutes`\n• **Reason** : `{reason}`", color=discord.Color.red())
-    embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+async def timeout_member(ctx, member: discord.Member, time_str: str, *, reason="No reason provided"):
+    time_units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    unit = time_str[-1].lower()
+    
+    if unit not in time_units:
+        await ctx.reply("❌ Invalid time format! Use `s`, `m`, `h`, or `d`. Example: `1m`")
+        return
+    
+    try:
+        val = int(time_str[:-1])
+    except ValueError:
+        await ctx.reply("❌ Invalid time value! Example: `1m`, `30m`, `1h`")
+        return
+    
+    total_seconds = val * time_units[unit]
+    duration = discord.utils.utcnow() + timedelta(seconds=total_seconds)
+    
+    try:
+        await member.timeout(duration, reason=reason)
+        embed = discord.Embed(
+            title="⏳ Member Timed Out", 
+            description=f"• **User** : {member.mention}\n• **Duration** : `{time_str}`\n• **Reason** : `{reason}`", 
+            color=discord.Color.red()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.reply(embed=embed)
+    except Exception as e:
+        await ctx.reply(f"❌ Timeout failed: `{e}`. Make sure my role is higher than the target user's role!")
 
 @bot.command(name='afk')
 async def afk(ctx, *, reason="AFK"):
