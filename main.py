@@ -113,7 +113,7 @@ async def on_ready():
     print(f"----------------------------------------")
 
 
-# --- GLOBAL ERROR HANDLER ---
+# --- GLOBAL ERROR HANDLER (Correct Usage Feedback) ---
 @bot.event
 async def on_command_error(ctx, error):
     p = ctx.prefix
@@ -121,10 +121,11 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
 
-    elif isinstance(error, commands.MissingRequiredArgument):
+    elif isinstance(error, (commands.MissingRequiredArgument, commands.BadArgument)):
+        cmd_name = ctx.command.name if ctx.command else "command"
         embed = discord.Embed(
-            title="⚠️ Missing Argument",
-            description=f"• **Error** : Kuch zaroori details gayab hain!\n• **Usage** : Is command ko use karne ka sahi tarika dekhein ya `{p}menu` check karein.",
+            title="⚠️ Invalid Command Usage",
+            description=f"• **Error** : Kuch zaroori details galat hain ya gayab hain!\n• **Sahi Tarika** : `{p}{cmd_name}` ko use karne ka sahi tarika check karein ya `{p}menu` dekhein.",
             color=discord.Color.orange()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
@@ -151,7 +152,7 @@ async def on_command_error(ctx, error):
     else:
         embed = discord.Embed(
             title="❌ Command Error",
-            description=f"• **Details** : `{error}`",
+            description=f"• **Details** : `{error}`\n• **Tip** : `{p}menu` check karein.",
             color=discord.Color.red()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
@@ -224,7 +225,7 @@ class MenuSelect(discord.ui.Select):
             discord.SelectOption(label="Setups & Configuration", description="Server logs, backup, autorole & tickets", emoji="⚙️"),
             discord.SelectOption(label="Statistics & Tracking", description="Messages, invites, voice time & resets", emoji="📈"),
             discord.SelectOption(label="Moderation / Admin", description="Warns, automod, massban & cleanup", emoji="🛡️"),
-            discord.SelectOption(label="Utility & Tools", description="Weather, urban, translate, confessions", emoji="🛠️")
+            discord.SelectOption(label="Utility & Tools", description="Weather, confessions & tools", emoji="🛠️")
         ]
         super().__init__(placeholder="Select a category to view commands...", min_values=1, max_values=1, options=options)
 
@@ -291,10 +292,8 @@ class MenuSelect(discord.ui.Select):
             embed = discord.Embed(
                 title="🛠️ Utility & Tools",
                 description=(
-                    "Useful utilities, lookups, translations, and confessions.\n\n"
-                    f"• `{p}translate [lang] [text]` - Translate text between languages\n"
+                    "Useful utilities, lookups, and confessions.\n\n"
                     f"• `{p}weather [city]` - Check live weather updates\n"
-                    f"• `{p}urban [term]` - Search Urban Dictionary\n"
                     f"• `{p}confessionsetup` - Setup anonymous confessions\n"
                     f"• `{p}confess [message]` - Send anonymous confession\n"
                     f"• `{p}afk`, `{p}say`, `{p}reply`, `{p}si`"
@@ -708,23 +707,6 @@ async def set_language(ctx, lang_code: str):
     await ctx.send(embed=embed)
 
 
-@bot.command(name='translate')
-async def translate_text(ctx, target_lang: str, *, text: str):
-    try:
-        async with aiohttp.ClientSession() as session:
-            url = f"https://api.mymemory.translated.net/get?q={text}&langpair=en|{target_lang}"
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    res_json = await resp.json()
-                    translated = res_json['responseData']['translatedText']
-                    embed = discord.Embed(title="🌐 Translation", description=f"• **Original** : `{text}`\n• **Translated ({target_lang})** : `{translated}`", color=discord.Color.blue())
-                    embed.set_footer(text="Moonlight Heaven • Translation")
-                    await ctx.send(embed=embed)
-                    return
-    except Exception as e:
-        await ctx.send(f"❌ Translation failed: {e}")
-
-
 @bot.command(name='backup')
 @commands.has_permissions(administrator=True)
 async def backup_server(ctx):
@@ -907,7 +889,7 @@ async def check_voice(ctx, member: discord.Member = None):
     await ctx.send(embed=embed)
 
 
-# --- UTILITIES (WEATHER, URBAN) ---
+# --- UTILITIES (WEATHER) ---
 
 @bot.command(name='weather')
 async def weather(ctx, *, city: str):
@@ -923,24 +905,6 @@ async def weather(ctx, *, city: str):
                     return
     except Exception as e:
         await ctx.send(f"❌ Could not fetch weather: {e}")
-
-@bot.command(name='urban')
-async def urban(ctx, *, term: str):
-    try:
-        async with aiohttp.ClientSession() as session:
-            url = f"https://api.urbandictionary.com/v0/define?term={term}"
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data['list']:
-                        def_text = data['list'][0]['definition'].replace('[', '').replace(']', '')
-                        example = data['list'][0]['example'].replace('[', '').replace(']', '')
-                        embed = discord.Embed(title=f"📖 Urban Dictionary: {term}", description=f"• **Definition** : {def_text}\n\n• **Example** : *{example}*", color=discord.Color.blurple())
-                        embed.set_footer(text="Moonlight Heaven • Utility")
-                        await ctx.send(embed=embed)
-                        return
-    except Exception as e:
-        await ctx.send(f"❌ Urban search failed: {e}")
 
 
 # --- RESET COMMANDS ---
