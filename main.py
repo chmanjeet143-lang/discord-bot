@@ -55,7 +55,7 @@ def load_data():
     return {
         "logs": {}, "birthdays": {}, "backups": {}, "prefixes": {},
         "warns": {}, "automod": {}, "language": {}, "autorole": {},
-        "tickets": {}
+        "tickets": {}, "welcome": {}
     }
 
 def save_data():
@@ -68,7 +68,8 @@ def save_data():
         "automod": guild_automod,
         "language": guild_languages,
         "autorole": guild_autoroles,
-        "tickets": guild_tickets
+        "tickets": guild_tickets,
+        "welcome": guild_welcomes
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -84,6 +85,7 @@ guild_automod = {int(k): v for k, v in db.get("automod", {}).items()}
 guild_languages = {int(k): v for k, v in db.get("language", {}).items()}
 guild_autoroles = {int(k): v for k, v in db.get("autorole", {}).items()}
 guild_tickets = {int(k): v for k, v in db.get("tickets", {}).items()}
+guild_welcomes = {int(k): v for k, v in db.get("welcome", {}).items()}
 
 # Data Storage for runtime
 user_messages = {}
@@ -214,10 +216,10 @@ class MenuSelect(discord.ui.Select):
         self.prefix = prefix
         options = [
             discord.SelectOption(label="Command Center", description="Overview and quick-start guide", emoji="📊"),
-            discord.SelectOption(label="Setups & Configuration", description="Server logs, backup, giveaways & tickets", emoji="⚙️"),
+            discord.SelectOption(label="Setups & Configuration", description="Server logs, backup, welcomes & tickets", emoji="⚙️"),
             discord.SelectOption(label="Statistics & Tracking", description="Messages, invites, voice time & resets", emoji="📈"),
             discord.SelectOption(label="Moderation / Admin", description="Warns, automod, massban & cleanup", emoji="🛡️"),
-            discord.SelectOption(label="Utility & Tools", description="Weather & tools", emoji="🛠️")
+            discord.SelectOption(label="Utility & Tools", description="AFK & general tools", emoji="🛠️")
         ]
         super().__init__(placeholder="Select a category to view commands...", min_values=1, max_values=1, options=options)
 
@@ -242,6 +244,7 @@ class MenuSelect(discord.ui.Select):
                 description=(
                     "```ansi\n\u001b[0;33mAutomation & Server Management Tools\u001b[0m\n```\n"
                     f"• `{p}setup` - Generate standard log channels\n"
+                    f"• `{p}welcomesetup` - Setup dual welcome channels\n"
                     f"• `{p}nicknamesetup` - Setup interactive nickname channel\n"
                     f"• `{p}birthdaysetup` - Setup birthday collection channel\n"
                     f"• `{p}giveaway [time] [winners] [prize]` - Host an active giveaway\n"
@@ -284,7 +287,6 @@ class MenuSelect(discord.ui.Select):
                 title="🛠️ Utility & Tools",
                 description=(
                     "```ansi\n\u001b[0;36mGeneral Utilities & Lookups\u001b[0m\n```\n"
-                    f"• `{p}weather [city]` - Retrieve live global weather data\n"
                     f"• `{p}afk`, `{p}say`, `{p}reply`, `{p}si`"
                 ),
                 color=discord.Color.blurple()
@@ -477,6 +479,37 @@ async def on_member_join(member):
             except:
                 pass
 
+    # Dual-Channel Welcome Message logic
+    if guild_id in guild_welcomes:
+        data = guild_welcomes[guild_id]
+        ch1 = member.guild.get_channel(data.get('channel1'))
+        ch2 = member.guild.get_channel(data.get('channel2'))
+        
+        welcome_embed = discord.Embed(
+            title="🎉 Welcome to Moonlight Heaven! ✨",
+            description=(
+                f"• **Member** : {member.mention}\n"
+                f"• **Total Members** : `{member.guild.member_count}`\n"
+                f"• **Status** : We are thrilled to have you here! Enjoy your stay. 🚀"
+            ),
+            color=discord.Color.from_rgb(138, 43, 226),
+            timestamp=discord.utils.utcnow()
+        )
+        if member.avatar:
+            welcome_embed.set_thumbnail(url=member.avatar.url)
+        welcome_embed.set_footer(text=f"Moonlight Heaven • {member.guild.name}")
+
+        if ch1:
+            try:
+                await ch1.send(content=member.mention, embed=welcome_embed)
+            except:
+                pass
+        if ch2:
+            try:
+                await ch2.send(content=member.mention, embed=welcome_embed)
+            except:
+                pass
+
     channel = get_log_channel(member.guild.id, 'member')
     if channel:
         embed = discord.Embed(
@@ -563,6 +596,39 @@ async def setup(ctx):
             description=(
                 f"• **Status** : All automated log channels created successfully.\n"
                 f"• **Channels** : {member_ch.mention}, {msg_ch.mention}, {mod_ch.mention}, {channel_ch.mention}, {role_ch.mention}, {voice_ch.mention}, {logs_ch.mention}, {nick_ch.mention}"
+            ),
+            color=discord.Color.green()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.send(embed=embed)
+    except Exception as e:
+        err_embed = discord.Embed(title="❌ Setup Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
+        err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
+        await ctx.send(embed=err_embed)
+
+@bot.command(name='welcomesetup')
+@commands.has_permissions(administrator=True)
+async def welcomesetup(ctx):
+    guild = ctx.guild
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=False),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+    }
+    try:
+        welcome_ch1 = await guild.create_text_channel('welcome-main', overwrites=overwrites)
+        welcome_ch2 = await guild.create_text_channel('welcome-announcements', overwrites=overwrites)
+        
+        guild_welcomes[guild.id] = {
+            'channel1': welcome_ch1.id,
+            'channel2': welcome_ch2.id
+        }
+        save_data()
+
+        embed = discord.Embed(
+            title="✨ Welcome Setup Complete",
+            description=(
+                f"• **Status** : Dual welcome channels created successfully.\n"
+                f"• **Channels** : {welcome_ch1.mention} and {welcome_ch2.mention}"
             ),
             color=discord.Color.green()
         )
@@ -900,22 +966,6 @@ async def check_voice(ctx, member: discord.Member = None):
     )
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
     await ctx.send(embed=embed)
-
-# --- UTILITIES (WEATHER) ---
-@bot.command(name='weather')
-async def weather(ctx, *, city: str):
-    try:
-        async with aiohttp.ClientSession() as session:
-            url = f"https://wttr.in/{city}?format=3"
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    text = await resp.text()
-                    embed = discord.Embed(title=f"🌤️ Weather in {city.capitalize()}", description=f"• **Forecast** : `{text.strip()}`", color=discord.Color.blue())
-                    embed.set_footer(text="Moonlight Heaven • Utility")
-                    await ctx.send(embed=embed)
-                    return
-    except Exception as e:
-        await ctx.send(f"❌ Could not fetch weather: {e}")
 
 # --- RESET COMMANDS ---
 @bot.command(name='rm')
