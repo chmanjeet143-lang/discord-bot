@@ -109,7 +109,7 @@ async def on_ready():
     print(f"----------------------------------------")
     print(f"Bot Name: Moonlight Heaven")
     print(f"Developer: Zeus")
-    print(f"Status: Online & Ready (Extended Features Loaded)!")
+    print(f"Status: Online & Ready!")
     print(f"----------------------------------------")
 
 
@@ -128,7 +128,7 @@ async def on_command_error(ctx, error):
             color=discord.Color.orange()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
 
     elif isinstance(error, commands.MissingPermissions):
         embed = discord.Embed(
@@ -137,7 +137,7 @@ async def on_command_error(ctx, error):
             color=discord.Color.red()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
 
     elif isinstance(error, commands.BotMissingPermissions):
         embed = discord.Embed(
@@ -146,7 +146,7 @@ async def on_command_error(ctx, error):
             color=discord.Color.red()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
 
     else:
         embed = discord.Embed(
@@ -155,7 +155,7 @@ async def on_command_error(ctx, error):
             color=discord.Color.red()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
 
 
 # --- BACKGROUND TASKS ---
@@ -224,8 +224,7 @@ class MenuSelect(discord.ui.Select):
             discord.SelectOption(label="Setups & Configuration", description="Server logs, backup, autorole & tickets", emoji="⚙️"),
             discord.SelectOption(label="Statistics & Tracking", description="Messages, invites, voice time & resets", emoji="📈"),
             discord.SelectOption(label="Moderation / Admin", description="Warns, automod, massban & cleanup", emoji="🛡️"),
-            discord.SelectOption(label="Utility & Tools", description="Weather, urban, translate, confessions", emoji="🛠️"),
-            discord.SelectOption(label="Fun & Interaction", description="Coinflip, hug, slap, pat, giveaways", emoji="🎉")
+            discord.SelectOption(label="Utility & Tools", description="Weather, urban, translate, confessions", emoji="🛠️")
         ]
         super().__init__(placeholder="Select a category to view commands...", min_values=1, max_values=1, options=options)
 
@@ -299,18 +298,6 @@ class MenuSelect(discord.ui.Select):
                     f"• `{p}confessionsetup` - Setup anonymous confessions\n"
                     f"• `{p}confess [message]` - Send anonymous confession\n"
                     f"• `{p}afk`, `{p}say`, `{p}reply`, `{p}si`"
-                ),
-                color=discord.Color.blurple()
-            )
-        elif self.values[0] == "Fun & Interaction":
-            embed = discord.Embed(
-                title="🎉 Fun & Interaction",
-                description=(
-                    "Interactive commands, coinflips, and giveaways.\n\n"
-                    f"• `{p}coinflip` - Flip a coin\n"
-                    f"• `{p}hug` / `{p}slap` / `{p}pat` / `{p}kiss` [user]\n"
-                    f"• `{p}gcreate [time] [winners] [prize]` - Host giveaway\n"
-                    f"• `{p}boosters` - List server booster details"
                 ),
                 color=discord.Color.blurple()
             )
@@ -415,7 +402,7 @@ async def on_message(message):
                     color=discord.Color.blurple()
                 )
                 embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-                await message.reply(embed=embed)
+                await message.channel.send(embed=embed)
                 return
             except Exception as e:
                 embed = discord.Embed(
@@ -424,7 +411,7 @@ async def on_message(message):
                     color=discord.Color.red()
                 )
                 embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-                await message.reply(embed=embed)
+                await message.channel.send(embed=embed)
                 return
 
     # Birthday channel logic
@@ -445,7 +432,7 @@ async def on_message(message):
                 color=discord.Color.from_rgb(255, 105, 180)
             )
             embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-            await message.reply(embed=embed)
+            await message.channel.send(embed=embed)
             return
 
     author_id = message.author.id
@@ -470,7 +457,7 @@ async def on_message(message):
                 color=discord.Color.blurple()
             )
             embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-            await message.reply(embed=embed)
+            await message.channel.send(embed=embed)
 
     await bot.process_commands(message)
 
@@ -598,11 +585,11 @@ async def setup(ctx):
             color=discord.Color.green()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.send(embed=err_embed)
 
 
 @bot.command(name='nicknamesetup')
@@ -626,11 +613,11 @@ async def nicknamesetup(ctx):
             color=discord.Color.blue()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.send(embed=err_embed)
 
 
 @bot.command(name='birthdaysetup')
@@ -656,11 +643,11 @@ async def birthdaysetup(ctx):
             color=discord.Color.from_rgb(255, 105, 180)
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.send(embed=err_embed)
 
 
 @bot.command(name='autorole')
@@ -670,7 +657,7 @@ async def autorole(ctx, role: discord.Role):
     save_data()
     embed = discord.Embed(title="✅ Autorole Set", description=f"• **Role** : {role.mention}\n• **Status** : Assigned automatically to new members.", color=discord.Color.green())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 
 @bot.command(name='ticketsetup')
@@ -689,7 +676,7 @@ async def confessionsetup(ctx, channel: discord.TextChannel):
     save_data()
     embed = discord.Embed(title="💬 Confessions Setup", description=f"• **Channel** : {channel.mention}\n• **Status** : Users can now use `{ctx.prefix}confess [msg]` to confess anonymously.", color=discord.Color.purple())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 
 @bot.command(name='confess')
@@ -708,7 +695,7 @@ async def confess(ctx, *, message: str):
             await ch.send(embed=embed)
             await ctx.author.send("✅ Your confession has been posted successfully!")
             return
-    await ctx.reply("⚠️ Confessions channel is not setup in this server yet!", delete_after=5)
+    await ctx.send("⚠️ Confessions channel is not setup in this server yet!", delete_after=5)
 
 
 @bot.command(name='language')
@@ -718,7 +705,7 @@ async def set_language(ctx, lang_code: str):
     save_data()
     embed = discord.Embed(title="🌐 Language Updated", description=f"• **Language** : `{lang_code.upper()}`\n• **Status** : Server language preference updated.", color=discord.Color.green())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 
 @bot.command(name='translate')
@@ -732,10 +719,10 @@ async def translate_text(ctx, target_lang: str, *, text: str):
                     translated = res_json['responseData']['translatedText']
                     embed = discord.Embed(title="🌐 Translation", description=f"• **Original** : `{text}`\n• **Translated ({target_lang})** : `{translated}`", color=discord.Color.blue())
                     embed.set_footer(text="Moonlight Heaven • Translation")
-                    await ctx.reply(embed=embed)
+                    await ctx.send(embed=embed)
                     return
     except Exception as e:
-        await ctx.reply(f"❌ Translation failed: {e}")
+        await ctx.send(f"❌ Translation failed: {e}")
 
 
 @bot.command(name='backup')
@@ -767,11 +754,11 @@ async def backup_server(ctx):
         
         embed = discord.Embed(title="💾 Backup Successful", description="• **Status** : Server layout backup saved successfully! (Also runs automatically every 6 hours).", color=discord.Color.green())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
     except Exception as e:
         err_embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         err_embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=err_embed)
+        await ctx.send(embed=err_embed)
 
 
 @bot.command(name='restore')
@@ -781,11 +768,11 @@ async def restore_server(ctx):
     if guild.id not in server_backups:
         embed = discord.Embed(title="⚠️ No Backup Found", description="• **Status** : Please run `&backup` first or wait for the automatic 6-hour backup.", color=discord.Color.orange())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
         return
 
     backup = server_backups[guild.id]
-    msg = await ctx.reply("🔄 Restoring server categories and channels from backup...")
+    msg = await ctx.send("🔄 Restoring server categories and channels from backup...")
 
     try:
         for cat_data in backup["categories"]:
@@ -807,7 +794,7 @@ async def setprefix(ctx, new_prefix: str):
     if len(new_prefix) > 5:
         embed = discord.Embed(title="❌ Error", description="• **Details** : Prefix 5 characters se lamba nahi ho sakta.", color=discord.Color.red())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
         return
         
     guild_prefixes[ctx.guild.id] = new_prefix
@@ -819,10 +806,10 @@ async def setprefix(ctx, new_prefix: str):
         color=discord.Color.green()
     )
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 
-# --- MENU & SERVERINFO & BOOSTERS COMMANDS ---
+# --- MENU & SERVERINFO COMMANDS ---
 
 @bot.command(name='menu', aliases=['help'])
 async def menu(ctx):
@@ -843,7 +830,7 @@ async def menu(ctx):
     )
     embed.set_footer(text="Moonlight Heaven • Command Center")
     view = MenuView(p)
-    await ctx.reply(embed=embed, view=view)
+    await ctx.send(embed=embed, view=view)
 
 @bot.command(name='si')
 async def serverinfo(ctx):
@@ -863,19 +850,7 @@ async def serverinfo(ctx):
     if guild.icon:
         embed.set_thumbnail(url=guild.icon.url)
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
-
-@bot.command(name='boosters')
-async def boosters(ctx):
-    guild = ctx.guild
-    boosters_list = guild.premium_subscribers
-    if not boosters_list:
-        await ctx.reply("✨ There are currently no active server boosters.")
-        return
-    mentions = ", ".join([b.mention for b in boosters_list])
-    embed = discord.Embed(title="💎 Server Boosters", description=f"• **Boosters Count** : `{len(boosters_list)}`\n• **Members** : {mentions}", color=discord.Color.from_rgb(255, 114, 215))
-    embed.set_footer(text="Moonlight Heaven • Boosters")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 
 # --- STATS COMMANDS ---
@@ -894,7 +869,7 @@ async def check_messages(ctx, member: discord.Member = None):
         color=discord.Color.blurple()
     )
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='i')
 async def check_invites(ctx, member: discord.Member = None):
@@ -910,7 +885,7 @@ async def check_invites(ctx, member: discord.Member = None):
         color=discord.Color.green()
     )
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='v')
 async def check_voice(ctx, member: discord.Member = None):
@@ -929,17 +904,10 @@ async def check_voice(ctx, member: discord.Member = None):
         color=discord.Color.gold()
     )
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 
-# --- UTILITIES (WEATHER, URBAN, COINFLIP, INTERACTIVE ACTIONS) ---
-
-@bot.command(name='coinflip')
-async def coinflip(ctx):
-    result = random.choice(["Heads 🪙", "Tails 🪙"])
-    embed = discord.Embed(title="🪙 Coin Flip", description=f"• **Result** : **{result}**", color=discord.Color.gold())
-    embed.set_footer(text="Moonlight Heaven • Fun")
-    await ctx.reply(embed=embed)
+# --- UTILITIES (WEATHER, URBAN) ---
 
 @bot.command(name='weather')
 async def weather(ctx, *, city: str):
@@ -951,10 +919,10 @@ async def weather(ctx, *, city: str):
                     text = await resp.text()
                     embed = discord.Embed(title=f"🌤️ Weather in {city.capitalize()}", description=f"• **Forecast** : `{text.strip()}`", color=discord.Color.blue())
                     embed.set_footer(text="Moonlight Heaven • Utility")
-                    await ctx.reply(embed=embed)
+                    await ctx.send(embed=embed)
                     return
     except Exception as e:
-        await ctx.reply(f"❌ Could not fetch weather: {e}")
+        await ctx.send(f"❌ Could not fetch weather: {e}")
 
 @bot.command(name='urban')
 async def urban(ctx, *, term: str):
@@ -969,73 +937,10 @@ async def urban(ctx, *, term: str):
                         example = data['list'][0]['example'].replace('[', '').replace(']', '')
                         embed = discord.Embed(title=f"📖 Urban Dictionary: {term}", description=f"• **Definition** : {def_text}\n\n• **Example** : *{example}*", color=discord.Color.blurple())
                         embed.set_footer(text="Moonlight Heaven • Utility")
-                        await ctx.reply(embed=embed)
+                        await ctx.send(embed=embed)
                         return
     except Exception as e:
-        await ctx.reply(f"❌ Urban search failed: {e}")
-
-@bot.command(name='hug')
-async def hug(ctx, member: discord.Member):
-    embed = discord.Embed(title="🤗 Hug!", description=f"{ctx.author.mention} hugs {member.mention} warmly! ❤️", color=discord.Color.from_rgb(255, 105, 180))
-    embed.set_footer(text="Moonlight Heaven • Interaction")
-    await ctx.reply(embed=embed)
-
-@bot.command(name='slap')
-async def slap(ctx, member: discord.Member):
-    embed = discord.Embed(title="👋 Slap!", description=f"{ctx.author.mention} slaps {member.mention}!", color=discord.Color.red())
-    embed.set_footer(text="Moonlight Heaven • Interaction")
-    await ctx.reply(embed=embed)
-
-@bot.command(name='pat')
-async def pat(ctx, member: discord.Member):
-    embed = discord.Embed(title="✋ Headpat!", description=f"{ctx.author.mention} pats {member.mention} gently. 🌸", color=discord.Color.gold())
-    embed.set_footer(text="Moonlight Heaven • Interaction")
-    await ctx.reply(embed=embed)
-
-@bot.command(name='kiss')
-async def kiss(ctx, member: discord.Member):
-    embed = discord.Embed(title="💋 Kiss!", description=f"{ctx.author.mention} kisses {member.mention}! 😘", color=discord.Color.from_rgb(255, 105, 180))
-    embed.set_footer(text="Moonlight Heaven • Interaction")
-    await ctx.reply(embed=embed)
-
-
-# --- GIVEAWAY ---
-
-@bot.command(name='gcreate')
-@commands.has_permissions(administrator=True)
-async def gcreate(ctx, duration: str, winners: int, *, prize: str):
-    time_units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
-    unit = duration[-1].lower()
-    if unit not in time_units:
-        await ctx.reply("❌ Invalid time unit! Use s, m, h, or d.")
-        return
-    try:
-        val = int(duration[:-1])
-    except:
-        await ctx.reply("❌ Invalid duration format!")
-        return
-    
-    secs = val * time_units[unit]
-    embed = discord.Embed(title="🎉 GIVEAWAY 🎉", description=f"• **Prize** : **{prize}**\n• **Winners** : `{winners}`\n• **Hosted by** : {ctx.author.mention}\n\nReact with 🎉 to enter!", color=discord.Color.gold())
-    embed.set_footer(text=f"Ends in {duration}")
-    msg = await ctx.reply(embed=embed)
-    await msg.add_reaction("🎉")
-
-    await asyncio.sleep(secs)
-    new_msg = await ctx.channel.fetch_message(msg.id)
-    users = []
-    for reaction in new_msg.reactions:
-        if str(reaction.emoji) == "🎉":
-            async for user in reaction.users():
-                if not user.bot:
-                    users.append(user)
-    
-    if users:
-        chosen = random.sample(users, min(winners, len(users)))
-        mentions = ", ".join([u.mention for u in chosen])
-        await ctx.send(f"🎊 Congratulations {mentions}! You won **{prize}**!")
-    else:
-        await ctx.send("😢 Giveaway ended with no valid entries.")
+        await ctx.send(f"❌ Urban search failed: {e}")
 
 
 # --- RESET COMMANDS ---
@@ -1055,7 +960,7 @@ async def reset_messages(ctx, target: str):
             embed = discord.Embed(title="❌ Error", description="• **Details** : Please specify a valid member or type `all`.", color=discord.Color.red())
     
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='ri')
 @commands.has_permissions(administrator=True)
@@ -1063,7 +968,7 @@ async def reset_invites(ctx, member: discord.Member):
     user_invites[member.id] = 0
     embed = discord.Embed(title="🔄 Invite Reset", description=f"• **User** : {member.mention}\n• **Status** : Count successfully reset to 0.", color=discord.Color.orange())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='rv')
 @commands.has_permissions(administrator=True)
@@ -1087,7 +992,7 @@ async def reset_voice(ctx, target: str):
             embed = discord.Embed(title="❌ Error", description="• **Details** : Please specify a valid member or type `all`.", color=discord.Color.red())
             
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 
 # --- MODERATION (WARN, MASSBAN, AUTOMOD TOGGLE, ETC.) ---
@@ -1105,7 +1010,7 @@ async def warn_member(ctx, member: discord.Member, *, reason="No reason provided
     save_data()
     embed = discord.Embed(title="⚠️ Member Warned", description=f"• **User** : {member.mention}\n• **Reason** : `{reason}`\n• **Total Warns** : `{len(guild_warns[guild_id][str(member.id)])}`", color=discord.Color.orange())
     embed.set_footer(text="Moonlight Heaven • Moderation")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='warnings')
 async def check_warnings(ctx, member: discord.Member):
@@ -1114,7 +1019,7 @@ async def check_warnings(ctx, member: discord.Member):
     reasons = "\n".join([f"{i+1}. {w}" for i, w in enumerate(warns)]) if warns else "No warnings found."
     embed = discord.Embed(title=f"⚠️ Warnings for {member.name}", description=reasons, color=discord.Color.orange())
     embed.set_footer(text="Moonlight Heaven • Moderation")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='clearwarn')
 @commands.has_permissions(kick_members=True)
@@ -1125,13 +1030,13 @@ async def clear_warnings(ctx, member: discord.Member):
         save_data()
     embed = discord.Embed(title="✅ Warnings Cleared", description=f"• **User** : {member.mention}\n• **Status** : All warnings have been wiped.", color=discord.Color.green())
     embed.set_footer(text="Moonlight Heaven • Moderation")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='massban')
 @commands.has_permissions(ban_members=True)
 async def massban(ctx, members: commands.Greedy[discord.Member], *, reason="Massban executed"):
     if not members:
-        await ctx.reply("❌ Please mention valid members to massban.")
+        await ctx.send("❌ Please mention valid members to massban.")
         return
     banned_count = 0
     for member in members:
@@ -1142,7 +1047,7 @@ async def massban(ctx, members: commands.Greedy[discord.Member], *, reason="Mass
             pass
     embed = discord.Embed(title="🔨 Massban Complete", description=f"• **Banned Members** : `{banned_count}`\n• **Reason** : `{reason}`", color=discord.Color.dark_red())
     embed.set_footer(text="Moonlight Heaven • Moderation")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='automod')
 @commands.has_permissions(administrator=True)
@@ -1151,13 +1056,13 @@ async def automod(ctx, status: str):
     if status.lower() == "on":
         guild_automod[guild_id] = True
         save_data()
-        await ctx.reply("🛡️ Automod has been enabled!")
+        await ctx.send("🛡️ Automod has been enabled!")
     elif status.lower() == "off":
         guild_automod[guild_id] = False
         save_data()
-        await ctx.reply("🛡️ Automod has been disabled!")
+        await ctx.send("🛡️ Automod has been disabled!")
     else:
-        await ctx.reply("❌ Please specify `on` or `off`.")
+        await ctx.send("❌ Please specify `on` or `off`.")
 
 
 # --- UTILITY & MODERATION COMMANDS ---
@@ -1178,7 +1083,7 @@ async def reply_msg(ctx, message_link: str, *, message: str):
     except Exception as e:
         embed = discord.Embed(title="❌ Error", description=f"• **Details** : `{e}`", color=discord.Color.red())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
 
 @bot.command(name='timeout')
 @commands.has_permissions(moderate_members=True)
@@ -1187,13 +1092,13 @@ async def timeout_member(ctx, member: discord.Member, time_str: str, *, reason="
     unit = time_str[-1].lower()
     
     if unit not in time_units:
-        await ctx.reply("❌ Invalid time format! Use `s`, `m`, `h`, or `d`. Example: `1m`")
+        await ctx.send("❌ Invalid time format! Use `s`, `m`, `h`, or `d`. Example: `1m`")
         return
     
     try:
         val = int(time_str[:-1])
     except ValueError:
-        await ctx.reply("❌ Invalid time value! Example: `1m`, `30m`, `1h`")
+        await ctx.send("❌ Invalid time value! Example: `1m`, `30m`, `1h`")
         return
     
     total_seconds = val * time_units[unit]
@@ -1207,16 +1112,16 @@ async def timeout_member(ctx, member: discord.Member, time_str: str, *, reason="
             color=discord.Color.red()
         )
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
     except Exception as e:
-        await ctx.reply(f"❌ Timeout failed: `{e}`. Make sure my role is higher than the target user's role!")
+        await ctx.send(f"❌ Timeout failed: `{e}`. Make sure my role is higher than the target user's role!")
 
 @bot.command(name='afk')
 async def afk(ctx, *, reason="AFK"):
     afk_users[ctx.author.id] = reason
     embed = discord.Embed(title="💤 AFK Mode Activated", description=f"• **User** : {ctx.author.mention}\n• **Reason** : `{reason}`", color=discord.Color.blue())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='kick')
 @commands.has_permissions(kick_members=True)
@@ -1224,7 +1129,7 @@ async def kick(ctx, member: discord.Member, *, reason=None):
     await member.kick(reason=reason)
     embed = discord.Embed(title="👢 Member Kicked", description=f"• **User** : {member.mention}\n• **Reason** : `{reason or 'None'}`", color=discord.Color.orange())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='ban')
 @commands.has_permissions(ban_members=True)
@@ -1232,7 +1137,7 @@ async def ban(ctx, member: discord.Member, *, reason=None):
     await member.ban(reason=reason)
     embed = discord.Embed(title="🔨 Member Banned", description=f"• **User** : {member.mention}\n• **Reason** : `{reason or 'None'}`", color=discord.Color.dark_red())
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-    await ctx.reply(embed=embed)
+    await ctx.send(embed=embed)
 
 @bot.command(name='unban')
 @commands.has_permissions(ban_members=True)
@@ -1242,11 +1147,11 @@ async def unban(ctx, user_id: int):
         await ctx.guild.unban(user)
         embed = discord.Embed(title="🔓 Member Unbanned", description=f"• **User** : {user.mention}", color=discord.Color.green())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
     except Exception as e:
         embed = discord.Embed(title="⚠️ Warning", description=f"• **Status** : User not found or invalid ID. ({e})", color=discord.Color.orange())
         embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
 
 @bot.command(name='clear')
 @commands.has_permissions(manage_messages=True)
