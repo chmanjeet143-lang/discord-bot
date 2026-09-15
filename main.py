@@ -272,4 +272,54 @@ class MenuSelect(discord.ui.Select):
             embed = discord.Embed(
                 title="🛡️ Moderation & Security",
                 description=(
-                    "```ansi\n\u001b
+                    "```ansi\n\u001b[0;31mAdvanced Protection & Control Tools\u001b[0m\n```\n"
+                    f"• `{p}warn [user] [reason]` - Issue a formal server warning\n"
+                    f"• `{p}warns [user]` - View accumulated user warnings\n"
+                    f"• `{p}automod` - Configure automated filter triggers\n"
+                    f"• `{p}purge [count]` - Clear bulk chat messages\n"
+                    f"• `{p}lock` / `{p}unlock` - Secure channel permissions"
+                ),
+                color=discord.Color.blurple()
+            )
+        elif self.values[0] == "Utility & Tools":
+            embed = discord.Embed(
+                title="🛠️ Utility & Tools",
+                description=(
+                    "```ansi\n\u001b[0;36mGeneral Utility Commands\u001b[0m\n```\n"
+                    f"• `{p}afk [reason]` - Set your status to AFK\n"
+                    f"• `{p}ping` - Check bot response latency"
+                ),
+                color=discord.Color.blurple()
+            )
+        
+        embed.set_footer(text="Moonlight Heaven • Developed by Zeus", icon_url=interaction.guild.icon.url if interaction.guild and interaction.guild.icon else None)
+        await interaction.response.edit_message(embed=embed, view=self.view)
+
+class MenuView(discord.ui.View):
+    def __init__(self, prefix):
+        super().__init__(timeout=180)
+        self.add_item(MenuSelect(prefix))
+
+@bot.command(name="menu")
+async def menu_command(ctx):
+    p = ctx.prefix
+    embed = discord.Embed(
+        title="✨ Moonlight Heaven • Help Menu",
+        description=(
+            "```ansi\n\u001b[0;36mSelect a category from the dropdown menu below to view available commands.\u001b[0m\n```\n"
+            "• **Developer** : Created by **Zeus** 🚀\n"
+            "• **Prefix** : Use custom or default `&` prefix"
+        ),
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="Moonlight Heaven • Interactive Menu", icon_url=ctx.guild.icon.url if ctx.guild and ctx.guild.icon else None)
+    await ctx.send(embed=embed, view=MenuView(p))
+
+# --- RUN BOT ---
+if __name__ == "__main__":
+    keep_alive()
+    TOKEN = os.getenv("TOKEN")
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        print("❌ Error: TOKEN environment variable not found!")
