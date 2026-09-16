@@ -210,6 +210,65 @@ async def auto_backup_task():
         except Exception as e:
             print(f"Auto backup failed for {guild.name}: {e}")
 
+# --- WELCOME SYSTEM SETUP & EVENT ---
+@bot.command(name="welcomesetup")
+@commands.has_permissions(administrator=True)
+async def welcomesetup(ctx, main_channel: discord.TextChannel, rules_channel: discord.TextChannel):
+    """Setup dual welcome and rules channels for the server"""
+    guild_welcomes[ctx.guild.id] = {
+        "main_channel": main_channel.id,
+        "rules_channel": rules_channel.id
+    }
+    save_data()
+    embed = discord.Embed(
+        title="✅ Welcome Setup Successful",
+        description=(
+            "```ansi\n\u001b[0;32mDual Welcome Channels Configured\u001b[0m\n```\n"
+            f"• **Main Welcome Channel** : {main_channel.mention}\n"
+            f"• **Rules / Info Channel** : {rules_channel.mention}"
+        ),
+        color=discord.Color.green()
+    )
+    embed.set_footer(text="Moonlight Heaven • Welcome System", icon_url=ctx.guild.icon.url if ctx.guild and ctx.guild.icon else None)
+    await ctx.send(embed=embed)
+
+@bot.event
+async def on_member_join(member):
+    guild_id = member.guild.id
+    if guild_id in guild_welcomes:
+        data = guild_welcomes[guild_id]
+        main_ch_id = data.get("main_channel")
+        rules_ch_id = data.get("rules_channel")
+        
+        main_channel = member.guild.get_channel(main_ch_id)
+        rules_channel = member.guild.get_channel(rules_ch_id)
+        
+        if main_channel:
+            welcome_embed = discord.Embed(
+                title="✨ Welcome to Moonlight Heaven! ✨",
+                description=(
+                    f"Hello {member.mention}, welcome to **{member.guild.name}**! 🎉\n\n"
+                    f"• Please check out {rules_channel.mention if rules_channel else 'the rules channel'} to stay safe.\n"
+                    f"• Enjoy your stay and have a wonderful time with us!"
+                ),
+                color=discord.Color.blurple()
+            )
+            welcome_embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
+            welcome_embed.set_footer(text=f"Member #{member.guild.member_count}", icon_url=member.guild.icon.url if member.guild.icon else None)
+            await main_channel.send(content=member.mention, embed=welcome_embed)
+
+# --- UTILITY COMMANDS ---
+@bot.command(name="ping")
+async def ping_command(ctx):
+    latency = round(bot.latency * 1000)
+    embed = discord.Embed(
+        title="🏓 Pong!",
+        description=f"```ansi\n\u001b[0;36mBot Latency : {latency}ms\u001b[0m\n```",
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="Moonlight Heaven • Utility", icon_url=ctx.guild.icon.url if ctx.guild and ctx.guild.icon else None)
+    await ctx.send(embed=embed)
+
 # --- DROPDOWN MENU VIEW FOR &MENU ---
 class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
@@ -244,7 +303,7 @@ class MenuSelect(discord.ui.Select):
                 description=(
                     "```ansi\n\u001b[0;33mAutomation & Server Management Tools\u001b[0m\n```\n"
                     f"• `{p}setup` - Generate standard log channels\n"
-                    f"• `{p}welcomesetup` - Setup dual welcome channels\n"
+                    f"• `{p}welcomesetup [main_ch] [rules_ch]` - Setup dual welcome channels\n"
                     f"• `{p}nicknamesetup` - Setup interactive nickname channel\n"
                     f"• `{p}birthdaysetup` - Setup birthday collection channel\n"
                     f"• `{p}giveaway [time] [winners] [prize]` - Host an active giveaway\n"
