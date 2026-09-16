@@ -10,7 +10,7 @@ from flask import Flask
 from threading import Thread
 from datetime import datetime, timedelta
 
-# 1. Flask server to keep bot alive on Render 24/7
+# Flask server to keep bot alive on Render 24/7
 app = Flask('')
 
 @app.route('/')
@@ -24,7 +24,7 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# 2. Bot Intents & Configuration
+# Bot Intents & Configuration
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -41,7 +41,7 @@ def get_prefix(bot, message):
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 bot.remove_command("help")
 
-# --- Persistent Storage Functions (JSON Based) ---
+# Persistent Storage Functions (JSON Based)
 DATA_FILE = "bot_database.json"
 
 def load_data():
@@ -77,7 +77,6 @@ def save_data():
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-# Load data into memory on startup
 db = load_data()
 guild_logs = {int(k): v for k, v in db.get("logs", {}).items()}
 guild_birthdays = {int(k): v for k, v in db.get("birthdays", {}).items()}
@@ -113,10 +112,9 @@ async def on_ready():
     print("----------------------------------------")
     print("Bot Name: Moonlight Heaven")
     print("Developer: Zeus")
-    print("Status: Online & Ready with All 300+ Features!")
+    print("Status: Online & Ready with All Features!")
     print("----------------------------------------")
 
-# --- GLOBAL ERROR HANDLER ---
 @bot.event
 async def on_command_error(ctx, error):
     p = ctx.prefix
@@ -130,7 +128,6 @@ async def on_command_error(ctx, error):
         embed = discord.Embed(title="❌ Command Error", description=f"`{error}`", color=discord.Color.red())
     await ctx.send(embed=embed)
 
-# --- BACKGROUND TASKS ---
 @tasks.loop(hours=24)
 async def daily_birthday_check():
     today = datetime.now().strftime("%d-%m")
@@ -161,7 +158,6 @@ async def auto_backup_task():
         except:
             pass
 
-# --- EVENT LISTENERS ---
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -170,7 +166,6 @@ async def on_message(message):
     g_id = message.guild.id if message.guild else 0
     u_id = message.author.id
 
-    # Automod Check (Bad words/links filter simulation)
     if g_id in guild_automod and guild_automod[g_id].get("enabled", False):
         blocked_words = ["discord.gg/", "http://", "https://"]
         if any(w in message.content.lower() for w in blocked_words) and not message.author.guild_permissions.manage_messages:
@@ -181,13 +176,11 @@ async def on_message(message):
             except:
                 pass
 
-    # Message Counter Track
     if g_id not in user_messages:
         user_messages[g_id] = {}
     user_messages[g_id][str(u_id)] = user_messages[g_id].get(str(u_id), 0) + 1
     save_data()
 
-    # AFK System check
     if u_id in afk_users:
         del afk_users[u_id]
         try:
@@ -220,7 +213,6 @@ async def on_voice_state_update(member, before, after):
 
 @bot.event
 async def on_member_join(member):
-    # Autorole
     g_id = member.guild.id
     if g_id in guild_autoroles:
         role_id = guild_autoroles[g_id]
@@ -231,14 +223,12 @@ async def on_member_join(member):
             except:
                 pass
 
-    # Welcome system
     data = guild_welcomes.get(g_id)
     if data:
         ch = member.guild.get_channel(data.get("main_channel"))
         if ch:
             await ch.send(f"✨ Welcome {member.mention} to **{member.guild.name}**! 🎉")
 
-    # Invite tracking
     try:
         guild = member.guild
         current_invites = await guild.invites()
@@ -257,7 +247,7 @@ async def on_member_join(member):
     except:
         pass
 
-# --- 1. COMMAND CENTER & GENERAL ---
+# Commands Section
 @bot.command(name="ping")
 async def ping_command(ctx):
     latency = round(bot.latency * 1000)
@@ -280,7 +270,6 @@ async def afk_command(ctx, *, reason="AFK"):
     afk_users[ctx.author.id] = reason
     await ctx.send(f"💤 {ctx.author.mention} is now AFK: **{reason}**")
 
-# --- 2. SETUPS & CONFIGURATION ---
 @bot.command(name="setup")
 @commands.has_permissions(administrator=True)
 async def setup_channels(ctx):
@@ -347,7 +336,6 @@ async def backup_server(ctx):
 async def restore_server(ctx):
     await ctx.send("🔄 Server layout restoration completed from backup profile.")
 
-# --- 3. STATISTICS & TRACKING + RESETS ---
 @bot.command(name="m", aliases=["messages"])
 async def check_messages(ctx, member: discord.Member = None):
     member = member or ctx.author
@@ -422,7 +410,6 @@ async def reset_voice(ctx, target: str = "all"):
         except:
             await ctx.send("❌ Invalid user specified.")
 
-# --- 4. MODERATION & SECURITY ---
 @bot.command(name="warn")
 @commands.has_permissions(kick_members=True)
 async def warn_user(ctx, member: discord.Member, *, reason="No reason provided"):
@@ -474,7 +461,6 @@ async def unlock_channel(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
     await ctx.send("🔓 Channel has been unlocked.")
 
-# --- DYNAMIC MENU VIEW (Matches Screenshots Exactly) ---
 class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
         self.prefix = prefix
@@ -570,4 +556,19 @@ async def menu_command(ctx):
     embed = discord.Embed(
         title="✨ Moonlight Heaven • Help Menu",
         description=(
-            "```ansi\n
+            "```ansi\n\u001b[0;36mSelect a category from the dropdown menu below to view available commands.\u001b[0m\n```\n"
+            "• **Developer** : Created by **Zeus** 🚀\n"
+            "• **Prefix** : Use custom or default `&` prefix"
+        ),
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="Moonlight Heaven • Interactive Menu", icon_url=ctx.guild.icon.url if ctx.guild and ctx.guild.icon else None)
+    await ctx.send(embed=embed, view=MenuView(p))
+
+if __name__ == "__main__":
+    keep_alive()
+    TOKEN = os.getenv("TOKEN")
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        print("❌ Error: TOKEN environment variable not found!")
