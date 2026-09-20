@@ -33,15 +33,6 @@ intents.guilds = True
 intents.bans = True
 intents.invites = True
 
-def get_prefix(bot, message):
-    if not message.guild:
-        return "&"
-    return guild_prefixes.get(message.guild.id, "&")
-
-bot = commands.Bot(command_prefix=get_prefix, intents=intents)
-bot.remove_command("help")
-
-# Persistent Storage Functions (JSON Based)
 DATA_FILE = "bot_database.json"
 
 def load_data():
@@ -55,7 +46,7 @@ def load_data():
         "logs": {}, "birthdays": {}, "backups": {}, "prefixes": {},
         "warns": {}, "automod": {}, "autorole": {}, "tickets": {}, 
         "welcome": {}, "messages": {}, "voice_time": {}, "invites": {},
-        "nickname_setup": {}
+        "nickname_setup": {}, "counting": {}
     }
 
 def save_data():
@@ -72,7 +63,8 @@ def save_data():
         "messages": user_messages,
         "voice_time": user_voice_time,
         "invites": user_invites,
-        "nickname_setup": guild_nicknames
+        "nickname_setup": guild_nicknames,
+        "counting": guild_counting
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -91,6 +83,15 @@ user_messages = {int(k): v for k, v in db.get("messages", {}).items()}
 user_voice_time = {int(k): v for k, v in db.get("voice_time", {}).items()}
 user_invites = {int(k): v for k, v in db.get("invites", {}).items()}
 guild_nicknames = {int(k): v for k, v in db.get("nickname_setup", {}).items()}
+guild_counting = {int(k): v for k, v in db.get("counting", {}).items()}
+
+def get_prefix(bot, message):
+    if not message.guild:
+        return "&"
+    return guild_prefixes.get(message.guild.id, "&")
+
+bot = commands.Bot(command_prefix=get_prefix, intents=intents)
+bot.remove_command("help")
 
 afk_users = {}
 voice_join_timestamps = {}
@@ -166,6 +167,33 @@ async def on_message(message):
     g_id = message.guild.id if message.guild else 0
     u_id = message.author.id
 
+    # --- COUNTING SYSTEM LOGIC ---
+    if g_id in guild_counting:
+        c_data = guild_counting[g_id]
+        if message.channel.id == c_data.get("channel_id"):
+            try:
+                number = int(message.content.strip())
+                expected = c_data.get("next_number", 1)
+                last_user = c_data.get("last_user", 0)
+
+                if number == expected and u_id != last_user:
+                    c_data["next_number"] = expected + 1
+                    c_data["last_user"] = u_id
+                    save_data()
+                    react_emoji = c_data.get("emoji", "✅")
+                    await message.add_reaction(react_emoji)
+                else:
+                    await message.delete()
+                    err_msg = await message.channel.send(f"❌ {message.author.mention}, wrong counting or consecutive message! Reset to `{expected}`.", delete_after=5)
+            except ValueError:
+                # Agar user ne number ke alawa kuch aur likha counting channel me
+                if not message.author.guild_permissions.manage_messages:
+                    try:
+                        await message.delete()
+                    except:
+                        pass
+
+    # Automod Check
     if g_id in guild_automod and guild_automod[g_id].get("enabled", False):
         blocked_words = ["discord.gg/", "http://", "https://"]
         if any(w in message.content.lower() for w in blocked_words) and not message.author.guild_permissions.manage_messages:
@@ -247,7 +275,87 @@ async def on_member_join(member):
     except:
         pass
 
-# Commands Section
+# --- NEW FEATURE 1: PREFIX CHANGER ---
+@bot.command(name="setprefix")
+@commands.has_permissions(administrator=True)
+async def set_prefix_cmd(ctx, new_prefix: str):
+    if len(new_prefix) > 5:
+        await ctx.send("❌ Prefix length cannot be more than 5 characters.")
+        return
+    guild_prefixes[ctx.guild.id] = new_prefix
+    save_data()
+    await ctx.send(f"✅ Server prefix successfully updated to: `{new_prefix}`")
+
+# --- NEW FEATURE 2: EMOJI & STICKER CLONE COMMAND ---
+@bot.command(name="clone")
+@commands.has_permissions(manage_emojis=True)
+async def clone_command(ctx):
+    if not ctx.message.reference:
+        await ctx.send("❌ Please reply to a message containing an emoji or a sticker to clone it!")
+        return
+    
+    try:
+        referenced_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+    except:
+        await ctx.send("❌ Could not fetch the replied message.")
+        return
+
+    cloned_count = 0
+    
+    # Check for Stickers in replied message
+    if referenced_msg.stickers:
+        for sticker in referenced_msg.stickers:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(sticker.url) as resp:
+                        if resp.status == 200:
+                            data = await resp.read()
+                            file = discord.File(fp=io.BytesIO(data), filename=f"{sticker.name}.png")
+                            await ctx.guild.create_sticker(name=sticker.name, description="Cloned sticker", file=file, emoji="✨")
+                            cloned_count += 1
+            except Exception as e:
+                pass
+
+    # Check for custom emojis in message content or embeds
+    import re
+    custom_emojis = re.findall(r'<a?:([a-zA-Z0-9_]+):([0-9]+)>', referenced_msg.content)
+    for name, emoji_id in custom_emojis:
+        animated = referenced_msg.content.startswith("<a:")
+        extension = "gif" if animated else "png"
+        url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        emoji = await ctx.guild.create_custom_emoji(name=name, image=data)
+                        await ctx.channel.send(f"✅ Successfully cloned emoji: {emoji}")
+                        cloned_count += 1
+        except Exception as e:
+            pass
+
+    if cloned_count > 0:
+        await ctx.send(f"🚀 Successfully cloned `{cloned_count}` items to the server!")
+    else:
+        await ctx.send("❌ No valid custom emoji or sticker found in the replied message.")
+
+import io
+
+# --- NEW FEATURE 3: HIDDEN COUNTING SETUP & START COMMANDS ---
+@bot.command(name="start")
+@commands.has_permissions(administrator=True)
+async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = None, emoji: str = "✅"):
+    target_channel = channel or ctx.channel
+    guild_counting[ctx.guild.id] = {
+        "channel_id": target_channel.id,
+        "next_number": amount,
+        "last_user": 0,
+        "emoji": emoji
+    }
+    save_data()
+    await ctx.send(f"🔢 Counting initialized in {target_channel.mention} starting from **{amount}** with reaction **{emoji}**!")
+
+# Standard Commands Section
 @bot.command(name="ping")
 async def ping_command(ctx):
     latency = round(bot.latency * 1000)
@@ -497,6 +605,7 @@ class MenuSelect(discord.ui.Select):
                     f"• `{p}welcomesetup [main_ch] [rules_ch]` - Setup dual welcome channels\n"
                     f"• `{p}nicknamesetup` - Setup interactive nickname channel\n"
                     f"• `{p}birthdaysetup` - Setup birthday collection channel\n"
+                    f"• `{p}setprefix [new_prefix]` - Change server command prefix\n"
                     f"• `{p}giveaway [time] [winners] [prize]` - Host an active giveaway\n"
                     f"• `{p}autorole [role]` - Set automated welcome role\n"
                     f"• `{p}ticketsetup` - Initialize support ticketing system\n"
@@ -536,6 +645,7 @@ class MenuSelect(discord.ui.Select):
                 title="🛠️ Utility & Tools",
                 description=(
                     "```ansi\n\u001b[0;36mGeneral Utility Commands\u001b[0m\n```\n"
+                    f"• `{p}clone` - Reply to an emoji/sticker to clone it\n"
                     f"• `{p}afk [reason]` - Set your status to AFK\n"
                     f"• `{p}ping` - Check bot response latency"
                 ),
