@@ -117,7 +117,7 @@ async def on_ready():
     print("----------------------------------------")
     print("Bot Name: Moonlight Heaven")
     print("Developer: Zeus")
-    print("Status: Counting & All Commands Restored!")
+    print("Status: Error Fixed & Fully Online!")
     print("----------------------------------------")
 
 @bot.event
@@ -171,13 +171,11 @@ async def on_message(message):
     g_id = message.guild.id if message.guild else 0
     u_id = message.author.id
 
-    # Autoresponder Check
     if g_id in guild_autoresponder:
         responses = guild_autoresponder[g_id]
         if message.content.lower() in responses:
             await message.channel.send(responses[message.content.lower()])
 
-    # Counting System Logic
     if g_id in guild_counting:
         c_data = guild_counting[g_id]
         if message.channel.id == c_data.get("channel_id"):
@@ -199,7 +197,6 @@ async def on_message(message):
                     try: await message.delete()
                     except: pass
 
-    # Automod Check
     if g_id in guild_automod and guild_automod[g_id].get("enabled", False):
         if any(w in message.content.lower() for w in ["discord.gg/", "http://", "https://"]) and not message.author.guild_permissions.manage_messages:
             try:
@@ -220,7 +217,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ==================== ALL COMMANDS ACROSS CATEGORIES ====================
+# ==================== COMMANDS ====================
 
 @bot.command(name="ping")
 async def ping_command(ctx):
@@ -280,7 +277,6 @@ async def set_prefix(ctx, prefix: str):
 async def clone_emoji(ctx):
     await ctx.send(embed=ae(title="🚀 Clone", description="Reply to an emoji/sticker to clone it."))
 
-# Counting Setup Command
 @bot.command(name="start", aliases=["counting"])
 @commands.has_permissions(administrator=True)
 async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = None, emoji: str = "✅"):
@@ -292,7 +288,7 @@ async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = No
         "emoji": emoji
     }
     save_data()
-    await ctx.send(embed=ae(title="🔢 Counting Initialized", description=f"Counting configured in {target_channel.mention} starting from **{amount}**!"))
+    await ctx.send(embed=ae(title="🔢 Counting Initialized", description=f"Counting configured in {target_channel.mention} starting from **{amount}** with reaction **{emoji}**!"))
 
 @bot.command(name="roll")
 async def roll_dice(ctx):
@@ -398,7 +394,7 @@ async def log_setup(ctx):
     save_data()
     await ctx.send(embed=ae(title="🦇 Logging", description=f"Audit logging channel set to {ch.mention}"))
 
-# ==================== HELP MENU WITH ALL CATEGORIES ====================
+# ==================== HELP MENU ====================
 class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
         self.prefix = prefix
@@ -502,5 +498,3 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     else:
         print("❌ Error: TOKEN environment variable not found!")
-
-Ab counting command bhi help menu mein Fun category ke andar visible hai! Kya aapko iske alawa kisi aur command mein bhi koi update ya change chahiye?
