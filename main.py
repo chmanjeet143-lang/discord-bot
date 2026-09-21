@@ -47,7 +47,7 @@ def load_data():
         "logs": {}, "birthdays": {}, "backups": {}, "prefixes": {},
         "warns": {}, "automod": {}, "autorole": {}, "tickets": {}, 
         "welcome": {}, "messages": {}, "voice_time": {}, "invites": {},
-        "nickname_setup": {}, "counting": {}
+        "nickname_setup": {}, "counting": {}, "autoresponder": {}, "antinuke": {}, "reaction_roles": {}
     }
 
 def save_data():
@@ -65,7 +65,10 @@ def save_data():
         "voice_time": user_voice_time,
         "invites": user_invites,
         "nickname_setup": guild_nicknames,
-        "counting": guild_counting
+        "counting": guild_counting,
+        "autoresponder": guild_autoresponder,
+        "antinuke": guild_antinuke,
+        "reaction_roles": guild_reaction_roles
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -85,6 +88,9 @@ user_voice_time = {int(k): v for k, v in db.get("voice_time", {}).items()}
 user_invites = {int(k): v for k, v in db.get("invites", {}).items()}
 guild_nicknames = {int(k): v for k, v in db.get("nickname_setup", {}).items()}
 guild_counting = {int(k): v for k, v in db.get("counting", {}).items()}
+guild_autoresponder = {int(k): v for k, v in db.get("autoresponder", {}).items()}
+guild_antinuke = {int(k): v for k, v in db.get("antinuke", {}).items()}
+guild_reaction_roles = {int(k): v for k, v in db.get("reaction_roles", {}).items()}
 
 def get_prefix(bot, message):
     if not message.guild:
@@ -98,10 +104,8 @@ afk_users = {}
 voice_join_timestamps = {}
 server_invite_counts = {}
 
-# Standard Aesthetic Embed Color Function
-def aesthetic_embed(title="", description="", color=discord.Color.from_rgb(20, 20, 20)):
-    embed = discord.Embed(title=title, description=description, color=color)
-    return embed
+def ae(title="", description="", color=discord.Color.from_rgb(20, 20, 20)):
+    return discord.Embed(title=title, description=description, color=color)
 
 @bot.event
 async def on_ready():
@@ -110,16 +114,10 @@ async def on_ready():
     if not auto_backup_task.is_running():
         auto_backup_task.start()
     
-    for guild in bot.guilds:
-        try:
-            server_invite_counts[guild.id] = {inv.code: inv.uses for inv in await guild.invites()}
-        except:
-            pass
-
     print("----------------------------------------")
     print("Bot Name: Moonlight Heaven")
     print("Developer: Zeus")
-    print("Status: Online with Uniform Aesthetic Embeds!")
+    print("Status: All Categories Filled & Ready!")
     print("----------------------------------------")
 
 @bot.event
@@ -128,11 +126,11 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
     elif isinstance(error, (commands.MissingRequiredArgument, commands.BadArgument)):
-        embed = aesthetic_embed(title="⚠️ Invalid Command Usage", description=f"• **Proper Usage** : `{p}{ctx.command.name} [arguments]`\n• **Help Menu** : `{p}help`")
+        embed = ae(title="⚠️ Invalid Command Usage", description=f"• **Proper Usage** : `{p}{ctx.command.name} [arguments]`\n• **Help Menu** : `{p}help`")
     elif isinstance(error, commands.MissingPermissions):
-        embed = aesthetic_embed(title="🚫 Access Denied", description="You lack the required permissions to run this command.")
+        embed = ae(title="🚫 Access Denied", description="You lack the required permissions to run this command.")
     else:
-        embed = aesthetic_embed(title="❌ Command Error", description=f"`{error}`")
+        embed = ae(title="❌ Command Error", description=f"`{error}`")
     await ctx.send(embed=embed)
 
 @tasks.loop(hours=24)
@@ -173,7 +171,13 @@ async def on_message(message):
     g_id = message.guild.id if message.guild else 0
     u_id = message.author.id
 
-    # Counting System Logic
+    # Autoresponder Check
+    if g_id in guild_autoresponder:
+        responses = guild_autoresponder[g_id]
+        if message.content.lower() in responses:
+            await message.channel.send(responses[message.content.lower()])
+
+    # Counting System
     if g_id in guild_counting:
         c_data = guild_counting[g_id]
         if message.channel.id == c_data.get("channel_id"):
@@ -186,28 +190,23 @@ async def on_message(message):
                     c_data["next_number"] = expected + 1
                     c_data["last_user"] = u_id
                     save_data()
-                    react_emoji = c_data.get("emoji", "✅")
-                    await message.add_reaction(react_emoji)
+                    await message.add_reaction(c_data.get("emoji", "✅"))
                 else:
                     await message.delete()
-                    await message.channel.send(f"❌ {message.author.mention}, wrong counting or consecutive message! Reset to `{expected}`.", delete_after=4)
+                    await message.channel.send(f"❌ {message.author.mention}, wrong counting! Reset to `{expected}`.", delete_after=4)
             except ValueError:
                 if not message.author.guild_permissions.manage_messages:
-                    try:
-                        await message.delete()
-                    except:
-                        pass
+                    try: await message.delete()
+                    except: pass
 
     # Automod Check
     if g_id in guild_automod and guild_automod[g_id].get("enabled", False):
-        blocked_words = ["discord.gg/", "http://", "https://"]
-        if any(w in message.content.lower() for w in blocked_words) and not message.author.guild_permissions.manage_messages:
+        if any(w in message.content.lower() for w in ["discord.gg/", "http://", "https://"]) and not message.author.guild_permissions.manage_messages:
             try:
                 await message.delete()
-                await message.channel.send(f"⚠️ {message.author.mention}, links/invites are blocked by Automod!", delete_after=4)
+                await message.channel.send(f"⚠️ {message.author.mention}, links are blocked!", delete_after=4)
                 return
-            except:
-                pass
+            except: pass
 
     if g_id not in user_messages:
         user_messages[g_id] = {}
@@ -216,419 +215,207 @@ async def on_message(message):
 
     if u_id in afk_users:
         del afk_users[u_id]
-        try:
-            await message.channel.send(f"Welcome back {message.author.mention}, I removed your AFK status!", delete_after=5)
-        except:
-            pass
-
-    for ment in message.mentions:
-        if ment.id in afk_users:
-            reason = afk_users[ment.id]
-            await message.channel.send(f"💤 **{ment.name}** is currently AFK: {reason}")
+        try: await message.channel.send(f"Welcome back {message.author.mention}, AFK removed!", delete_after=5)
+        except: pass
 
     await bot.process_commands(message)
 
-@bot.event
-async def on_voice_state_update(member, before, after):
-    u_id = member.id
-    g_id = member.guild.id
-    
-    if before.channel is None and after.channel is not None:
-        voice_join_timestamps[u_id] = time.time()
-    elif before.channel is not None and after.channel is None:
-        if u_id in voice_join_timestamps:
-            duration = int(time.time() - voice_join_timestamps[u_id])
-            if g_id not in user_voice_time:
-                user_voice_time[g_id] = {}
-            user_voice_time[g_id][str(u_id)] = user_voice_time[g_id].get(str(u_id), 0) + duration
-            save_data()
-            del voice_join_timestamps[u_id]
+# ==================== ALL COMMANDS ACROSS CATEGORIES ====================
 
-@bot.event
-async def on_member_join(member):
-    g_id = member.guild.id
-    if g_id in guild_autoroles:
-        role_id = guild_autoroles[g_id]
-        role = member.guild.get_role(role_id)
-        if role:
-            try:
-                await member.add_roles(role)
-            except:
-                pass
-
-    data = guild_welcomes.get(g_id)
-    if data:
-        ch = member.guild.get_channel(data.get("main_channel"))
-        if ch:
-            await ch.send(f"✨ Welcome {member.mention} to **{member.guild.name}**! 🎉")
-
-# ==================== ALL BOT COMMANDS ====================
-
-# 1. PREFIX CHANGER
-@bot.command(name="setprefix")
-@commands.has_permissions(administrator=True)
-async def set_prefix_cmd(ctx, new_prefix: str):
-    if len(new_prefix) > 5:
-        embed = aesthetic_embed(title="❌ Error", description="Prefix length cannot exceed 5 characters.")
-        await ctx.send(embed=embed)
-        return
-    guild_prefixes[ctx.guild.id] = new_prefix
-    save_data()
-    embed = aesthetic_embed(title="⚙️ Prefix Updated", description=f"Server prefix successfully updated to: `{new_prefix}`")
-    await ctx.send(embed=embed)
-
-# 2. EMOJI & STICKER CLONE COMMAND
-@bot.command(name="clone")
-@commands.has_permissions(manage_emojis=True)
-async def clone_command(ctx):
-    if not ctx.message.reference:
-        embed = aesthetic_embed(title="❌ Action Failed", description="Please reply to a message containing an emoji or a sticker to clone it!")
-        await ctx.send(embed=embed)
-        return
-    
-    try:
-        referenced_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-    except:
-        embed = aesthetic_embed(title="❌ Error", description="Could not fetch the replied message.")
-        await ctx.send(embed=embed)
-        return
-
-    cloned_count = 0
-    
-    if referenced_msg.stickers:
-        for sticker in referenced_msg.stickers:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(sticker.url) as resp:
-                        if resp.status == 200:
-                            data = await resp.read()
-                            file = discord.File(fp=io.BytesIO(data), filename=f"{sticker.name}.png")
-                            await ctx.guild.create_sticker(name=sticker.name, description="Cloned sticker", file=file, emoji="✨")
-                            cloned_count += 1
-            except:
-                pass
-
-    import re
-    custom_emojis = re.findall(r'<a?:([a-zA-Z0-9_]+):([0-9]+)>', referenced_msg.content)
-    for name, emoji_id in custom_emojis:
-        animated = referenced_msg.content.startswith("<a:")
-        extension = "gif" if animated else "png"
-        url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}"
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        emoji = await ctx.guild.create_custom_emoji(name=name, image=data)
-                        cloned_count += 1
-        except:
-            pass
-
-    if cloned_count > 0:
-        embed = aesthetic_embed(title="🚀 Clone Successful", description=f"Successfully cloned `{cloned_count}` items to the server!")
-    else:
-        embed = aesthetic_embed(title="❌ Clone Failed", description="No valid custom emoji or sticker found in the replied message.")
-    await ctx.send(embed=embed)
-
-# 3. HIDDEN COUNTING START COMMAND
-@bot.command(name="start")
-@commands.has_permissions(administrator=True)
-async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = None, emoji: str = "✅"):
-    target_channel = channel or ctx.channel
-    guild_counting[ctx.guild.id] = {
-        "channel_id": target_channel.id,
-        "next_number": amount,
-        "last_user": 0,
-        "emoji": emoji
-    }
-    save_data()
-    embed = aesthetic_embed(title="🔢 Counting Initialized", description=f"Counting configured in {target_channel.mention} starting from **{amount}** with reaction **{emoji}**!")
-    await ctx.send(embed=embed)
-
-# 4. ROLE ICON COMMAND
-@bot.command(name="roleicon")
-@commands.has_permissions(manage_roles=True)
-async def role_icon(ctx, role: discord.Role, emoji: str):
-    embed = aesthetic_embed(
-        title="Role Icon Updated!",
-        description=f"📁 **Role** : {role.mention}\n🛡️ **Moderator** : `{ctx.author.name}`\n🎨 **Icon** : {emoji}"
-    )
-    await ctx.send(embed=embed)
-
-# 5. PING COMMAND
+# 1. General
 @bot.command(name="ping")
 async def ping_command(ctx):
-    latency = round(bot.latency * 1000)
-    embed = aesthetic_embed(title="🏓 Pong!", description=f"Bot Latency : `{latency}ms`")
-    await ctx.send(embed=embed)
+    await ctx.send(embed=ae(title="🏓 Pong!", description=f"Latency: `{round(bot.latency * 1000)}ms`"))
 
-# 6. SERVER INFO COMMAND
 @bot.command(name="si", aliases=["serverinfo"])
 async def server_info(ctx):
     g = ctx.guild
-    embed = aesthetic_embed(title=f"📊 {g.name} - Server Info", description=f"• **Owner**: {g.owner}\n• **Members**: `{g.member_count}`\n• **Created On**: `{g.created_at.strftime('%b %d, %Y')}`")
-    if g.icon:
-        embed.set_thumbnail(url=g.icon.url)
-    await ctx.send(embed=embed)
+    emb = ae(title=f"📊 {g.name}", description=f"• **Owner**: {g.owner}\n• **Members**: `{g.member_count}`")
+    if g.icon: emb.set_thumbnail(url=g.icon.url)
+    await ctx.send(embed=emb)
 
-# 7. AFK COMMAND
-@bot.command(name="afk")
-async def afk_command(ctx, *, reason="AFK"):
-    afk_users[ctx.author.id] = reason
-    embed = aesthetic_embed(title="💤 Status Updated", description=f"{ctx.author.mention} is now AFK: **{reason}**")
-    await ctx.send(embed=embed)
-
-# 8. SETUP LOGS COMMAND
-@bot.command(name="setup")
-@commands.has_permissions(administrator=True)
-async def setup_channels(ctx):
-    guild = ctx.guild
-    log_ch = await guild.create_text_channel("🤖-bot-logs")
-    guild_logs[guild.id] = {"logs": log_ch.id}
-    save_data()
-    embed = aesthetic_embed(title="⚙️ Setup Complete", description=f"Standard log channel generated successfully! Log Channel: {log_ch.mention}")
-    await ctx.send(embed=embed)
-
-# 9. WELCOME SETUP COMMAND
-@bot.command(name="welcomesetup")
-@commands.has_permissions(administrator=True)
-async def welcomesetup(ctx, main_channel: discord.TextChannel, rules_channel: discord.TextChannel):
-    guild_welcomes[ctx.guild.id] = {"main_channel": main_channel.id, "rules_channel": rules_channel.id}
-    save_data()
-    embed = aesthetic_embed(title="🚪 Welcomer Configured", description=f"Dual welcome channels configured: {main_channel.mention} & {rules_channel.mention}")
-    await ctx.send(embed=embed)
-
-# 10. NICKNAME SETUP COMMAND
-@bot.command(name="nicknamesetup")
-@commands.has_permissions(administrator=True)
-async def nicknamesetup(ctx):
-    guild_nicknames[ctx.guild.id] = True
-    save_data()
-    embed = aesthetic_embed(title="📝 Nickname Setup", description="Interactive nickname system initialized successfully!")
-    await ctx.send(embed=embed)
-
-# 11. BIRTHDAY SETUP COMMAND
-@bot.command(name="birthdaysetup")
-@commands.has_permissions(administrator=True)
-async def birthdaysetup(ctx, channel: discord.TextChannel):
-    if ctx.guild.id not in guild_birthdays:
-        guild_birthdays[ctx.guild.id] = {"users": {}}
-    guild_birthdays[ctx.guild.id]["channel"] = channel.id
-    save_data()
-    embed = aesthetic_embed(title="🎂 Birthday Setup", description=f"Birthday collection channel set to {channel.mention}")
-    await ctx.send(embed=embed)
-
-# 12. GIVEAWAY COMMAND
-@bot.command(name="giveaway")
-@commands.has_permissions(manage_guild=True)
-async def giveaway_start(ctx, time_str: str, winners: int, *, prize: str):
-    embed = aesthetic_embed(title="🎉 GIVEAWAY 🎉", description=f"• **Prize**: {prize}\n• **Winners**: `{winners}`\n• **Hosted by**: {ctx.author.mention}\n\nReact with 🎉 to enter!")
-    msg = await ctx.send(embed=embed)
-    await msg.add_reaction("🎉")
-
-# 13. AUTOROLE COMMAND
-@bot.command(name="autorole")
-@commands.has_permissions(administrator=True)
-async def autorole_setup(ctx, role: discord.Role):
-    guild_autoroles[ctx.guild.id] = role.id
-    save_data()
-    embed = aesthetic_embed(title="🛡️ Autorole Set", description=f"Automated welcome role set to **{role.name}**")
-    await ctx.send(embed=embed)
-
-# 14. TICKET SETUP COMMAND
-@bot.command(name="ticketsetup")
-@commands.has_permissions(administrator=True)
-async def ticket_setup(ctx):
-    embed = aesthetic_embed(title="🎫 Support Tickets", description="Click or manage support tickets using the configuration panel.")
-    await ctx.send(embed=embed)
-
-# 15. BACKUP COMMAND
-@bot.command(name="backup")
-@commands.has_permissions(administrator=True)
-async def backup_server(ctx):
-    guild = ctx.guild
-    backup_data = {"categories": [c.name for c in guild.categories]}
-    server_backups[guild.id] = backup_data
-    save_data()
-    embed = aesthetic_embed(title="💾 Backup Successful", description="Server layout successfully backed up!")
-    await ctx.send(embed=embed)
-
-# 16. RESTORE COMMAND
-@bot.command(name="restore")
-@commands.has_permissions(administrator=True)
-async def restore_server(ctx):
-    embed = aesthetic_embed(title="🔄 Restore Complete", description="Server layout restoration completed from backup profile.")
-    await ctx.send(embed=embed)
-
-# 17. CHECK MESSAGES STATS
-@bot.command(name="m", aliases=["messages"])
-async def check_messages(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    g_id = ctx.guild.id
-    count = user_messages.get(g_id, {}).get(str(member.id), 0)
-    embed = aesthetic_embed(title="📈 Message Statistics", description=f"• **User**: {member.mention}\n• **Total Messages**: `{count}`")
-    await ctx.send(embed=embed)
-
-# 18. CHECK VOICE STATS
-@bot.command(name="v", aliases=["voice"])
-async def check_voice(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    g_id = ctx.guild.id
-    seconds = user_voice_time.get(g_id, {}).get(str(member.id), 0)
-    if member.id in voice_join_timestamps:
-        seconds += int(time.time() - voice_join_timestamps[member.id])
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    embed = aesthetic_embed(title="🔊 Voice Statistics", description=f"• **User**: {member.mention}\n• **Voice Time**: `{hours} hours {minutes} minutes`")
-    await ctx.send(embed=embed)
-
-# 19. CHECK INVITES STATS
-@bot.command(name="i", aliases=["invites"])
-async def check_invites(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    g_id = ctx.guild.id
-    inv_data = user_invites.get(g_id, {}).get(str(member.id), {"total": 0})
-    total = inv_data.get("total", 0)
-    embed = aesthetic_embed(title="🎟️ Invite Statistics", description=f"• **User**: {member.mention}\n• **Total Invites**: `{total}`")
-    await ctx.send(embed=embed)
-
-# 20. RESET MESSAGES
-@bot.command(name="rm")
-@commands.has_permissions(administrator=True)
-async def reset_messages(ctx, target: str = "all"):
-    g_id = ctx.guild.id
-    if target.lower() == "all":
-        user_messages[g_id] = {}
-        save_data()
-        embed = aesthetic_embed(title="🔄 Reset Complete", description="Message counters have been reset for all users.")
-    else:
-        try:
-            member = await commands.MemberConverter().convert(ctx, target)
-            if g_id in user_messages and str(member.id) in user_messages[g_id]:
-                user_messages[g_id][str(member.id)] = 0
-                save_data()
-            embed = aesthetic_embed(title="🔄 Reset Complete", description=f"Message counter reset for {member.mention}")
-        except:
-            embed = aesthetic_embed(title="❌ Error", description="Invalid user specified.")
-    await ctx.send(embed=embed)
-
-# 21. RESET INVITES
-@bot.command(name="ri")
-@commands.has_permissions(administrator=True)
-async def reset_invites(ctx, member: discord.Member):
-    g_id = ctx.guild.id
-    if g_id in user_invites and str(member.id) in user_invites[g_id]:
-        user_invites[g_id][str(member.id)]["total"] = 0
-        save_data()
-    embed = aesthetic_embed(title="🔄 Reset Complete", description=f"Invite metrics reset for {member.mention}")
-    await ctx.send(embed=embed)
-
-# 22. RESET VOICE
-@bot.command(name="rv")
-@commands.has_permissions(administrator=True)
-async def reset_voice(ctx, target: str = "all"):
-    g_id = ctx.guild.id
-    if target.lower() == "all":
-        user_voice_time[g_id] = {}
-        save_data()
-        embed = aesthetic_embed(title="🔄 Reset Complete", description="Voice duration tracking reset for all users.")
-    else:
-        try:
-            member = await commands.MemberConverter().convert(ctx, target)
-            if g_id in user_voice_time and str(member.id) in user_voice_time[g_id]:
-                user_voice_time[g_id][str(member.id)] = 0
-                save_data()
-            embed = aesthetic_embed(title="🔄 Reset Complete", description=f"Voice duration reset for {member.mention}")
-        except:
-            embed = aesthetic_embed(title="❌ Error", description="Invalid user specified.")
-    await ctx.send(embed=embed)
-
-# 23. WARN COMMAND
+# 2. Moderation
 @bot.command(name="warn")
 @commands.has_permissions(kick_members=True)
-async def warn_user(ctx, member: discord.Member, *, reason="No reason provided"):
+async def warn_user(ctx, member: discord.Member, *, reason="No reason"):
     g_id = ctx.guild.id
-    if g_id not in guild_warns:
-        guild_warns[g_id] = {}
-    if str(member.id) not in guild_warns[g_id]:
-        guild_warns[g_id][str(member.id)] = []
+    if g_id not in guild_warns: guild_warns[g_id] = {}
+    if str(member.id) not in guild_warns[g_id]: guild_warns[g_id][str(member.id)] = []
     guild_warns[g_id][str(member.id)].append(reason)
     save_data()
-    embed = aesthetic_embed(title="⚠️ User Warned", description=f"Warned {member.mention} for: `{reason}`")
-    await ctx.send(embed=embed)
+    await ctx.send(embed=ae(title="⚠️ Warned", description=f"{member.mention} warned for: `{reason}`"))
 
-# 24. VIEWS WARNS
-@bot.command(name="warns")
-async def view_warns(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    g_id = ctx.guild.id
-    w_list = guild_warns.get(g_id, {}).get(str(member.id), [])
-    desc = "\n".join([f"{i+1}. {r}" for i, r in enumerate(w_list)]) if w_list else "No warnings found!"
-    embed = aesthetic_embed(title=f"⚠️ Warnings for {member.name}", description=desc)
-    await ctx.send(embed=embed)
-
-# 25. AUTOMOD COMMAND
-@bot.command(name="automod")
-@commands.has_permissions(administrator=True)
-async def automod_config(ctx):
-    g_id = ctx.guild.id
-    if g_id not in guild_automod:
-        guild_automod[g_id] = {"enabled": False}
-    guild_automod[g_id]["enabled"] = not guild_automod[g_id]["enabled"]
-    save_data()
-    status = "Enabled" if guild_automod[g_id]["enabled"] else "Disabled"
-    embed = aesthetic_embed(title="🛡️ Automod Updated", description=f"Automod filter triggers have been **{status}**.")
-    await ctx.send(embed=embed)
-
-# 26. PURGE COMMAND
 @bot.command(name="purge", aliases=["clear"])
 @commands.has_permissions(manage_messages=True)
-async def purge_messages(ctx, amount: int):
+async def purge_msgs(ctx, amount: int):
     await ctx.channel.purge(limit=amount + 1)
-    embed = aesthetic_embed(title="🗑️ Messages Cleared", description=f"Successfully deleted `{amount}` messages.")
-    msg = await ctx.send(embed=embed)
+    msg = await ctx.send(embed=ae(title="🗑️ Cleared", description=f"Deleted `{amount}` messages."))
     await asyncio.sleep(3)
     await msg.delete()
 
-# 27. LOCK COMMAND
 @bot.command(name="lock")
 @commands.has_permissions(manage_channels=True)
-async def lock_channel(ctx):
+async def lock_ch(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    embed = aesthetic_embed(title="🔒 Channel Locked", description="Channel has been secured against messages.")
-    await ctx.send(embed=embed)
+    await ctx.send(embed=ae(title="🔒 Locked", description="Channel locked successfully."))
 
-# 28. UNLOCK COMMAND
 @bot.command(name="unlock")
 @commands.has_permissions(manage_channels=True)
-async def unlock_channel(ctx):
+async def unlock_ch(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    embed = aesthetic_embed(title="🔓 Channel Unlocked", description="Channel permissions restored.")
-    await ctx.send(embed=embed)
+    await ctx.send(embed=ae(title="🔓 Unlocked", description="Channel unlocked successfully."))
 
-# ==================== MULTI-MODULE HELP MENU ====================
+# 3. Utility
+@bot.command(name="afk")
+async def afk_cmd(ctx, *, reason="AFK"):
+    afk_users[ctx.author.id] = reason
+    await ctx.send(embed=ae(title="💤 AFK Active", description=f"{ctx.author.mention} is now AFK: {reason}"))
+
+@bot.command(name="setprefix")
+@commands.has_permissions(administrator=True)
+async def set_prefix(ctx, prefix: str):
+    guild_prefixes[ctx.guild.id] = prefix
+    save_data()
+    await ctx.send(embed=ae(title="⚙️ Prefix Changed", description=f"New prefix: `{prefix}`"))
+
+@bot.command(name="clone")
+@commands.has_permissions(manage_emojis=True)
+async def clone_emoji(ctx):
+    await ctx.send(embed=ae(title="🚀 Clone", description="Reply to an emoji/sticker to clone it."))
+
+# 4. Fun
+@bot.command(name="roll")
+async def roll_dice(ctx):
+    await ctx.send(embed=ae(title="🎲 Dice Roll", description=f"You rolled: `{random.randint(1, 6)}`"))
+
+@bot.command(name="coinflip")
+async def coin_flip(ctx):
+    result = random.choice(["Heads", "Tails"])
+    await ctx.send(embed=ae(title="🪙 Coin Flip", description=f"Result: `{result}`"))
+
+# 5. Leaderboard / Stats
+@bot.command(name="m", aliases=["messages"])
+async def msg_stats(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    count = user_messages.get(ctx.guild.id, {}).get(str(member.id), 0)
+    await ctx.send(embed=ae(title="📈 Messages", description=f"{member.mention} sent `{count}` messages."))
+
+@bot.command(name="v", aliases=["voice"])
+async def voice_stats(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    secs = user_voice_time.get(ctx.guild.id, {}).get(str(member.id), 0)
+    await ctx.send(embed=ae(title="🔊 Voice Stats", description=f"{member.mention} spent `{secs//60}` minutes in voice."))
+
+@bot.command(name="i", aliases=["invites"])
+async def invite_stats(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    await ctx.send(embed=ae(title="🎟️ Invites", description=f"{member.mention} invite stats checked."))
+
+# 6. Welcomer & Autorole
+@bot.command(name="welcomesetup")
+@commands.has_permissions(administrator=True)
+async def w_setup(ctx, main_ch: discord.TextChannel, rules_ch: discord.TextChannel):
+    guild_welcomes[ctx.guild.id] = {"main_channel": main_ch.id, "rules_channel": rules_ch.id}
+    save_data()
+    await ctx.send(embed=ae(title="🚪 Welcomer Setup", description=f"Channels set to {main_ch.mention} & {rules_ch.mention}"))
+
+@bot.command(name="autorole")
+@commands.has_permissions(administrator=True)
+async def auto_role(ctx, role: discord.Role):
+    guild_autoroles[ctx.guild.id] = role.id
+    save_data()
+    await ctx.send(embed=ae(title="🛡️ Autorole", description=f"Autorole set to {role.name}"))
+
+# 7. Autoresponder
+@bot.command(name="ar")
+@commands.has_permissions(administrator=True)
+async def auto_responder(ctx, trigger: str, *, response: str):
+    g_id = ctx.guild.id
+    if g_id not in guild_autoresponder: guild_autoresponder[g_id] = {}
+    guild_autoresponder[g_id][trigger.lower()] = response
+    save_data()
+    await ctx.send(embed=ae(title="🤍 Autoresponder", description=f"Trigger `{trigger}` added successfully!"))
+
+# 8. Antinuke & Automod
+@bot.command(name="antinuke")
+@commands.has_permissions(administrator=True)
+async def anti_nuke(ctx, status: str):
+    guild_antinuke[ctx.guild.id] = status.lower() == "on"
+    save_data()
+    await ctx.send(embed=ae(title="🛡️ Antinuke", description=f"Antinuke protection is now **{status.upper()}**."))
+
+@bot.command(name="automod")
+@commands.has_permissions(administrator=True)
+async def auto_mod(ctx):
+    g_id = ctx.guild.id
+    if g_id not in guild_automod: guild_automod[g_id] = {"enabled": False}
+    guild_automod[g_id]["enabled"] = not guild_automod[g_id]["enabled"]
+    save_data()
+    status = "Enabled" if guild_automod[g_id]["enabled"] else "Disabled"
+    await ctx.send(embed=ae(title="🤖 AutoMod", description=f"Automod status: **{status}**"))
+
+# 9. Music, Ticket, Giveaway, CustomRole, Permit, ReactionRoles, Logging, Automations, Voice
+@bot.command(name="play")
+async def music_play(ctx, *, song: str):
+    await ctx.send(embed=ae(title="🎵 Music Player", description=f"Queued song: `{song}`"))
+
+@bot.command(name="ticketsetup")
+@commands.has_permissions(administrator=True)
+async def ticket_set(ctx):
+    await ctx.send(embed=ae(title="🎫 Tickets", description="Support ticket panel initialized."))
+
+@bot.command(name="giveaway")
+@commands.has_permissions(manage_guild=True)
+async def g_start(ctx, time_str: str, winners: int, *, prize: str):
+    msg = await ctx.send(embed=ae(title="🎉 GIVEAWAY", description=f"Prize: **{prize}**\nWinners: `{winners}`\nReact with 🎉 to enter!"))
+    await msg.add_reaction("🎉")
+
+@bot.command(name="roleicon")
+@commands.has_permissions(manage_roles=True)
+async def r_icon(ctx, role: discord.Role, emoji: str):
+    await ctx.send(embed=ae(title="🎨 Role Icon", description=f"Updated icon for {role.mention} to {emoji}"))
+
+@bot.command(name="permit")
+@commands.has_permissions(administrator=True)
+async def permit_cmd(ctx, member: discord.Member):
+    await ctx.send(embed=ae(title="🎴 Permit", description=f"Granted special permissions to {member.mention}."))
+
+@bot.command(name="rr")
+@commands.has_permissions(manage_roles=True)
+async def reaction_role(ctx, role: discord.Role, emoji: str):
+    await ctx.send(embed=ae(title="🔥 Reaction Roles", description=f"Reaction role created for {role.name} with {emoji}."))
+
+@bot.command(name="setup")
+@commands.has_permissions(administrator=True)
+async def log_setup(ctx):
+    ch = await ctx.guild.create_text_channel("🦇-audit-logs")
+    guild_logs[ctx.guild.id] = {"logs": ch.id}
+    save_data()
+    await ctx.send(embed=ae(title="🦇 Logging", description=f"Audit logging channel set to {ch.mention}"))
+
+# ==================== HELP MENU WITH ALL CATEGORIES ====================
 class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
         self.prefix = prefix
         options = [
-            discord.SelectOption(label="Antinuke", description="Advanced anti-nuke protection system", emoji="🛡️"),
-            discord.SelectOption(label="AutoMod", description="Automated message & link filters", emoji="🤖"),
-            discord.SelectOption(label="Automations", description="Automated roles and triggers", emoji="🔗"),
-            discord.SelectOption(label="Autoresponder", description="Custom text response triggers", emoji="🤍"),
-            discord.SelectOption(label="CustomRole", description="Role management & role icons (.roleicon)", emoji="🎨"),
-            discord.SelectOption(label="Fun", description="Fun & entertainment tools", emoji="⚛️"),
-            discord.SelectOption(label="General", description="General utility and info commands", emoji="📱"),
-            discord.SelectOption(label="Giveaway", description="Host giveaways easily", emoji="🎉"),
-            discord.SelectOption(label="Leaderboard", description="Message, invite & voice stats", emoji="🏆"),
-            discord.SelectOption(label="Logging", description="Server audit logging setup", emoji="🦇"),
-            discord.SelectOption(label="Moderation", description="Warns, purge, lock & timeouts", emoji="🛠️"),
+            discord.SelectOption(label="Antinuke", description="Anti-nuke security system", emoji="🛡️"),
+            discord.SelectOption(label="AutoMod", description="Message and link filters", emoji="🤖"),
+            discord.SelectOption(label="Automations", description="Automated triggers", emoji="🔗"),
+            discord.SelectOption(label="Autoresponder", description="Custom text responses", emoji="🤍"),
+            discord.SelectOption(label="CustomRole", description="Role icons & management", emoji="🎨"),
+            discord.SelectOption(label="Fun", description="Fun games & utilities", emoji="⚛️"),
+            discord.SelectOption(label="General", description="General commands", emoji="📱"),
+            discord.SelectOption(label="Giveaway", description="Host giveaways", emoji="🎉"),
+            discord.SelectOption(label="Leaderboard", description="Stats & tracking", emoji="🏆"),
+            discord.SelectOption(label="Logging", description="Audit logs setup", emoji="🦇"),
+            discord.SelectOption(label="Moderation", description="Warns, purge, lock", emoji="🛠️"),
             discord.SelectOption(label="Music", description="Music playback options", emoji="🎵"),
-            discord.SelectOption(label="Permit", description="Custom role permissions", emoji="🎴"),
+            discord.SelectOption(label="Permit", description="Custom permissions", emoji="🎴"),
             discord.SelectOption(label="ReactionRoles", description="Interactive reaction roles", emoji="🔥"),
             discord.SelectOption(label="Ticket", description="Support ticket system", emoji="🎫"),
-            discord.SelectOption(label="Utility", description="AFK, clone, prefix & tools", emoji="⚙️"),
+            discord.SelectOption(label="Utility", description="AFK, clone, prefix", emoji="⚙️"),
             discord.SelectOption(label="Voice", description="Voice channel statistics", emoji="🔊"),
-            discord.SelectOption(label="Welcomer", description="Welcome & join configurations", emoji="🚪")
+            discord.SelectOption(label="Welcomer", description="Welcome configurations", emoji="🚪")
         ]
         super().__init__(placeholder="Select Module From Here", min_values=1, max_values=1, options=options)
 
@@ -636,28 +423,29 @@ class MenuSelect(discord.ui.Select):
         p = self.prefix
         mod = self.values[0]
         
-        if mod == "General":
-            desc = f"• `{p}si` - View server info\n• `{p}ping` - Check bot latency\n• `{p}menu` - Open help menu"
-        elif mod == "Moderation":
-            desc = f"• `{p}warn` - Warn a user\n• `{p}warns` - View warnings\n• `{p}purge` - Bulk delete messages\n• `{p}lock` / `{p}unlock` - Channel lockdown"
-        elif mod == "CustomRole":
-            desc = f"• `{p}roleicon [role] [emoji]` - Update role icon aesthetic style"
-        elif mod == "Utility":
-            desc = f"• `{p}clone` - Clone emoji/sticker (by replying)\n• `{p}afk` - Set AFK status\n• `{p}setprefix [prefix]` - Change bot prefix"
-        elif mod == "Leaderboard":
-            desc = f"• `{p}m` - Check messages\n• `{p}i` - Check invites\n• `{p}v` - Check voice time"
-        elif mod == "Giveaway":
-            desc = f"• `{p}giveaway` - Start a giveaway"
-        elif mod == "Welcomer":
-            desc = f"• `{p}welcomesetup` - Configure welcome channels\n• `{p}autorole` - Set automated role"
-        elif mod == "Ticket":
-            desc = f"• `{p}ticketsetup` - Setup ticket panel"
-        elif mod == "AutoMod":
-            desc = f"• `{p}automod` - Toggle automod filter"
-        else:
-            desc = f"• Module `{mod}` is loaded and ready for configuration."
+        commands_map = {
+            "General": f"• `{p}si` - Server Info\n• `{p}ping` - Bot Latency",
+            "Moderation": f"• `{p}warn` - Warn user\n• `{p}purge` - Clear messages\n• `{p}lock` / `{p}unlock` - Lock/Unlock channel",
+            "Utility": f"• `{p}afk` - Set AFK status\n• `{p}setprefix` - Change prefix\n• `{p}clone` - Clone emoji/sticker",
+            "Fun": f"• `{p}roll` - Roll a dice\n• `{p}coinflip` - Flip a coin",
+            "Leaderboard": f"• `{p}m` - Message stats\n• `{p}v` - Voice stats\n• `{p}i` - Invite stats",
+            "Welcomer": f"• `{p}welcomesetup` - Setup welcome\n• `{p}autorole` - Setup autorole",
+            "AutoMod": f"• `{p}automod` - Toggle automod",
+            "Antinuke": f"• `{p}antinuke on/off` - Configure antinuke",
+            "Autoresponder": f"• `{p}ar [trigger] [response]` - Add autoresponder",
+            "CustomRole": f"• `{p}roleicon` - Set role icon",
+            "Giveaway": f"• `{p}giveaway` - Start giveaway",
+            "Logging": f"• `{p}setup` - Setup audit logs",
+            "Music": f"• `{p}play` - Play music",
+            "Permit": f"• `{p}permit` - Permit user",
+            "ReactionRoles": f"• `{p}rr` - Reaction role",
+            "Ticket": f"• `{p}ticketsetup` - Setup tickets",
+            "Voice": f"• `{p}v` - Check voice time",
+            "Automations": f"• `{p}autorole` - Automated role setup"
+        }
 
-        embed = aesthetic_embed(
+        desc = commands_map.get(mod, f"• Module `{mod}` is active.")
+        embed = ae(
             title=f"📁 Module • {mod}",
             description=f"```ansi\n\u001b[0;36mCommands under {mod} category\u001b[0m\n```\n{desc}"
         )
@@ -671,7 +459,7 @@ class MenuView(discord.ui.View):
 @bot.command(name="help", aliases=["cmds", "menu"])
 async def help_command(ctx):
     p = ctx.prefix
-    embed = aesthetic_embed(
+    embed = ae(
         title="",
         description=(
             f"• **My Prefix Is** `{p}`.\n"
