@@ -1,6 +1,3 @@
-Aapse maafi chahta hoon! Galti se counting system ki command help menu ya dropdown se miss ho gayi thi, kyunki maine baki commands par zyada focus kiya tha.
-Counting feature ka logic bot ke andar background mein (on_message ke through) bilkul theek kaam kar raha hai, bas uski command help menu aur dropdown mein add nahi thi.
-Maine use wapas Utility / Fun / General category ke andar add kar diya hai aur ab counting ki command (start ya counting) menu mein bhi dikhegi. Yeh lijiye final updated code jisme counting aur baaki saare commands fully integrated hain:
 import os
 import time
 import json
