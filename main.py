@@ -11,7 +11,6 @@ from flask import Flask
 from threading import Thread
 from datetime import datetime, timedelta
 
-# Flask server to keep bot alive on Render 24/7
 app = Flask('')
 
 @app.route('/')
@@ -25,7 +24,6 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# Bot Intents & Configuration
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -52,23 +50,12 @@ def load_data():
 
 def save_data():
     data = {
-        "logs": guild_logs,
-        "birthdays": guild_birthdays,
-        "backups": server_backups,
-        "prefixes": guild_prefixes,
-        "warns": guild_warns,
-        "automod": guild_automod,
-        "autorole": guild_autoroles,
-        "tickets": guild_tickets,
-        "welcome": guild_welcomes,
-        "messages": user_messages,
-        "voice_time": user_voice_time,
-        "invites": user_invites,
-        "nickname_setup": guild_nicknames,
-        "counting": guild_counting,
-        "autoresponder": guild_autoresponder,
-        "antinuke": guild_antinuke,
-        "reaction_roles": guild_reaction_roles
+        "logs": guild_logs, "birthdays": guild_birthdays, "backups": server_backups,
+        "prefixes": guild_prefixes, "warns": guild_warns, "automod": guild_automod,
+        "autorole": guild_autoroles, "tickets": guild_tickets, "welcome": guild_welcomes,
+        "messages": user_messages, "voice_time": user_voice_time, "invites": user_invites,
+        "nickname_setup": guild_nicknames, "counting": guild_counting, "autoresponder": guild_autoresponder,
+        "antinuke": guild_antinuke, "reaction_roles": guild_reaction_roles
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -104,8 +91,11 @@ afk_users = {}
 voice_join_timestamps = {}
 server_invite_counts = {}
 
-def ae(title="", description="", color=discord.Color.from_rgb(20, 20, 20)):
-    return discord.Embed(title=title, description=description, color=color)
+# Ultra Unique & Stylish Embed Generator
+def ae(title="", description="", color=discord.Color.from_rgb(15, 15, 20)):
+    embed = discord.Embed(title=f"✦ {title}" if title else "", description=description, color=color)
+    embed.set_footer(text="❖ Bot Developed by Zeus ❖")
+    return embed
 
 @bot.event
 async def on_ready():
@@ -117,7 +107,7 @@ async def on_ready():
     print("----------------------------------------")
     print("Bot Name: Moonlight Heaven")
     print("Developer: Zeus")
-    print("Status: VC Alias Removed & Online!")
+    print("Status: Unique Aesthetic Design & Voice Fixed Online!")
     print("----------------------------------------")
 
 @bot.event
@@ -126,11 +116,11 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
     elif isinstance(error, (commands.MissingRequiredArgument, commands.BadArgument)):
-        embed = ae(title="⚠️ Invalid Command Usage", description=f"• **Proper Usage** : `{p}{ctx.command.name} [arguments]`\n• **Help Menu** : `{p}help`")
+        embed = ae(title="SECURITY PROTOCOL WARNING", description=f"◈ **Syntax Error** : `{p}{ctx.command.name} [arguments]`\n◈ **Access Portal** : `{p}help`")
     elif isinstance(error, commands.MissingPermissions):
-        embed = ae(title="🚫 Access Denied", description="You lack the required permissions to run this command.")
+        embed = ae(title="ACCESS DENIED", description="◈ You do not possess the required clearance permissions for this command.")
     else:
-        embed = ae(title="❌ Command Error", description=f"`{error}`")
+        embed = ae(title="SYSTEM ERROR EXCEPTION", description=f"◈ `{error}`")
     await ctx.send(embed=embed)
 
 @tasks.loop(hours=24)
@@ -149,7 +139,7 @@ async def daily_birthday_check():
             if bday == today:
                 member = guild.get_member(int(user_id_str))
                 if member:
-                    await channel.send(content=f"@everyone 🎉 Happy Birthday {member.mention}! 🎂🥳")
+                    await channel.send(content=f"@everyone ❖ Celestial Event: Happy Birthday {member.mention}! May your day be legendary. 🎂✨")
 
 @tasks.loop(hours=6)
 async def auto_backup_task():
@@ -216,10 +206,10 @@ async def on_message(message):
                     c_data["next_number"] = expected + 1
                     c_data["last_user"] = u_id
                     save_data()
-                    await message.add_reaction(c_data.get("emoji", "✅"))
+                    await message.add_reaction(c_data.get("emoji", "❖"))
                 else:
                     await message.delete()
-                    await message.channel.send(f"❌ {message.author.mention}, wrong counting or consecutive message! Reset to `{expected}`.", delete_after=4)
+                    await message.channel.send(f"◈ {message.author.mention}, sequencing anomaly detected or consecutive input violation! Reset to `{expected}`.", delete_after=4)
             except ValueError:
                 if not message.author.guild_permissions.manage_messages:
                     try: await message.delete()
@@ -229,7 +219,7 @@ async def on_message(message):
         if any(w in message.content.lower() for w in ["discord.gg/", "http://", "https://"]) and not message.author.guild_permissions.manage_messages:
             try:
                 await message.delete()
-                await message.channel.send(f"⚠️ {message.author.mention}, links are blocked!", delete_after=4)
+                await message.channel.send(f"◈ {message.author.mention}, external links are strictly restricted by protocol!", delete_after=4)
                 return
             except: pass
 
@@ -240,7 +230,7 @@ async def on_message(message):
 
     if u_id in afk_users:
         del afk_users[u_id]
-        try: await message.channel.send(f"Welcome back {message.author.mention}, AFK removed!", delete_after=5)
+        try: await message.channel.send(f"◈ Welcome back, {message.author.mention}. AFK cloak deactivated.", delete_after=5)
         except: pass
 
     await bot.process_commands(message)
@@ -249,12 +239,12 @@ async def on_message(message):
 
 @bot.command(name="ping")
 async def ping_command(ctx):
-    await ctx.send(embed=ae(title="🏓 Pong!", description=f"Latency: `{round(bot.latency * 1000)}ms`"))
+    await ctx.send(embed=ae(title="SYSTEM LATENCY MATRIX", description=f"◈ **Connection Response Rate** : `⚡ {round(bot.latency * 1000)}ms`"))
 
 @bot.command(name="si", aliases=["serverinfo"])
 async def server_info(ctx):
     g = ctx.guild
-    emb = ae(title=f"📊 {g.name}", description=f"• **Owner**: {g.owner}\n• **Members**: `{g.member_count}`")
+    emb = ae(title=f"REALM ARCHIVE • {g.name}", description=f"◈ **Supreme Ruler**: {g.owner}\n◈ **Total Entity Count**: `{g.member_count}`\n◈ **Security Grade**: Alpha Verified")
     if g.icon: emb.set_thumbnail(url=g.icon.url)
     await ctx.send(embed=emb)
 
@@ -266,13 +256,13 @@ async def warn_user(ctx, member: discord.Member, *, reason="No reason"):
     if str(member.id) not in guild_warns[g_id]: guild_warns[g_id][str(member.id)] = []
     guild_warns[g_id][str(member.id)].append(reason)
     save_data()
-    await ctx.send(embed=ae(title="⚠️ Warned", description=f"{member.mention} warned for: `{reason}`"))
+    await ctx.send(embed=ae(title="DISCIPLINARY STRIKE", description=f"◈ Target: {member.mention}\n◈ Infraction Noted: `{reason}`"))
 
 @bot.command(name="purge", aliases=["clear"])
 @commands.has_permissions(manage_messages=True)
 async def purge_msgs(ctx, amount: int):
     await ctx.channel.purge(limit=amount + 1)
-    msg = await ctx.send(embed=ae(title="🗑️ Cleared", description=f"Deleted `{amount}` messages."))
+    msg = await ctx.send(embed=ae(title="DATA EXPUNGED", description=f"◈ Successfully purged `{amount}` chat fragments from current timeline."))
     await asyncio.sleep(3)
     await msg.delete()
 
@@ -280,34 +270,34 @@ async def purge_msgs(ctx, amount: int):
 @commands.has_permissions(manage_channels=True)
 async def lock_ch(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send(embed=ae(title="🔒 Locked", description="Channel locked successfully."))
+    await ctx.send(embed=ae(title="SECTOR LOCKDOWN", description="◈ Channel transmission privileges suspended."))
 
 @bot.command(name="unlock")
 @commands.has_permissions(manage_channels=True)
 async def unlock_ch(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send(embed=ae(title="🔓 Unlocked", description="Channel unlocked successfully."))
+    await ctx.send(embed=ae(title="SECTOR RESTORED", description="◈ Channel communication channels are now open."))
 
 @bot.command(name="afk")
 async def afk_cmd(ctx, *, reason="AFK"):
     afk_users[ctx.author.id] = reason
-    await ctx.send(embed=ae(title="💤 AFK Active", description=f"{ctx.author.mention} is now AFK: {reason}"))
+    await ctx.send(embed=ae(title="STEALTH CLOAK ENGAGED", description=f"◈ {ctx.author.mention} is now marked AFK: **{reason}**"))
 
 @bot.command(name="setprefix")
 @commands.has_permissions(administrator=True)
 async def set_prefix(ctx, prefix: str):
     guild_prefixes[ctx.guild.id] = prefix
     save_data()
-    await ctx.send(embed=ae(title="⚙️ Prefix Changed", description=f"New prefix: `{prefix}`"))
+    await ctx.send(embed=ae(title="SIGNATURE MODIFIED", description=f"◈ New server command prefix initialized to: `{prefix}`"))
 
 @bot.command(name="clone")
 @commands.has_permissions(manage_emojis=True)
 async def clone_emoji(ctx):
-    await ctx.send(embed=ae(title="🚀 Clone", description="Reply to an emoji/sticker to clone it."))
+    await ctx.send(embed=ae(title="ASSET DUPLICATION", description="◈ Reply directly to a target emote/sticker to replicate it."))
 
 @bot.command(name="start", aliases=["counting"])
 @commands.has_permissions(administrator=True)
-async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = None, emoji: str = "✅"):
+async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = None, emoji: str = "❖"):
     target_channel = channel or ctx.channel
     guild_counting[ctx.guild.id] = {
         "channel_id": target_channel.id,
@@ -316,22 +306,22 @@ async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = No
         "emoji": emoji
     }
     save_data()
-    await ctx.send(embed=ae(title="🔢 Counting Initialized", description=f"Counting configured in {target_channel.mention} starting from **{amount}** with reaction **{emoji}**!"))
+    await ctx.send(embed=ae(title="NUMERICAL PROTOCOL ACTIVE", description=f"◈ Configured in {target_channel.mention} starting from **{amount}** with validation icon **{emoji}**!"))
 
 @bot.command(name="roll")
 async def roll_dice(ctx):
-    await ctx.send(embed=ae(title="🎲 Dice Roll", description=f"You rolled: `{random.randint(1, 6)}`"))
+    await ctx.send(embed=ae(title="QUANTUM DIE CAST", description=f"◈ Result computed: `[{random.randint(1, 6)}]`"))
 
 @bot.command(name="coinflip")
 async def coin_flip(ctx):
     result = random.choice(["Heads", "Tails"])
-    await ctx.send(embed=ae(title="🪙 Coin Flip", description=f"Result: `{result}`"))
+    await ctx.send(embed=ae(title="BINARY TOSS", description=f"◈ The orbital coin settled on: **{result}**"))
 
 @bot.command(name="m", aliases=["messages"])
 async def msg_stats(ctx, member: discord.Member = None):
     member = member or ctx.author
     count = user_messages.get(ctx.guild.id, {}).get(str(member.id), 0)
-    await ctx.send(embed=ae(title="📈 Messages", description=f"{member.mention} sent `{count}` messages."))
+    await ctx.send(embed=ae(title="TRANSMISSION METRICS", description=f"◈ {member.mention} has dispatched a cumulative total of `{count}` text payloads."))
 
 @bot.command(name="v", aliases=["voice"])
 async def voice_stats(ctx, member: discord.Member = None):
@@ -340,26 +330,26 @@ async def voice_stats(ctx, member: discord.Member = None):
     minutes = secs // 60
     hours = minutes // 60
     rem_mins = minutes % 60
-    await ctx.send(embed=ae(title="🔊 Voice Stats", description=f"{member.mention} spent `{hours} hours and {rem_mins} minutes` (`{secs} seconds`) in voice channels."))
+    await ctx.send(embed=ae(title="AUDITORY CHRONO LOG", description=f"◈ {member.mention} has spent `{hours} hours and {rem_mins} minutes` embedded in voice environments."))
 
 @bot.command(name="i", aliases=["invites"])
 async def invite_stats(ctx, member: discord.Member = None):
     member = member or ctx.author
-    await ctx.send(embed=ae(title="🎟️ Invites", description=f"{member.mention} invite stats checked."))
+    await ctx.send(embed=ae(title="RECRUITMENT ANALYTICS", description=f"◈ Inspected portal generation vectors for {member.mention}."))
 
 @bot.command(name="welcomesetup")
 @commands.has_permissions(administrator=True)
 async def w_setup(ctx, main_ch: discord.TextChannel, rules_ch: discord.TextChannel):
     guild_welcomes[ctx.guild.id] = {"main_channel": main_ch.id, "rules_channel": rules_ch.id}
     save_data()
-    await ctx.send(embed=ae(title="🚪 Welcomer Setup", description=f"Channels set to {main_ch.mention} & {rules_ch.mention}"))
+    await ctx.send(embed=ae(title="ARRIVAL PORTAL LINKED", description=f"◈ Welcome coordinates mapped to {main_ch.mention} & {rules_ch.mention}"))
 
 @bot.command(name="autorole")
 @commands.has_permissions(administrator=True)
 async def auto_role(ctx, role: discord.Role):
     guild_autoroles[ctx.guild.id] = role.id
     save_data()
-    await ctx.send(embed=ae(title="🛡️ Autorole", description=f"Autorole set to {role.name}"))
+    await ctx.send(embed=ae(title="AUTOMATED INVESTITURE", description=f"◈ Incoming entities will be bound to **{role.name}** automatically."))
 
 @bot.command(name="ar")
 @commands.has_permissions(administrator=True)
@@ -368,14 +358,14 @@ async def auto_responder(ctx, trigger: str, *, response: str):
     if g_id not in guild_autoresponder: guild_autoresponder[g_id] = {}
     guild_autoresponder[g_id][trigger.lower()] = response
     save_data()
-    await ctx.send(embed=ae(title="🤍 Autoresponder", description=f"Trigger `{trigger}` added successfully!"))
+    await ctx.send(embed=ae(title="NEURAL REFLEX ADDED", description=f"◈ Trigger key `{trigger}` has been integrated successfully!"))
 
 @bot.command(name="antinuke")
 @commands.has_permissions(administrator=True)
 async def anti_nuke(ctx, status: str):
     guild_antinuke[ctx.guild.id] = status.lower() == "on"
     save_data()
-    await ctx.send(embed=ae(title="🛡️ Antinuke", description=f"Antinuke protection is now **{status.upper()}**."))
+    await ctx.send(embed=ae(title="FORTIFIED ANLTINUKE MATRIX", description=f"◈ Threat countermeasures state: **{status.upper()}**."))
 
 @bot.command(name="automod")
 @commands.has_permissions(administrator=True)
@@ -385,37 +375,37 @@ async def auto_mod(ctx):
     guild_automod[g_id]["enabled"] = not guild_automod[g_id]["enabled"]
     save_data()
     status = "Enabled" if guild_automod[g_id]["enabled"] else "Disabled"
-    await ctx.send(embed=ae(title="🤖 AutoMod", description=f"Automod status: **{status}**"))
+    await ctx.send(embed=ae(title="AUTOMATED SENTINEL", description=f"◈ Content moderation filter state: **{status}**"))
 
 @bot.command(name="play")
 async def music_play(ctx, *, song: str):
-    await ctx.send(embed=ae(title="🎵 Music Player", description=f"Queued song: `{song}`"))
+    await ctx.send(embed=ae(title="SONIC FREQUENCY STREAM", description=f"◈ Injected audio token into queue: `{song}`"))
 
 @bot.command(name="ticketsetup")
 @commands.has_permissions(administrator=True)
 async def ticket_set(ctx):
-    await ctx.send(embed=ae(title="🎫 Tickets", description="Support ticket panel initialized."))
+    await ctx.send(embed=ae(title="DISPATCH DESK DEPLOYED", description="◈ Confidential support ticketing console established."))
 
 @bot.command(name="giveaway")
 @commands.has_permissions(manage_guild=True)
 async def g_start(ctx, time_str: str, winners: int, *, prize: str):
-    msg = await ctx.send(embed=ae(title="🎉 GIVEAWAY", description=f"Prize: **{prize}**\nWinners: `{winners}`\nReact with 🎉 to enter!"))
-    await msg.add_reaction("🎉")
+    msg = await ctx.send(embed=ae(title="CELESTIAL GIVEAWAY EVENT", description=f"🎁 **Asset**: {prize}\n👑 **Slots Available**: `{winners}`\n◈ React with ❖ below to claim validation entry!"))
+    await msg.add_reaction("❖")
 
 @bot.command(name="roleicon")
 @commands.has_permissions(manage_roles=True)
 async def r_icon(ctx, role: discord.Role, emoji: str):
-    await ctx.send(embed=ae(title="🎨 Role Icon", description=f"Updated icon for {role.mention} to {emoji}"))
+    await ctx.send(embed=ae(title="SYMBOLIC HERALDRY", description=f"◈ Reconfigured emblem for {role.mention} to {emoji}."))
 
 @bot.command(name="permit")
 @commands.has_permissions(administrator=True)
 async def permit_cmd(ctx, member: discord.Member):
-    await ctx.send(embed=ae(title="🎴 Permit", description=f"Granted special permissions to {member.mention}."))
+    await ctx.send(embed=ae(title="SECURITY BYPASS GRANTED", description=f"◈ Sovereign clearance tokens extended to {member.mention}."))
 
 @bot.command(name="rr")
 @commands.has_permissions(manage_roles=True)
 async def reaction_role(ctx, role: discord.Role, emoji: str):
-    await ctx.send(embed=ae(title="🔥 Reaction Roles", description=f"Reaction role created for {role.name} with {emoji}."))
+    await ctx.send(embed=ae(title="INTERACTIVE CATALYST", description=f"◈ Reaction bind forged for {role.name} via {emoji}."))
 
 @bot.command(name="setup")
 @commands.has_permissions(administrator=True)
@@ -423,7 +413,7 @@ async def log_setup(ctx):
     ch = await ctx.guild.create_text_channel("🦇-audit-logs")
     guild_logs[ctx.guild.id] = {"logs": ch.id}
     save_data()
-    await ctx.send(embed=ae(title="🦇 Logging", description=f"Audit logging channel set to {ch.mention}"))
+    await ctx.send(embed=ae(title="CHRONICLE LOGGING ARRAY", description=f"◈ Centralized observation network routed to {ch.mention}"))
 
 # ==================== HELP MENU ====================
 class MenuSelect(discord.ui.Select):
@@ -449,7 +439,7 @@ class MenuSelect(discord.ui.Select):
             discord.SelectOption(label="Voice", description="Voice channel statistics", emoji="🔊"),
             discord.SelectOption(label="Welcomer", description="Welcome configurations", emoji="🚪")
         ]
-        super().__init__(placeholder="Select Module From Here", min_values=1, max_values=1, options=options)
+        super().__init__(placeholder="❖ SELECT A MODULE SUBSYSTEM ❖", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         p = self.prefix
@@ -476,10 +466,10 @@ class MenuSelect(discord.ui.Select):
             "Automations": f"• `{p}autorole` - Automated role setup"
         }
 
-        desc = commands_map.get(mod, f"• Module `{mod}` is active.")
+        desc = commands_map.get(mod, f"• Module `{mod}` active.")
         embed = ae(
-            title=f"📁 Module • {mod}",
-            description=f"```ansi\n\u001b[0;36mCommands under {mod} category\u001b[0m\n```\n{desc}"
+            title=f"MODULE MATRIX • {mod}",
+            description=f"```ansi\n\u001b[0;36mDirectives under {mod} partition\u001b[0m\n```\n{desc}"
         )
         await interaction.response.edit_message(embed=embed, view=self.view)
 
@@ -492,11 +482,11 @@ class MenuView(discord.ui.View):
 async def help_command(ctx):
     p = ctx.prefix
     embed = ae(
-        title="",
+        title="MOONLIGHT HEAVEN • OMEGA TERMINAL",
         description=(
-            f"• **My Prefix Is** `{p}`.\n"
-            "• **Total Commands:** `542`\n"
-            "• **Choose a Specific Module of your Desire**\n\n"
+            f"◈ **Command Prefix**: `{p}`\n"
+            "◈ **Total Directives**: `542`\n"
+            "◈ **Choose a operational sector from the dropdown below**\n\n"
             "🛡️ `»` Antinuke\n"
             "🤖 `»` AutoMod\n"
             "🔗 `»` Automations\n"
@@ -515,11 +505,10 @@ async def help_command(ctx):
             "⚙️ `»` Utility\n"
             "🔊 `»` Voice\n"
             "🚪 `»` Welcomer\n\n"
-            "🔗 **Links**\n"
+            "🔗 **External Nodes**\n"
             "[Invite Me](https://discord.com) | [Support Server](https://discord.com) | [Website](https://discord.com)"
         )
     )
-    embed.set_footer(text="Powered By Moonlight Development™ | Designed by Zeus")
     await ctx.send(embed=embed, view=MenuView(p))
 
 if __name__ == "__main__":
