@@ -117,7 +117,7 @@ async def on_ready():
     print("----------------------------------------")
     print("Bot Name: Moonlight Heaven")
     print("Developer: Zeus")
-    print("Status: Error Fixed & Fully Online!")
+    print("Status: VC Alias Removed & Online!")
     print("----------------------------------------")
 
 @bot.event
@@ -162,6 +162,34 @@ async def auto_backup_task():
             save_data()
         except:
             pass
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.bot:
+        return
+    
+    g_id = member.guild.id
+    u_id = str(member.id)
+    
+    if before.channel is None and after.channel is not None:
+        voice_join_timestamps[(g_id, member.id)] = time.time()
+    elif before.channel is not None and after.channel is None:
+        start_time = voice_join_timestamps.pop((g_id, member.id), None)
+        if start_time:
+            duration = int(time.time() - start_time)
+            if g_id not in user_voice_time:
+                user_voice_time[g_id] = {}
+            user_voice_time[g_id][u_id] = user_voice_time[g_id].get(u_id, 0) + duration
+            save_data()
+    elif before.channel != after.channel and before.channel is not None and after.channel is not None:
+        start_time = voice_join_timestamps.pop((g_id, member.id), None)
+        if start_time:
+            duration = int(time.time() - start_time)
+            if g_id not in user_voice_time:
+                user_voice_time[g_id] = {}
+            user_voice_time[g_id][u_id] = user_voice_time[g_id].get(u_id, 0) + duration
+        voice_join_timestamps[(g_id, member.id)] = time.time()
+        save_data()
 
 @bot.event
 async def on_message(message):
@@ -309,7 +337,10 @@ async def msg_stats(ctx, member: discord.Member = None):
 async def voice_stats(ctx, member: discord.Member = None):
     member = member or ctx.author
     secs = user_voice_time.get(ctx.guild.id, {}).get(str(member.id), 0)
-    await ctx.send(embed=ae(title="🔊 Voice Stats", description=f"{member.mention} spent `{secs//60}` minutes in voice."))
+    minutes = secs // 60
+    hours = minutes // 60
+    rem_mins = minutes % 60
+    await ctx.send(embed=ae(title="🔊 Voice Stats", description=f"{member.mention} spent `{hours} hours and {rem_mins} minutes` (`{secs} seconds`) in voice channels."))
 
 @bot.command(name="i", aliases=["invites"])
 async def invite_stats(ctx, member: discord.Member = None):
