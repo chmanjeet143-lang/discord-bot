@@ -7,13 +7,13 @@ import discord
 from discord.ext import commands, tasks
 from flask import Flask
 from threading import Thread
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "🤖 Zynrax Bot is Alive and Running!"
+    return "🤖 Moonlight Heaven is Alive and Running!"
 
 def run():
     app.run(host="0.0.0.0", port=10000)
@@ -78,8 +78,8 @@ guild_reaction_roles = {int(k): v for k, v in db.get("reaction_roles", {}).items
 
 def get_prefix(bot, message):
     if not message.guild:
-        return "Z"
-    return guild_prefixes.get(message.guild.id, "Z")
+        return "&"
+    return guild_prefixes.get(message.guild.id, "&")
 
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 bot.remove_command("help")
@@ -88,8 +88,8 @@ afk_users = {}
 voice_join_timestamps = {}
 
 def ae(title="", description="", color=discord.Color.from_rgb(15, 15, 20)):
-    embed = discord.Embed(title=title, description=description, color=color)
-    embed.set_footer(text="❖ Zynrax Bot Core ❖")
+    embed = discord.Embed(title=f"✦ {title}" if title else "", description=description, color=color)
+    embed.set_footer(text="❖ Bot Developed by Zeus ❖")
     return embed
 
 @bot.event
@@ -101,8 +101,9 @@ async def on_ready():
                     voice_join_timestamps[(guild.id, member.id)] = time.time()
 
     print("----------------------------------------")
-    print(f"Bot Name: {bot.user.name}")
-    print("Status: Zynrax Fully Operational with All Commands!")
+    print("Bot Name: Moonlight Heaven")
+    print("Developer: Zeus")
+    print("Status: Fully Operational & Beautiful Embeds Loaded!")
     print("----------------------------------------")
 
 @bot.event
@@ -110,7 +111,7 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
     elif isinstance(error, commands.MissingPermissions):
-        await ctx.send(embed=ae(title="Access Denied", description="You lack required permissions for this command."))
+        await ctx.send(embed=ae(title="Access Denied", description="Aapke paas ye command chalane ki permission nahi hai."))
     else:
         print(f"Error: {error}")
 
@@ -173,7 +174,7 @@ async def on_message(message):
                     await message.add_reaction(c_data.get("emoji", "❖"))
                 else:
                     await message.delete()
-                    await message.channel.send(f"{message.author.mention}, wrong counting number! Reset to `{expected}`.", delete_after=4)
+                    await message.channel.send(f"{message.author.mention}, galat number! Reset to `{expected}`.", delete_after=4)
             except ValueError:
                 if not message.author.guild_permissions.manage_messages:
                     try: await message.delete()
@@ -186,12 +187,12 @@ async def on_message(message):
 
     if u_id in afk_users:
         del afk_users[u_id]
-        try: await message.channel.send(f"Welcome back, {message.author.mention}. AFK removed.", delete_after=5)
+        try: await message.channel.send(f"Welcome back, {message.author.mention}. AFK hata diya gaya hai.", delete_after=5)
         except: pass
 
     await bot.process_commands(message)
 
-# ==================== ALL COMMANDS ====================
+# ==================== COMMANDS ====================
 
 @bot.command(name="ping")
 async def ping_command(ctx):
@@ -200,7 +201,7 @@ async def ping_command(ctx):
 @bot.command(name="si", aliases=["serverinfo"])
 async def server_info(ctx):
     g = ctx.guild
-    emb = ae(title=f"Server Info • {g.name}", description=f"Supreme Ruler: {g.owner}\nTotal Members: `{g.member_count}`")
+    emb = ae(title=f"Server Info • {g.name}", description=f"Owner: {g.owner}\nTotal Members: `{g.member_count}`")
     if g.icon: emb.set_thumbnail(url=g.icon.url)
     await ctx.send(embed=emb)
 
@@ -226,6 +227,19 @@ async def member_count(ctx):
     )
     await ctx.send(embed=ae(title="Member Statistics", description=desc))
 
+@bot.command(name="ban")
+@commands.has_permissions(ban_members=True)
+async def ban_user(ctx, member: discord.Member, *, reason="No reason provided"):
+    await member.ban(reason=reason)
+    await ctx.send(embed=ae(title="Entity Banished", description=f"Target: {member.mention}\nReason: `{reason}`"))
+
+@bot.command(name="mute", aliases=["timeout"])
+@commands.has_permissions(moderate_members=True)
+async def mute_user(ctx, member: discord.Member, minutes: int, *, reason="No reason provided"):
+    duration = timedelta(minutes=minutes)
+    await member.timeout(duration, reason=reason)
+    await ctx.send(embed=ae(title="Entity Muted", description=f"Target: {member.mention} for `{minutes} minutes`\nReason: `{reason}`"))
+
 @bot.command(name="warn")
 @commands.has_permissions(kick_members=True)
 async def warn_user(ctx, member: discord.Member, *, reason="No reason"):
@@ -234,13 +248,13 @@ async def warn_user(ctx, member: discord.Member, *, reason="No reason"):
     if str(member.id) not in guild_warns[g_id]: guild_warns[g_id][str(member.id)] = []
     guild_warns[g_id][str(member.id)].append(reason)
     save_data()
-    await ctx.send(embed=ae(title="Disciplinary Strike", description=f"Target: {member.mention}\nInfraction: `{reason}`"))
+    await ctx.send(embed=ae(title="Disciplinary Strike", description=f"Target: {member.mention}\nReason: `{reason}`"))
 
 @bot.command(name="purge", aliases=["clear"])
 @commands.has_permissions(manage_messages=True)
 async def purge_msgs(ctx, amount: int):
     await ctx.channel.purge(limit=amount + 1)
-    msg = await ctx.send(embed=ae(title="Data Expunged", description=f"Purged `{amount}` messages."))
+    msg = await ctx.send(embed=ae(title="Data Expunged", description=f"Successfully purged `{amount}` messages."))
     await asyncio.sleep(3)
     await msg.delete()
 
@@ -248,30 +262,30 @@ async def purge_msgs(ctx, amount: int):
 @commands.has_permissions(manage_channels=True)
 async def lock_ch(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send(embed=ae(title="Sector Lockdown", description="Channel locked successfully."))
+    await ctx.send(embed=ae(title="Sector Lockdown", description="Channel lock kar diya gaya hai."))
 
 @bot.command(name="unlock")
 @commands.has_permissions(manage_channels=True)
 async def unlock_ch(ctx):
     await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send(embed=ae(title="Sector Restored", description="Channel unlocked successfully."))
+    await ctx.send(embed=ae(title="Sector Restored", description="Channel unlock kar diya gaya hai."))
 
 @bot.command(name="afk")
 async def afk_cmd(ctx, *, reason="AFK"):
     afk_users[ctx.author.id] = reason
-    await ctx.send(embed=ae(title="AFK Enabled", description=f"{ctx.author.mention} is now AFK: **{reason}**"))
+    await ctx.send(embed=ae(title="Stealth Cloak Engaged", description=f"{ctx.author.mention} ab AFK hain: **{reason}**"))
 
 @bot.command(name="setprefix")
 @commands.has_permissions(administrator=True)
 async def set_prefix(ctx, prefix: str):
     guild_prefixes[ctx.guild.id] = prefix
     save_data()
-    await ctx.send(embed=ae(title="Prefix Modified", description=f"New prefix set to: `{prefix}`"))
+    await ctx.send(embed=ae(title="Signature Modified", description=f"Naya prefix set ho gaya hai: `{prefix}`"))
 
 @bot.command(name="clone")
 @commands.has_permissions(manage_emojis=True)
 async def clone_emoji(ctx):
-    await ctx.send(embed=ae(title="Asset Duplication", description="Reply to an emoji to clone it."))
+    await ctx.send(embed=ae(title="Asset Duplication", description="Emoji ko clone karne ke liye uspar reply karein."))
 
 @bot.command(name="start", aliases=["counting"])
 @commands.has_permissions(administrator=True)
@@ -284,7 +298,7 @@ async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = No
         "emoji": emoji
     }
     save_data()
-    await ctx.send(embed=ae(title="Counting Active", description=f"Configured in {target_channel.mention} starting from **{amount}**!"))
+    await ctx.send(embed=ae(title="Counting Active", description=f"Counting channel {target_channel.mention} mein **{amount}** se shuru ho gayi hai!"))
 
 @bot.command(name="roll")
 async def roll_dice(ctx):
@@ -299,7 +313,11 @@ async def coin_flip(ctx):
 async def msg_stats(ctx, member: discord.Member = None):
     member = member or ctx.author
     count = user_messages.get(ctx.guild.id, {}).get(str(member.id), 0)
-    await ctx.send(embed=ae(title="Transmission Metrics", description=f"{member.mention} has sent `{count}` messages."))
+    desc = (
+        f"💬 **Target User**: {member.mention}\n"
+        f"📊 **Total Messages Dispatched**: `{count}` messages"
+    )
+    await ctx.send(embed=ae(title="Transmission Metrics", description=desc))
 
 @bot.command(name="v", aliases=["voice"])
 async def voice_stats(ctx, member: discord.Member = None):
@@ -308,32 +326,40 @@ async def voice_stats(ctx, member: discord.Member = None):
     minutes = secs // 60
     hours = minutes // 60
     rem_mins = minutes % 60
-    await ctx.send(embed=ae(title="Auditory Chrono Log", description=f"{member.mention} has spent `{hours} hours and {rem_mins} minutes` in voice channels."))
+    desc = (
+        f"🔊 **Target User**: {member.mention}\n"
+        f"⏱️ **Voice Channel Time**: `{hours} hours aur {rem_mins} minutes`"
+    )
+    await ctx.send(embed=ae(title="Auditory Chrono Log", description=desc))
 
 @bot.command(name="i", aliases=["invites"])
 async def invite_stats(ctx, member: discord.Member = None):
     member = member or ctx.author
-    await ctx.send(embed=ae(title="Recruitment Analytics", description=f"Invite statistics for {member.mention}."))
+    desc = (
+        f"🎟️ **Target User**: {member.mention}\n"
+        f"📈 **Recruitment Analytics**: Portal tracking active."
+    )
+    await ctx.send(embed=ae(title="Recruitment Analytics", description=desc))
 
 @bot.command(name="rm")
 async def reset_messages(ctx, target: str = None):
     if not ctx.author.guild_permissions.administrator:
-        return await ctx.send(embed=ae(title="Error", description="You need Administrator permissions."))
+        return await ctx.send(embed=ae(title="Error", description="Aapko Administrator permission chahiye."))
     if target == "all":
         user_messages[ctx.guild.id] = {}
         save_data()
-        await ctx.send(embed=ae(title="Success", description="All users message stats have been reset."))
+        await ctx.send(embed=ae(title="Success", description="Sabhi users ke message stats reset kar diye gaye hain."))
     else:
         await ctx.send(embed=ae(title="Usage", description="Use `&rm all` to clear message stats."))
 
 @bot.command(name="rv")
 async def reset_voice(ctx, target: str = None):
     if not ctx.author.guild_permissions.administrator:
-        return await ctx.send(embed=ae(title="Error", description="You need Administrator permissions."))
+        return await ctx.send(embed=ae(title="Error", description="Aapko Administrator permission chahiye."))
     if target == "all":
         user_voice_time[ctx.guild.id] = {}
         save_data()
-        await ctx.send(embed=ae(title="Success", description="All users voice time stats have been reset."))
+        await ctx.send(embed=ae(title="Success", description="Sabhi users ke voice time stats reset kar diye gaye hain."))
     else:
         await ctx.send(embed=ae(title="Usage", description="Use `&rv all` to clear voice stats."))
 
@@ -349,7 +375,7 @@ async def w_setup(ctx, main_ch: discord.TextChannel, rules_ch: discord.TextChann
 async def auto_role(ctx, role: discord.Role):
     guild_autoroles[ctx.guild.id] = role.id
     save_data()
-    await ctx.send(embed=ae(title="Autorole Set", description=f"New members will get **{role.name}**."))
+    await ctx.send(embed=ae(title="Autorole Set", description=f"Naye members ko **{role.name}** mil jayega."))
 
 @bot.command(name="ar")
 @commands.has_permissions(administrator=True)
@@ -358,7 +384,7 @@ async def auto_responder(ctx, trigger: str, *, response: str):
     if g_id not in guild_autoresponder: guild_autoresponder[g_id] = {}
     guild_autoresponder[g_id][trigger.lower()] = response
     save_data()
-    await ctx.send(embed=ae(title="Autoresponder Added", description=f"Trigger `{trigger}` added successfully!"))
+    await ctx.send(embed=ae(title="Autoresponder Added", description=f"Trigger `{trigger}` successfully add ho gaya hai!"))
 
 @bot.command(name="antinuke")
 @commands.has_permissions(administrator=True)
@@ -379,7 +405,7 @@ async def auto_mod(ctx):
 
 @bot.command(name="play")
 async def music_play(ctx, *, song: str):
-    await ctx.send(embed=ae(title="Music Player", description=f"Queued song: `{song}`"))
+    await ctx.send(embed=ae(title="Music Player", description=f"Song queued: `{song}`"))
 
 @bot.command(name="ticketsetup")
 @commands.has_permissions(administrator=True)
@@ -415,7 +441,7 @@ async def log_setup(ctx):
     save_data()
     await ctx.send(embed=ae(title="Audit Logs Setup", description=f"Logs routed to {ch.mention}"))
 
-# ==================== HELP MENU (ZYNRAX EXACT) ====================
+# ==================== HELP MENU ====================
 
 class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
@@ -456,7 +482,7 @@ class MenuView(discord.ui.View):
         super().__init__(timeout=180)
         self.add_item(MenuSelect(prefix))
 
-@bot.command(name="help", aliases=["cmds", "menu", "zhelp"])
+@bot.command(name="help", aliases=["cmds", "menu", "helpme"])
 async def help_command(ctx):
     p = ctx.prefix
     desc = (
@@ -486,12 +512,12 @@ async def help_command(ctx):
         "🚪 `»` Welcomer"
     )
     embed = discord.Embed(
-        title="Hey, I'm Zynrax™",
+        title="Hey, I'm Moonlight Heaven™",
         description=desc,
         color=discord.Color.from_rgb(15, 15, 20)
     )
     embed.set_thumbnail(url="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe")
-    embed.set_footer(text="❖ Zynrax Bot Core ❖")
+    embed.set_footer(text="❖ Bot Developed by Zeus ❖")
     
     await ctx.send(embed=embed, view=MenuView(p))
 
