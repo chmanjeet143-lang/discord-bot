@@ -88,7 +88,6 @@ afk_users = {}
 voice_join_timestamps = {}
 snipe_data = {}
 
-# Safe & Error-Free Embed Function
 def emb(title="", description="", color=0x5865F2):
     embed = discord.Embed(title=title, description=description, color=color)
     embed.set_footer(text="Moonlight Heaven • Developed by Zeus")
@@ -190,6 +189,7 @@ async def on_message(message):
         if message.content.lower() in responses:
             await message.channel.send(responses[message.content.lower()])
 
+    # Fixed counting reaction bug here
     if g_id in guild_counting:
         c_data = guild_counting[g_id]
         if message.channel.id == c_data.get("channel_id"):
@@ -197,11 +197,16 @@ async def on_message(message):
                 number = int(message.content.strip())
                 expected = c_data.get("next_number", 1)
                 last_user = c_data.get("last_user", 0)
+                custom_emoji = c_data.get("emoji", "✅")
+                
                 if number == expected and u_id != last_user:
                     c_data["next_number"] = expected + 1
                     c_data["last_user"] = u_id
                     save_data()
-                    await message.add_reaction("✅")
+                    try:
+                        await message.add_reaction(custom_emoji)
+                    except:
+                        await message.add_reaction("✅")
                 else:
                     await message.delete()
                     await message.channel.send(f"{message.author.mention}, wrong number! Counting reset back to `{expected}`.", delete_after=4)
@@ -221,7 +226,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ==================== MASSIVE COMMAND SUITE ====================
+# ==================== COMMAND SUITE ====================
 
 @bot.command(name="ping")
 async def ping_command(ctx):
@@ -472,7 +477,7 @@ async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = No
     target_channel = channel or ctx.channel
     guild_counting[ctx.guild.id] = {"channel_id": target_channel.id, "next_number": amount, "last_user": 0, "emoji": emoji}
     save_data()
-    await ctx.send(embed=emb(title="Counting Initialized", description=f"Started in {target_channel.mention} at number {amount}."))
+    await ctx.send(embed=emb(title="Counting Initialized", description=f"Started in {target_channel.mention} at number {amount} using emoji {emoji}."))
 
 @bot.command(name="m", aliases=["messages"])
 async def msg_stats(ctx, member: discord.Member = None):
@@ -535,10 +540,12 @@ async def auto_mod(ctx):
     status = "Enabled" if guild_automod[g_id]["enabled"] else "Disabled"
     await ctx.send(embed=emb(title="Automod Protection", description=f"Automod status: {status}."))
 
-@bot.command(name="giveaway")
+# Fully Optimized Giveaway Command
+@bot.command(name="giveaway", aliases=["gvw", "gcreate"])
 @commands.has_permissions(manage_guild=True)
 async def g_start(ctx, time_str: str, winners: int, *, prize: str):
-    msg = await ctx.send(embed=emb(title="GIVEAWAY", description=f"Prize: {prize}\nWinners: {winners}\nDuration: {time_str}\n\nReact with 🎉 to enter!"))
+    e = emb(title="🎉 GIVEAWAY 🎉", description=f"🎁 **Prize**: {prize}\n👑 **Winners**: `{winners}`\n⏱️ **Duration**: `{time_str}`\n\nReact with 🎉 to enter!")
+    msg = await ctx.send(embed=e)
     await msg.add_reaction("🎉")
 
 @bot.command(name="setup")
