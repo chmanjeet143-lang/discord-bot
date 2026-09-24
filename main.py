@@ -88,10 +88,9 @@ afk_users = {}
 voice_join_timestamps = {}
 snipe_data = {}
 
-# Beautiful Clean & Square Embed Theme (Dark / Accent Style)
-def emb(title="", description="", color=discord.IntColor if hasattr(discord, 'IntColor') else 0x2b2d31):
-    # Using a sleek dark sidebar color (0x2b2d31 or custom vibrant blue 0x5865F2)
-    embed = discord.Embed(title=title, description=description, color=0x5865F2)
+# Clean & Square Modern Embed Theme (Fixed & Error-Free)
+def emb(title="", description="", color=0x5865F2):
+    embed = discord.Embed(title=title, description=description, color=color)
     embed.set_footer(text="❖ Moonlight Heaven • Developed by Zeus")
     return embed
 
@@ -133,7 +132,7 @@ async def on_command_error(ctx, error):
             "reminder": f"`{p}reminder [minutes] [task]`",
             "addrole": f"`{p}addrole @user @role`",
             "removerole": f"`{p}removerole @user @role`",
-            "cloneemoji": f"`{p}cloneemoji [emoji_url] [name]`",
+            "cloneemoji": f"`{p}cloneemoji [emoji] [name]`",
             "clonesticker": f"`{p}clonesticker [name]`"
         }
         correct_usage = usage_dict.get(cmd_name, f"Check help menu: `{p}help`")
