@@ -102,7 +102,7 @@ async def on_ready():
                     voice_join_timestamps[(guild.id, member.id)] = time.time()
 
     print("----------------------------------------")
-    print("Bot Name: Moonlight Heaven (Massive Edition)")
+    print("Bot Name: Moonlight Heaven (Custom Emoji Counting)")
     print("Developer: Zeus")
     print("Status: All Commands Online!")
     print("----------------------------------------")
@@ -128,12 +128,13 @@ async def on_command_error(ctx, error):
             "giveaway": f"Correct Usage: `{p}giveaway [time] [winners] [prize]`",
             "poll": f"Correct Usage: `{p}poll [question]`",
             "say": f"Correct Usage: `{p}say [text]`",
-            "reminder": f"Correct Usage: `{p}reminder [minutes] [task]`"
+            "reminder": f"Correct Usage: `{p}reminder [minutes] [task]`",
+            "start": f"Correct Usage: `{p}start [amount] [#channel] [emoji]`"
         }
         correct_usage = usage_dict.get(cmd_name, f"Check the help menu for correct usage: `{p}help`")
         await ctx.send(embed=emb(title="⚠️ Invalid Command Usage", description=f"You used the command incorrectly!\n\n**Proper Way:**\n{correct_usage}"))
     elif isinstance(error, commands.BadArgument):
-        await ctx.send(embed=emb(title="⚠️ Bad Argument", description="You provided an invalid value (e.g., text instead of a member). Please check your input."))
+        await ctx.send(embed=emb(title="⚠️ Bad Argument", description="You provided an invalid value. Please double-check your arguments (e.g., proper channel link/mention or numbers)."))
     else:
         print(f"Error: {error}")
 
@@ -192,14 +193,19 @@ async def on_message(message):
                 number = int(message.content.strip())
                 expected = c_data.get("next_number", 1)
                 last_user = c_data.get("last_user", 0)
+                custom_emoji = c_data.get("emoji", "✅")
+                
                 if number == expected and u_id != last_user:
                     c_data["next_number"] = expected + 1
                     c_data["last_user"] = u_id
                     save_data()
-                    await message.add_reaction("✅")
+                    try:
+                        await message.add_reaction(custom_emoji)
+                    except Exception:
+                        await message.add_reaction("✅") # Fallback if emoji fails
                 else:
                     await message.delete()
-                    await message.channel.send(f"{message.author.mention}, wrong number! Counting reset back to `{expected}`.", delete_after=4)
+                    await message.channel.send(f"{message.author.mention}, wrong number or consecutive message! Counting remains at/resets to `{expected}`.", delete_after=4)
             except ValueError:
                 if not message.author.guild_permissions.manage_messages:
                     try: await message.delete()
@@ -393,11 +399,15 @@ async def set_prefix(ctx, prefix: str):
 
 @bot.command(name="start", aliases=["counting"])
 @commands.has_permissions(administrator=True)
-async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = None, emoji: str = "✅"):
-    target_channel = channel or ctx.channel
-    guild_counting[ctx.guild.id] = {"channel_id": target_channel.id, "next_number": amount, "last_user": 0, "emoji": emoji}
+async def start_counting(ctx, amount: int, channel: discord.TextChannel, emoji: str):
+    guild_counting[ctx.guild.id] = {
+        "channel_id": channel.id, 
+        "next_number": amount, 
+        "last_user": 0, 
+        "emoji": emoji
+    }
     save_data()
-    await ctx.send(embed=emb(title="Counting Started", description=f"🔢 Counting initialized in {target_channel.mention} starting from **{amount}**!"))
+    await ctx.send(embed=emb(title="Counting Started", description=f"🔢 Counting initialized in {channel.mention} starting from **{amount}** using custom reaction: {emoji}!"))
 
 @bot.command(name="m", aliases=["messages"])
 async def msg_stats(ctx, member: discord.Member = None):
@@ -484,7 +494,7 @@ class MenuSelect(discord.ui.Select):
             discord.SelectOption(label="Moderation", description="Ban, kick, mute, warn, purge commands", emoji="🛠️"),
             discord.SelectOption(label="Fun & Games", description="8ball, roll, coinflip, iq, slap, hug", emoji="⚛️"),
             discord.SelectOption(label="Utility & Tracking", description="Ping, serverinfo, userinfo, snipe, afk", emoji="⚙️"),
-            discord.SelectOption(label="Setup & Security", description="Antinuke, automod, autorole, welcome", emoji="🛡️")
+            discord.SelectOption(label="Setup & Security", description="Antinuke, automod, autorole, logs", emoji="🛡️")
         ]
         super().__init__(placeholder="❖ CHOOSE A CATEGORY ❖", min_values=1, max_values=1, options=options)
 
