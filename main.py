@@ -42,7 +42,8 @@ def load_data():
         "logs": {}, "birthdays": {}, "backups": {}, "prefixes": {},
         "warns": {}, "automod": {}, "autorole": {}, "tickets": {}, 
         "welcome": {}, "messages": {}, "voice_time": {}, "invites": {},
-        "nickname_setup": {}, "counting": {}, "autoresponder": {}, "antinuke": {}, "reaction_roles": {}
+        "nickname_setup": {}, "counting": {}, "autoresponder": {}, "antinuke": {}, 
+        "reaction_roles": {}, "abuse_words": {}, "antispam_status": {}, "antiabuse_status": {}
     }
 
 def save_data():
@@ -52,7 +53,8 @@ def save_data():
         "autorole": guild_autoroles, "tickets": guild_tickets, "welcome": guild_welcomes,
         "messages": user_messages, "voice_time": user_voice_time, "invites": user_invites,
         "nickname_setup": guild_nicknames, "counting": guild_counting, "autoresponder": guild_autoresponder,
-        "antinuke": guild_antinuke, "reaction_roles": guild_reaction_roles
+        "antinuke": guild_antinuke, "reaction_roles": guild_reaction_roles, "abuse_words": guild_abuse_words,
+        "antispam_status": guild_antispam_status, "antiabuse_status": guild_antiabuse_status
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -75,6 +77,9 @@ guild_counting = {int(k): v for k, v in db.get("counting", {}).items()}
 guild_autoresponder = {int(k): v for k, v in db.get("autoresponder", {}).items()}
 guild_antinuke = {int(k): v for k, v in db.get("antinuke", {}).items()}
 guild_reaction_roles = {int(k): v for k, v in db.get("reaction_roles", {}).items()}
+guild_abuse_words = {int(k): v for k, v in db.get("abuse_words", {}).items()}
+guild_antispam_status = {int(k): v for k, v in db.get("antispam_status", {}).items()}
+guild_antiabuse_status = {int(k): v for k, v in db.get("antiabuse_status", {}).items()}
 
 def get_prefix(bot, message):
     if not message.guild:
@@ -87,6 +92,7 @@ bot.remove_command("help")
 afk_users = {}
 voice_join_timestamps = {}
 snipe_data = {}
+user_message_times = {}
 
 def emb(title="", description="", color=0x5865F2):
     embed = discord.Embed(title=title, description=description, color=color)
@@ -104,7 +110,7 @@ async def on_ready():
     print("----------------------------------------")
     print("Bot Name: Moonlight Heaven (Massive Edition)")
     print("Developer: Zeus")
-    print("Status: All Commands Online & Optimized!")
+    print("Status: All Old Commands + Anti-Spam/Abuse Online!")
     print("----------------------------------------")
 
 @bot.event
@@ -132,7 +138,11 @@ async def on_command_error(ctx, error):
             "addrole": f"Proper Way: `{p}addrole @user @role`",
             "removerole": f"Proper Way: `{p}removerole @user @role`",
             "cloneemoji": f"Proper Way: `{p}cloneemoji [emoji] [name]`",
-            "clonesticker": f"Proper Way: `{p}clonesticker [name]`"
+            "clonesticker": f"Proper Way: `{p}clonesticker [name]`",
+            "addabuse": f"Proper Way: `{p}addabuse [word]`",
+            "removeabuse": f"Proper Way: `{p}removeabuse [word]`",
+            "antispam": f"Proper Way: `{p}antispam [on/off]`",
+            "antiabuse": f"Proper Way: `{p}antiabuse [on/off]`"
         }
         correct_usage = usage_dict.get(cmd_name, f"Check help menu: `{p}help`")
         await ctx.send(embed=emb(title="⚠️ Invalid Command Usage", description=correct_usage))
@@ -181,15 +191,51 @@ async def on_voice_state_update(member, before, after):
 async def on_message(message):
     if message.author.bot:
         return
+    
     g_id = message.guild.id if message.guild else 0
     u_id = message.author.id
 
+    # 1. ANTI-ABUSE SYSTEM
+    if message.guild and guild_antiabuse_status.get(g_id, False):
+        abuse_list = guild_abuse_words.get(g_id, [])
+        content_lower = message.content.lower()
+        if any(word in content_lower for word in abuse_list):
+            try:
+                await message.delete()
+                duration = timedelta(hours=1)
+                await message.author.timeout(duration, reason="Using forbidden server abuse words.")
+                await message.channel.send(f"⚠️ {message.author.mention}, you wanted to abuse, but you couldn't do it! Take a 1-hour timeout! 🤡", delete_after=10)
+                return
+            except Exception as e:
+                print(f"Anti-Abuse Error: {e}")
+
+    # 2. ANTI-SPAM SYSTEM (3 msgs in 5 seconds)
+    if message.guild and guild_antispam_status.get(g_id, False) and not message.author.guild_permissions.manage_messages:
+        now = time.time()
+        key = (g_id, u_id)
+        if key not in user_message_times:
+            user_message_times[key] = []
+        
+        user_message_times[key] = [t for t in user_message_times[key] if now - t < 5]
+        user_message_times[key].append(now)
+
+        if len(user_message_times[key]) >= 3:
+            user_message_times[key] = [] 
+            try:
+                duration = timedelta(minutes=5)
+                await message.author.timeout(duration, reason="Spamming messages in chat.")
+                await message.channel.send(f"🛑 {message.author.mention}, you wanted to spam, but you couldn't do it! Take a 5-minute timeout! 💀", delete_after=10)
+                return
+            except Exception as e:
+                print(f"Anti-Spam Error: {e}")
+
+    # Autoresponder Check
     if g_id in guild_autoresponder:
         responses = guild_autoresponder[g_id]
         if message.content.lower() in responses:
             await message.channel.send(responses[message.content.lower()])
 
-    # Fixed counting reaction bug here
+    # Counting Check
     if g_id in guild_counting:
         c_data = guild_counting[g_id]
         if message.channel.id == c_data.get("channel_id"):
@@ -226,7 +272,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ==================== COMMAND SUITE ====================
+# ==================== ALL OLD & NEW COMMANDS ====================
 
 @bot.command(name="ping")
 async def ping_command(ctx):
@@ -348,6 +394,72 @@ async def clone_sticker(ctx, name: str = None):
     s_name = name or sticker.name
     new_sticker = await ctx.guild.create_sticker(name=s_name, description="Cloned sticker", file=file)
     await ctx.send(embed=emb(title="Sticker Cloned", description=f"Successfully cloned sticker {new_sticker.name}!"))
+
+# --- Anti-Spam & Anti-Abuse Control Commands ---
+@bot.command(name="antispam")
+@commands.has_permissions(administrator=True)
+async def anti_spam_toggle(ctx, status: str):
+    g_id = ctx.guild.id
+    st = status.lower()
+    if st in ["on", "enable", "true"]:
+        guild_antispam_status[g_id] = True
+        save_data()
+        await ctx.send(embed=emb(title="Anti-Spam Status", description="🛡️ Anti-Spam protection is now **ENABLED**."))
+    elif st in ["off", "disable", "false"]:
+        guild_antispam_status[g_id] = False
+        save_data()
+        await ctx.send(embed=emb(title="Anti-Spam Status", description="⚠️ Anti-Spam protection is now **DISABLED**."))
+    else:
+        await ctx.send(embed=emb(title="Error", description="Please use `&antispam on` or `&antispam off`."))
+
+@bot.command(name="antiabuse")
+@commands.has_permissions(administrator=True)
+async def anti_abuse_toggle(ctx, status: str):
+    g_id = ctx.guild.id
+    st = status.lower()
+    if st in ["on", "enable", "true"]:
+        guild_antiabuse_status[g_id] = True
+        save_data()
+        await ctx.send(embed=emb(title="Anti-Abuse Status", description="🛡️ Anti-Abuse filter is now **ENABLED**."))
+    elif st in ["off", "disable", "false"]:
+        guild_antiabuse_status[g_id] = False
+        save_data()
+        await ctx.send(embed=emb(title="Anti-Abuse Status", description="⚠️ Anti-Abuse filter is now **DISABLED**."))
+    else:
+        await ctx.send(embed=emb(title="Error", description="Please use `&antiabuse on` or `&antiabuse off`."))
+
+@bot.command(name="addabuse")
+@commands.has_permissions(administrator=True)
+async def add_abuse(ctx, *, word: str):
+    g_id = ctx.guild.id
+    if g_id not in guild_abuse_words:
+        guild_abuse_words[g_id] = []
+    w = word.lower()
+    if w not in guild_abuse_words[g_id]:
+        guild_abuse_words[g_id].append(w)
+        save_data()
+        await ctx.send(embed=emb(title="Anti-Abuse Updated", description=f"✅ Added `{w}` to the server's forbidden abuse list."))
+    else:
+        await ctx.send(embed=emb(title="Notice", description=f"The word `{w}` is already in the abuse list."))
+
+@bot.command(name="removeabuse")
+@commands.has_permissions(administrator=True)
+async def remove_abuse(ctx, *, word: str):
+    g_id = ctx.guild.id
+    w = word.lower()
+    if g_id in guild_abuse_words and w in guild_abuse_words[g_id]:
+        guild_abuse_words[g_id].remove(w)
+        save_data()
+        await ctx.send(embed=emb(title="Anti-Abuse Updated", description=f"❌ Removed `{w}` from the forbidden abuse list."))
+    else:
+        await ctx.send(embed=emb(title="Error", description=f"The word `{w}` was not found in the abuse list."))
+
+@bot.command(name="abuses", aliases=["abuselist"])
+async def list_abuses(ctx):
+    g_id = ctx.guild.id
+    words = guild_abuse_words.get(g_id, [])
+    desc = ", ".join([f"`{w}`" for w in words]) if words else "No abuse words added yet for this server."
+    await ctx.send(embed=emb(title="🛡️ Server Abuse Filter List", description=desc))
 
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
@@ -540,7 +652,6 @@ async def auto_mod(ctx):
     status = "Enabled" if guild_automod[g_id]["enabled"] else "Disabled"
     await ctx.send(embed=emb(title="Automod Protection", description=f"Automod status: {status}."))
 
-# Fully Optimized Giveaway Command
 @bot.command(name="giveaway", aliases=["gvw", "gcreate"])
 @commands.has_permissions(manage_guild=True)
 async def g_start(ctx, time_str: str, winners: int, *, prize: str):
@@ -565,7 +676,7 @@ class MenuSelect(discord.ui.Select):
             discord.SelectOption(label="Moderation & Roles", description="Ban, mute, add/role, hide/unhide", emoji="🛠️"),
             discord.SelectOption(label="Fun & Games", description="8ball, roll, coinflip, iq, slap, hug", emoji="⚛️"),
             discord.SelectOption(label="Utility & Leaderboard", description="Ping, info, snipe, lb (msg/voice)", emoji="⚙️"),
-            discord.SelectOption(label="Setup & Security", description="Antinuke, automod, giveaway, clone", emoji="🛡️")
+            discord.SelectOption(label="Setup & Security", description="Antinuke, automod, giveaway, clone, antispam, antiabuse", emoji="🛡️")
         ]
         super().__init__(placeholder="SELECT CATEGORY", min_values=1, max_values=1, options=options)
 
@@ -589,7 +700,7 @@ async def help_command(ctx):
         "🛠️ **Moderation**: ban, kick, mute, purge, addrole, removerole, hide, unhide\n"
         "⚛️ **Fun**: 8ball, roll, coinflip, iq, slap, hug, poll\n"
         "⚙️ **Utility**: ping, serverinfo, userinfo, snipe, leaderboard\n"
-        "🛡️ **Setup**: giveaway, cloneemoji, clonesticker, antinuke, automod"
+        "🛡️ **Setup**: giveaway, antispam, antiabuse, addabuse, removeabuse, cloneemoji"
     )
     e = discord.Embed(title="Moonlight Heaven - Control Center", description=desc, color=0x5865F2)
     e.set_footer(text="Moonlight Heaven • Developed by Zeus")
