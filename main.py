@@ -169,7 +169,7 @@ async def on_message(message):
             except Exception as e:
                 print(f"Anti-Spam Error: {e}")
 
-    # 3. Counting Check[span_1](start_span)[span_1](end_span)
+    # 3. Counting Check
     if g_id in guild_counting:
         c_data = guild_counting[g_id]
         if message.channel.id == c_data.get("channel_id"):
@@ -192,7 +192,7 @@ async def on_message(message):
             except ValueError:
                 pass
 
-    # Message Counter Track[span_2](start_span)[span_2](end_span)
+    # Message Counter Track
     if g_id not in user_messages: user_messages[g_id] = {}
     user_messages[g_id][str(u_id)] = user_messages[g_id].get(str(u_id), 0) + 1
     save_data()
@@ -257,41 +257,41 @@ async def add_abuse(ctx, *, words: str):
 @commands.has_permissions(manage_roles=True)
 async def add_role(ctx, member: discord.Member, role: discord.Role):
     await member.add_roles(role)
-    await ctx.send(embed=emb(title="Role Added", description=f"✅ Added {role.mention} to {member.mention}."))[span_3](start_span)[span_3](end_span)
+    await ctx.send(embed=emb(title="Role Added", description=f"✅ Added {role.mention} to {member.mention}."))
 
 @bot.command(name="removerole")
 @commands.has_permissions(manage_roles=True)
 async def remove_role(ctx, member: discord.Member, role: discord.Role):
     await member.remove_roles(role)
-    await ctx.send(embed=emb(title="Role Removed", description=f"❌ Removed {role.mention} from {member.mention}."))[span_4](start_span)[span_4](end_span)
+    await ctx.send(embed=emb(title="Role Removed", description=f"❌ Removed {role.mention} from {member.mention}."))
 
 @bot.command(name="hide")
 @commands.has_permissions(manage_channels=True)
 async def hide_channel(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, view_channel=False)
-    await ctx.send(embed=emb(title="Channel Hidden", description=f"🔒 {ch.mention} has been hidden."))[span_5](start_span)[span_5](end_span)
+    await ctx.send(embed=emb(title="Channel Hidden", description=f"🔒 {ch.mention} has been hidden."))
 
 @bot.command(name="unhide")
 @commands.has_permissions(manage_channels=True)
 async def unhide_channel(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, view_channel=True)
-    await ctx.send(embed=emb(title="Channel Unhidden", description=f"🔓 {ch.mention} is now visible."))[span_6](start_span)[span_6](end_span)
+    await ctx.send(embed=emb(title="Channel Unhidden", description=f"🔓 {ch.mention} is now visible."))
 
 @bot.command(name="lock")
 @commands.has_permissions(manage_channels=True)
 async def lock_channel(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send(embed=emb(title="Channel Locked", description=f"🔒 {ch.mention} has been locked."))[span_7](start_span)[span_7](end_span)
+    await ctx.send(embed=emb(title="Channel Locked", description=f"🔒 {ch.mention} has been locked."))
 
 @bot.command(name="unlock")
 @commands.has_permissions(manage_channels=True)
 async def unlock_channel(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send(embed=emb(title="Channel Unlocked", description=f"🔓 {ch.mention} has been unlocked."))[span_8](start_span)[span_8](end_span)
+    await ctx.send(embed=emb(title="Channel Unlocked", description=f"🔓 {ch.mention} has been unlocked."))
 
 # ==================== STATS, COUNTS & LEADERBOARDS ====================
 
@@ -299,19 +299,19 @@ async def unlock_channel(ctx, channel: discord.TextChannel = None):
 async def m_count(ctx, member: discord.Member = None):
     m = member or ctx.author
     count = user_messages.get(ctx.guild.id, {}).get(str(m.id), 0)
-    await ctx.send(embed=emb(title="Message Count", description=f"{m.mention} has sent `{count}` messages."))[span_9](start_span)[span_9](end_span)
+    await ctx.send(embed=emb(title="Message Count", description=f"{m.mention} has sent `{count}` messages."))
 
 @bot.command(name="v", aliases=["voicecount"])
 async def v_count(ctx, member: discord.Member = None):
     m = member or ctx.author
     mins = user_voice_time.get(ctx.guild.id, {}).get(str(m.id), 0)
-    await ctx.send(embed=emb(title="Voice Time", description=f"{m.mention} has spent `{mins} minutes` in voice channels."))[span_10](start_span)[span_10](end_span)
+    await ctx.send(embed=emb(title="Voice Time", description=f"{m.mention} has spent `{mins} minutes` in voice channels."))
 
 @bot.command(name="i", aliases=["invitecount"])
 async def i_count(ctx, member: discord.Member = None):
     m = member or ctx.author
     invs = user_invites.get(ctx.guild.id, {}).get(str(m.id), 0)
-    await ctx.send(embed=emb(title="Invite Count", description=f"{m.mention} has `{invs}` invites."))[span_11](start_span)[span_11](end_span)
+    await ctx.send(embed=emb(title="Invite Count", description=f"{m.mention} has `{invs}` invites."))
 
 @bot.command(name="rm")
 @commands.has_permissions(administrator=True)
@@ -319,7 +319,7 @@ async def reset_messages(ctx, target: str = ""):
     if target.lower() == "all":
         user_messages[ctx.guild.id] = {}
         save_data()
-        await ctx.send(embed=emb(title="Reset", description="✅ All user message counts have been reset."))[span_12](start_span)[span_12](end_span)
+        await ctx.send(embed=emb(title="Reset", description="✅ All user message counts have been reset."))
     else:
         await ctx.send(embed=emb(title="Error", description="Use `&rm all`"))
 
@@ -329,7 +329,7 @@ async def reset_voice(ctx, target: str = ""):
     if target.lower() == "all":
         user_voice_time[ctx.guild.id] = {}
         save_data()
-        await ctx.send(embed=emb(title="Reset", description="✅ All voice timing counts have been reset."))[span_13](start_span)[span_13](end_span)
+        await ctx.send(embed=emb(title="Reset", description="✅ All voice timing counts have been reset."))
     else:
         await ctx.send(embed=emb(title="Error", description="Use `&rv all`"))
 
@@ -339,7 +339,7 @@ async def reset_invites(ctx, target: str = ""):
     if target.lower() == "all":
         user_invites[ctx.guild.id] = {}
         save_data()
-        await ctx.send(embed=emb(title="Reset", description="✅ All invite counts have been reset."))[span_14](start_span)[span_14](end_span)
+        await ctx.send(embed=emb(title="Reset", description="✅ All invite counts have been reset."))
     else:
         await ctx.send(embed=emb(title="Error", description="Use `&ri all`"))
 
@@ -348,21 +348,21 @@ async def leaderboard_messages(ctx):
     data = user_messages.get(ctx.guild.id, {})
     sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
     desc = "\n".join([f"`{i+1}.` <@{uid}> - **{msgs}** msgs" for i, (uid, msgs) in enumerate(sorted_data)]) if sorted_data else "No data."
-    await ctx.send(embed=emb(title="🏆 Message Leaderboard", description=desc))[span_15](start_span)[span_15](end_span)
+    await ctx.send(embed=emb(title="🏆 Message Leaderboard", description=desc))
 
 @bot.command(name="lv")
 async def leaderboard_voice(ctx):
     data = user_voice_time.get(ctx.guild.id, {})
     sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
     desc = "\n".join([f"`{i+1}.` <@{uid}> - **{mins}** mins" for i, (uid, mins) in enumerate(sorted_data)]) if sorted_data else "No data."
-    await ctx.send(embed=emb(title="🏆 Voice Leaderboard", description=desc))[span_16](start_span)[span_16](end_span)
+    await ctx.send(embed=emb(title="🏆 Voice Leaderboard", description=desc))
 
 @bot.command(name="li")
 async def leaderboard_invites(ctx):
     data = user_invites.get(ctx.guild.id, {})
     sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
     desc = "\n".join([f"`{i+1}.` <@{uid}> - **{invs}** invites" for i, (uid, invs) in enumerate(sorted_data)]) if sorted_data else "No data."
-    await ctx.send(embed=emb(title="🏆 Invite Leaderboard", description=desc))[span_17](start_span)[span_17](end_span)
+    await ctx.send(embed=emb(title="🏆 Invite Leaderboard", description=desc))
 
 # ==================== UTILITY, SAY, REPLY & CLONE (EMOJI/STICKER) ====================
 
@@ -370,7 +370,7 @@ async def leaderboard_invites(ctx):
 @commands.has_permissions(manage_messages=True)
 async def say_cmd(ctx, *, message: str):
     await ctx.message.delete()
-    await ctx.send(message)[span_18](start_span)[span_18](end_span)
+    await ctx.send(message)
 
 @bot.command(name="reply")
 @commands.has_permissions(manage_messages=True)
@@ -380,7 +380,7 @@ async def reply_cmd(ctx, msg_id: int, *, message: str):
         await target_msg.reply(message)
         await ctx.message.delete()
     except Exception as e:
-        await ctx.send(f"Error: {e}")[span_19](start_span)[span_19](end_span)
+        await ctx.send(f"Error: {e}")
 
 @bot.command(name="clone")
 @commands.has_permissions(manage_emojis=True)
@@ -448,7 +448,7 @@ async def start_giveaway(ctx, minutes: int, *, prize: str):
         winner = random.choice(users)
         await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description=f"Winner: {winner.mention} won **{prize}**! 🎁"))
     else:
-        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description="No valid entries found."))[span_20](start_span)[span_20](end_span)
+        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description="No valid entries found."))
 
 # ==================== STANDARD MODERATION & BAN ====================
 
@@ -553,8 +553,8 @@ async def help_command(ctx):
 if __name__ == "__main__":
     keep_alive()
     voice_time_tracker.start()
-    TOKEN = os.getenv("TOKEN")
-    if TOKEN:
-        bot.run(TOKEN)
+    bot_token = os.getenv("bot_token")
+    if bot_token:
+        bot.run(bot_token)
     else:
-        print("❌ Error: TOKEN environment variable nahi mila!")
+        print("❌ Error: bot_token environment variable nahi mila!")
