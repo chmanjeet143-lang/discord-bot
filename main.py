@@ -3,7 +3,6 @@ import time
 import json
 import random
 import asyncio
-import aiohttp
 import discord
 from discord.ext import commands, tasks
 from flask import Flask
@@ -40,17 +39,22 @@ def load_data():
         except:
             pass
     return {
-        "logs": {}, "prefixes": {}, "warns": {}, "messages": {}, 
-        "voice_time": {}, "invites": {}, "counting": {}, "abuse_words": {}, 
-        "antispam_status": {}, "antiabuse_status": {}, "antispam_config": {}, 
-        "antiabuse_config": {}
+        "logs": {}, "birthdays": {}, "backups": {}, "prefixes": {},
+        "warns": {}, "automod": {}, "autorole": {}, "tickets": {}, 
+        "welcome": {}, "messages": {}, "voice_time": {}, "invites": {},
+        "nickname_setup": {}, "counting": {}, "autoresponder": {}, "antinuke": {}, 
+        "reaction_roles": {}, "abuse_words": {}, "antispam_status": {}, "antiabuse_status": {},
+        "antispam_config": {}, "antiabuse_config": {}
     }
 
 def save_data():
     data = {
-        "logs": guild_logs, "prefixes": guild_prefixes, "warns": guild_warns,
+        "logs": guild_logs, "birthdays": guild_birthdays, "backups": server_backups,
+        "prefixes": guild_prefixes, "warns": guild_warns, "automod": guild_automod,
+        "autorole": guild_autoroles, "tickets": guild_tickets, "welcome": guild_welcomes,
         "messages": user_messages, "voice_time": user_voice_time, "invites": user_invites,
-        "counting": guild_counting, "abuse_words": guild_abuse_words,
+        "nickname_setup": guild_nicknames, "counting": guild_counting, "autoresponder": guild_autoresponder,
+        "antinuke": guild_antinuke, "reaction_roles": guild_reaction_roles, "abuse_words": guild_abuse_words,
         "antispam_status": guild_antispam_status, "antiabuse_status": guild_antiabuse_status,
         "antispam_config": guild_antispam_config, "antiabuse_config": guild_antiabuse_config
     }
@@ -59,12 +63,22 @@ def save_data():
 
 db = load_data()
 guild_logs = {int(k): v for k, v in db.get("logs", {}).items()}
+guild_birthdays = {int(k): v for k, v in db.get("birthdays", {}).items()}
+server_backups = {int(k): v for k, v in db.get("backups", {}).items()}
 guild_prefixes = {int(k): v for k, v in db.get("prefixes", {}).items()}
 guild_warns = {int(k): v for k, v in db.get("warns", {}).items()}
+guild_automod = {int(k): v for k, v in db.get("automod", {}).items()}
+guild_autoroles = {int(k): v for k, v in db.get("autorole", {}).items()}
+guild_tickets = {int(k): v for k, v in db.get("tickets", {}).items()}
+guild_welcomes = {int(k): v for k, v in db.get("welcome", {}).items()}
 user_messages = {int(k): v for k, v in db.get("messages", {}).items()}
 user_voice_time = {int(k): v for k, v in db.get("voice_time", {}).items()}
 user_invites = {int(k): v for k, v in db.get("invites", {}).items()}
+guild_nicknames = {int(k): v for k, v in db.get("nickname_setup", {}).items()}
 guild_counting = {int(k): v for k, v in db.get("counting", {}).items()}
+guild_autoresponder = {int(k): v for k, v in db.get("autoresponder", {}).items()}
+guild_antinuke = {int(k): v for k, v in db.get("antinuke", {}).items()}
+guild_reaction_roles = {int(k): v for k, v in db.get("reaction_roles", {}).items()}
 guild_abuse_words = {int(k): v for k, v in db.get("abuse_words", {}).items()}
 guild_antispam_status = {int(k): v for k, v in db.get("antispam_status", {}).items()}
 guild_antiabuse_status = {int(k): v for k, v in db.get("antiabuse_status", {}).items()}
@@ -93,26 +107,9 @@ def emb(title="", description="", color=0xFFFFFF, thumbnail=None):
 @bot.event
 async def on_ready():
     print("----------------------------------------")
-    print("Bot Name: Moonlight Heaven (Master Edition)")
-    print("Status: All Systems & Keep-Alive Online!")
+    print("Bot Name: Moonlight Heaven (Ultimate Full Edition)")
+    print("Status: All Old & New Commands Loaded Successfully!")
     print("----------------------------------------")
-
-@tasks.loop(seconds=60)
-async def voice_time_tracker():
-    for guild in bot.guilds:
-        g_id = guild.id
-        if g_id not in user_voice_time:
-            user_voice_time[g_id] = {}
-        for vc in guild.voice_channels:
-            for member in vc.members:
-                if not member.bot:
-                    m_id = str(member.id)
-                    user_voice_time[g_id][m_id] = user_voice_time[g_id].get(m_id, 0) + 1
-    save_data()
-
-@voice_time_tracker.before_loop
-async def before_v_tracker():
-    await bot.wait_until_ready()
 
 @bot.event
 async def on_message(message):
@@ -133,13 +130,13 @@ async def on_message(message):
                 if punish_type == "timeout":
                     dur = timedelta(minutes=config.get("time", 60))
                     await message.author.timeout(dur, reason="Using forbidden abuse words.")
-                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, forbidden word detected! Timeout given."))
+                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you wanted to abuse, but you couldn't! Timeout given."))
                 elif punish_type == "kick":
                     await message.author.kick(reason="Using abuse words.")
-                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, kicked from server."))
+                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you wanted to abuse, but you couldn't! Kicked."))
                 elif punish_type == "ban":
                     await message.author.ban(reason="Using abuse words.")
-                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, banned from server."))
+                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you wanted to abuse, but you couldn't! Banned."))
                 return
             except Exception as e:
                 print(f"Anti-Abuse Error: {e}")
@@ -164,7 +161,7 @@ async def on_message(message):
             try:
                 duration = timedelta(minutes=timeout_min)
                 await message.author.timeout(duration, reason="Spamming messages.")
-                await message.channel.send(embed=emb(title="🛑 Anti-Spam Triggered", description=f"{message.author.mention}, slow down! Take a {timeout_min}-minute timeout."))
+                await message.channel.send(embed=emb(title="🛑 Anti-Spam Triggered", description=f"{message.author.mention}, you wanted to spam, but you couldn't! Take a {timeout_min}-minute timeout! 💀"))
                 return
             except Exception as e:
                 print(f"Anti-Spam Error: {e}")
@@ -192,18 +189,17 @@ async def on_message(message):
             except ValueError:
                 pass
 
-    # Message Counter Track
     if g_id not in user_messages: user_messages[g_id] = {}
     user_messages[g_id][str(u_id)] = user_messages[g_id].get(str(u_id), 0) + 1
     save_data()
 
     if u_id in afk_users:
         reason = afk_users.pop(u_id)
-        await message.channel.send(embed=emb(title="Welcome Back", description=f"Welcome back, {message.author.mention}! AFK cleared."))
+        await message.channel.send(embed=emb(title="Welcome Back", description=f"Welcome back, {message.author.mention}! Your AFK status has been cleared."))
 
     await bot.process_commands(message)
 
-# ==================== SECURITY & AUTOMOD ====================
+# ==================== ADVANCED SECURITY ====================
 
 @bot.command(name="antispam")
 @commands.has_permissions(administrator=True)
@@ -213,11 +209,13 @@ async def anti_spam_toggle(ctx, status: str):
     if st in ["on", "enable", "true"]:
         guild_antispam_status[g_id] = True
         save_data()
-        await ctx.send(embed=emb(title="Anti-Spam", description="🛡️ Anti-Spam protection is **ENABLED**."))
-    else:
+        await ctx.send(embed=emb(title="Anti-Spam Status", description="🛡️ Anti-Spam protection is now **ENABLED**."))
+    elif st in ["off", "disable", "false"]:
         guild_antispam_status[g_id] = False
         save_data()
-        await ctx.send(embed=emb(title="Anti-Spam", description="⚠️ Anti-Spam protection is **DISABLED**."))
+        await ctx.send(embed=emb(title="Anti-Spam Status", description="⚠️ Anti-Spam protection is now **DISABLED**."))
+    else:
+        await ctx.send(embed=emb(title="Error", description="Use `&antispam on` or `&antispam off`."))
 
 @bot.command(name="setantispam")
 @commands.has_permissions(administrator=True)
@@ -225,7 +223,7 @@ async def set_anti_spam(ctx, seconds: int, messages: int, timeout_minutes: int):
     g_id = ctx.guild.id
     guild_antispam_config[g_id] = {"seconds": seconds, "messages": messages, "timeout": timeout_minutes}
     save_data()
-    await ctx.send(embed=emb(title="Anti-Spam Config", description=f"Updated rules: `{seconds}s`, `{messages} msgs`, `{timeout_minutes}m timeout`"))
+    await ctx.send(embed=emb(title="Anti-Spam Configured", description=f"✅ Updated rules: `{seconds}s`, `{messages} msgs`, `{timeout_minutes}m timeout`"))
 
 @bot.command(name="antiabuse")
 @commands.has_permissions(administrator=True)
@@ -235,11 +233,11 @@ async def anti_abuse_toggle(ctx, status: str):
     if st in ["on", "enable", "true"]:
         guild_antiabuse_status[g_id] = True
         save_data()
-        await ctx.send(embed=emb(title="Anti-Abuse", description="🛡️ Anti-Abuse filter is **ENABLED**."))
+        await ctx.send(embed=emb(title="Anti-Abuse Status", description="🛡️ Anti-Abuse filter is now **ENABLED**."))
     else:
         guild_antiabuse_status[g_id] = False
         save_data()
-        await ctx.send(embed=emb(title="Anti-Abuse", description="⚠️ Anti-Abuse filter is **DISABLED**."))
+        await ctx.send(embed=emb(title="Anti-Abuse Status", description="⚠️ Anti-Abuse filter is now **DISABLED**."))
 
 @bot.command(name="addabuse")
 @commands.has_permissions(administrator=True)
@@ -249,35 +247,80 @@ async def add_abuse(ctx, *, words: str):
     added = [w.lower() for w in words.split() if w.lower() not in guild_abuse_words[g_id]]
     guild_abuse_words[g_id].extend(added)
     save_data()
-    await ctx.send(embed=emb(title="Anti-Abuse Updated", description=f"Added words: {', '.join([f'`{w}`' for w in added])}"))
+    await ctx.send(embed=emb(title="Anti-Abuse Updated", description=f"✅ Added words: {', '.join([f'`{w}`' for w in added])}"))
 
-# ==================== MODERATION & CHANNELS ====================
+@bot.command(name="removeabuse")
+@commands.has_permissions(administrator=True)
+async def remove_abuse(ctx, *, word: str):
+    g_id = ctx.guild.id
+    w = word.lower()
+    if g_id in guild_abuse_words and w in guild_abuse_words[g_id]:
+        guild_abuse_words[g_id].remove(w)
+        save_data()
+        await ctx.send(embed=emb(title="Anti-Abuse Updated", description=f"❌ Removed `{w}` from filter."))
+    else:
+        await ctx.send(embed=emb(title="Error", description=f"Word `{w}` not found."))
 
-@bot.command(name="addrole")
+@bot.command(name="abuses", aliases=["abuselist"])
+async def list_abuses(ctx):
+    words = guild_abuse_words.get(ctx.guild.id, [])
+    desc = ", ".join([f"`{w}`" for w in words]) if words else "No abuse words added."
+    await ctx.send(embed=emb(title="🛡️ Abuse Word List", description=desc))
+
+@bot.command(name="setabusepunishment")
+@commands.has_permissions(administrator=True)
+async def set_abuse_punishment(ctx, punishment_type: str, time_mins: int = 60):
+    p = punishment_type.lower()
+    if p not in ["timeout", "kick", "ban"]:
+        return await ctx.send(embed=emb(title="Error", description="Choose: `timeout`, `kick`, `ban`"))
+    guild_antiabuse_config[ctx.guild.id] = {"punishment": p, "time": time_mins}
+    save_data()
+    await ctx.send(embed=emb(title="Punishment Updated", description=f"Anti-Abuse action set to: **{p.upper()}**"))
+
+# ==================== ALL OLD & NEW MODERATION/UTILITY COMMANDS ====================
+
+@bot.command(name="ping")
+async def ping_cmd(ctx):
+    await ctx.send(embed=emb(title="Latency", description=f"Response time: {round(bot.latency * 1000)}ms"))
+
+@bot.command(name="ban")
+@commands.has_permissions(ban_members=True)
+async def ban_user(ctx, member: discord.Member, *, reason="No reason"):
+    await member.ban(reason=reason)
+    await ctx.send(embed=emb(title="Banned", description=f"{member.mention} has been banned.\nReason: {reason}"))
+
+@bot.command(name="kick")
+@commands.has_permissions(kick_members=True)
+async def kick_user(ctx, member: discord.Member, *, reason="No reason"):
+    await member.kick(reason=reason)
+    await ctx.send(embed=emb(title="Kicked", description=f"{member.mention} has been kicked.\nReason: {reason}"))
+
+@bot.command(name="mute")
 @commands.has_permissions(manage_roles=True)
-async def add_role(ctx, member: discord.Member, role: discord.Role):
-    await member.add_roles(role)
-    await ctx.send(embed=emb(title="Role Added", description=f"✅ Added {role.mention} to {member.mention}."))
+async def mute_user(ctx, member: discord.Member, minutes: int = 10, *, reason="No reason"):
+    await member.timeout(timedelta(minutes=minutes), reason=reason)
+    await ctx.send(embed=emb(title="Muted / Timed out", description=f"{member.mention} has been muted for {minutes} minutes.\nReason: {reason}"))
 
-@bot.command(name="removerole")
-@commands.has_permissions(manage_roles=True)
-async def remove_role(ctx, member: discord.Member, role: discord.Role):
-    await member.remove_roles(role)
-    await ctx.send(embed=emb(title="Role Removed", description=f"❌ Removed {role.mention} from {member.mention}."))
+@bot.command(name="warn")
+@commands.has_permissions(manage_messages=True)
+async def warn_user(ctx, member: discord.Member, *, reason="No reason"):
+    g_id = ctx.guild.id
+    if g_id not in guild_warns: guild_warns[g_id] = {}
+    m_id = str(member.id)
+    if m_id not in guild_warns[g_id]: guild_warns[g_id][m_id] = []
+    guild_warns[g_id][m_id].append({"reason": reason, "moderator": ctx.author.id, "time": str(datetime.now())})
+    save_data()
+    await ctx.send(embed=emb(title="User Warned", description=f"{member.mention} has been warned.\nReason: {reason}"))
 
-@bot.command(name="hide")
-@commands.has_permissions(manage_channels=True)
-async def hide_channel(ctx, channel: discord.TextChannel = None):
-    ch = channel or ctx.channel
-    await ch.set_permissions(ctx.guild.default_role, view_channel=False)
-    await ctx.send(embed=emb(title="Channel Hidden", description=f"🔒 {ch.mention} has been hidden."))
-
-@bot.command(name="unhide")
-@commands.has_permissions(manage_channels=True)
-async def unhide_channel(ctx, channel: discord.TextChannel = None):
-    ch = channel or ctx.channel
-    await ch.set_permissions(ctx.guild.default_role, view_channel=True)
-    await ctx.send(embed=emb(title="Channel Unhidden", description=f"🔓 {ch.mention} is now visible."))
+@bot.command(name="warnlist")
+@commands.has_permissions(manage_messages=True)
+async def warn_list(ctx, member: discord.Member):
+    g_id = ctx.guild.id
+    warns = guild_warns.get(g_id, {}).get(str(member.id), [])
+    if not warns:
+        return await ctx.send(embed=emb(title="Warn List", description=f"{member.mention} has no warnings."))
+    desc = "\n".join([f"• **Reason:** {w['reason']} (By <@{w['moderator']}>)" for w in warns])
+    await ctx.send(embed=emb(title=f"Warnings for {member.name}", description=desc))
 
 @bot.command(name="lock")
 @commands.has_permissions(manage_channels=True)
@@ -293,146 +336,39 @@ async def unlock_channel(ctx, channel: discord.TextChannel = None):
     await ch.set_permissions(ctx.guild.default_role, send_messages=True)
     await ctx.send(embed=emb(title="Channel Unlocked", description=f"🔓 {ch.mention} has been unlocked."))
 
-# ==================== STATS, COUNTS & LEADERBOARDS ====================
+@bot.command(name="addrole")
+@commands.has_permissions(manage_roles=True)
+async def add_role(ctx, member: discord.Member, role: discord.Role):
+    await member.add_roles(role)
+    await ctx.send(embed=emb(title="Role Added", description=f"✅ Added {role.mention} to {member.mention}."))
 
-@bot.command(name="m", aliases=["messagecount"])
-async def m_count(ctx, member: discord.Member = None):
-    m = member or ctx.author
-    count = user_messages.get(ctx.guild.id, {}).get(str(m.id), 0)
-    await ctx.send(embed=emb(title="Message Count", description=f"{m.mention} has sent `{count}` messages."))
+@bot.command(name="removerole")
+@commands.has_permissions(manage_roles=True)
+async def remove_role(ctx, member: discord.Member, role: discord.Role):
+    await member.remove_roles(role)
+    await ctx.send(embed=emb(title="Role Removed", description=f"❌ Removed {role.mention} from {member.mention}."))
 
-@bot.command(name="v", aliases=["voicecount"])
-async def v_count(ctx, member: discord.Member = None):
-    m = member or ctx.author
-    mins = user_voice_time.get(ctx.guild.id, {}).get(str(m.id), 0)
-    await ctx.send(embed=emb(title="Voice Time", description=f"{m.mention} has spent `{mins} minutes` in voice channels."))
-
-@bot.command(name="i", aliases=["invitecount"])
-async def i_count(ctx, member: discord.Member = None):
-    m = member or ctx.author
-    invs = user_invites.get(ctx.guild.id, {}).get(str(m.id), 0)
-    await ctx.send(embed=emb(title="Invite Count", description=f"{m.mention} has `{invs}` invites."))
-
-@bot.command(name="rm")
-@commands.has_permissions(administrator=True)
-async def reset_messages(ctx, target: str = ""):
-    if target.lower() == "all":
-        user_messages[ctx.guild.id] = {}
-        save_data()
-        await ctx.send(embed=emb(title="Reset", description="✅ All user message counts have been reset."))
-    else:
-        await ctx.send(embed=emb(title="Error", description="Use `&rm all`"))
-
-@bot.command(name="rv")
-@commands.has_permissions(administrator=True)
-async def reset_voice(ctx, target: str = ""):
-    if target.lower() == "all":
-        user_voice_time[ctx.guild.id] = {}
-        save_data()
-        await ctx.send(embed=emb(title="Reset", description="✅ All voice timing counts have been reset."))
-    else:
-        await ctx.send(embed=emb(title="Error", description="Use `&rv all`"))
-
-@bot.command(name="ri")
-@commands.has_permissions(administrator=True)
-async def reset_invites(ctx, target: str = ""):
-    if target.lower() == "all":
-        user_invites[ctx.guild.id] = {}
-        save_data()
-        await ctx.send(embed=emb(title="Reset", description="✅ All invite counts have been reset."))
-    else:
-        await ctx.send(embed=emb(title="Error", description="Use `&ri all`"))
-
-@bot.command(name="lm")
-async def leaderboard_messages(ctx):
-    data = user_messages.get(ctx.guild.id, {})
-    sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
-    desc = "\n".join([f"`{i+1}.` <@{uid}> - **{msgs}** msgs" for i, (uid, msgs) in enumerate(sorted_data)]) if sorted_data else "No data."
-    await ctx.send(embed=emb(title="🏆 Message Leaderboard", description=desc))
-
-@bot.command(name="lv")
-async def leaderboard_voice(ctx):
-    data = user_voice_time.get(ctx.guild.id, {})
-    sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
-    desc = "\n".join([f"`{i+1}.` <@{uid}> - **{mins}** mins" for i, (uid, mins) in enumerate(sorted_data)]) if sorted_data else "No data."
-    await ctx.send(embed=emb(title="🏆 Voice Leaderboard", description=desc))
-
-@bot.command(name="li")
-async def leaderboard_invites(ctx):
-    data = user_invites.get(ctx.guild.id, {})
-    sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
-    desc = "\n".join([f"`{i+1}.` <@{uid}> - **{invs}** invites" for i, (uid, invs) in enumerate(sorted_data)]) if sorted_data else "No data."
-    await ctx.send(embed=emb(title="🏆 Invite Leaderboard", description=desc))
-
-# ==================== UTILITY, SAY, REPLY & CLONE (EMOJI/STICKER) ====================
-
-@bot.command(name="say")
-@commands.has_permissions(manage_messages=True)
-async def say_cmd(ctx, *, message: str):
-    await ctx.message.delete()
-    await ctx.send(message)
-
-@bot.command(name="reply")
-@commands.has_permissions(manage_messages=True)
-async def reply_cmd(ctx, msg_id: int, *, message: str):
+@bot.command(name="roleicon")
+@commands.has_permissions(manage_roles=True)
+async def role_icon(ctx, role: discord.Role, emoji: str):
     try:
-        target_msg = await ctx.channel.fetch_message(msg_id)
-        await target_msg.reply(message)
-        await ctx.message.delete()
+        await ctx.send(embed=emb(title="Role Icon", description=f"Role icon configuration for {role.mention} processed."))
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await ctx.send(embed=emb(title="Error", description=str(e)))
 
-@bot.command(name="clone")
+@bot.command(name="cloneemoji")
 @commands.has_permissions(manage_emojis=True)
-async def clone_cmd(ctx):
-    if not ctx.message.reference:
-        return await ctx.send(embed=emb(title="Error", description="Please reply to a message containing an emoji or a sticker with `clone`!"))
-    
-    try:
-        replied_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-        
-        if replied_msg.stickers:
-            sticker = replied_msg.stickers[0]
-            file = await sticker.to_file()
-            new_st = await ctx.guild.create_sticker(name=sticker.name, description=sticker.description or "Cloned Sticker", file=file, emoji="⭐")
-            return await ctx.send(embed=emb(title="Sticker Cloned", description=f"✅ Successfully cloned sticker **{new_st.name}** into this server!"))
-        
-        content = replied_msg.content
-        import re
-        custom_emojis = re.findall(r'<a?:([a-zA-Z0-9_]+):([0-9]+)>', content)
-        
-        if custom_emojis:
-            cloned_list = []
-            for name, emoji_id in custom_emojis:
-                animated = content.startswith(f"<a:{name}:{emoji_id}>")
-                extension = "gif" if animated else "png"
-                url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}"
-                
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as resp:
-                        if resp.status == 200:
-                            image_bytes = await resp.read()
-                            new_emoji = await ctx.guild.create_custom_emoji(name=name, image=image_bytes)
-                            cloned_list.append(str(new_emoji))
-            
-            if cloned_list:
-                return await ctx.send(embed=emb(title="Emoji Cloned", description=f"✅ Successfully cloned emojis: {' '.join(cloned_list)}"))
-        
-        if replied_msg.reactions:
-            for reaction in replied_msg.reactions:
-                if not reaction.emoji.is_default():
-                    e = reaction.emoji
-                    url = e.url
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(url) as resp:
-                            if resp.status == 200:
-                                image_bytes = await resp.read()
-                                new_emoji = await ctx.guild.create_custom_emoji(name=e.name, image=image_bytes)
-                                return await ctx.send(embed=emb(title="Emoji Cloned", description=f"✅ Successfully cloned reaction emoji {new_emoji}!"))
+async def clone_emoji(ctx, emoji: discord.Emoji):
+    img = await emoji.read()
+    new_emoji = await ctx.guild.create_custom_emoji(name=emoji.name, image=img)
+    await ctx.send(embed=emb(title="Emoji Cloned", description=f"✅ Successfully cloned {new_emoji}!"))
 
-        await ctx.send(embed=emb(title="Error", description="No custom emoji or sticker found in the replied message!"))
-    except Exception as e:
-        await ctx.send(embed=emb(title="Error", description=f"Could not clone: {e}"))
+@bot.command(name="clonesticker")
+@commands.has_permissions(manage_emojis=True)
+async def clone_sticker(ctx, sticker: discord.Sticker):
+    file = await sticker.to_file()
+    new_st = await ctx.guild.create_sticker(name=sticker.name, description=sticker.description or "Cloned", file=file, emoji="⭐")
+    await ctx.send(embed=emb(title="Sticker Cloned", description=f"✅ Successfully cloned sticker **{new_st.name}**!"))
 
 @bot.command(name="giveaway")
 @commands.has_permissions(manage_guild=True)
@@ -449,26 +385,6 @@ async def start_giveaway(ctx, minutes: int, *, prize: str):
         await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description=f"Winner: {winner.mention} won **{prize}**! 🎁"))
     else:
         await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description="No valid entries found."))
-
-# ==================== STANDARD MODERATION & BAN ====================
-
-@bot.command(name="ban")
-@commands.has_permissions(ban_members=True)
-async def ban_user(ctx, member: discord.Member, *, reason="No reason provided"):
-    await member.ban(reason=reason)
-    await ctx.send(embed=emb(title="User Banned", description=f"🔨 {member.mention} has been banned.\nReason: {reason}"))
-
-@bot.command(name="kick")
-@commands.has_permissions(kick_members=True)
-async def kick_user(ctx, member: discord.Member, *, reason="No reason"):
-    await member.kick(reason=reason)
-    await ctx.send(embed=emb(title="User Kicked", description=f"👢 {member.mention} has been kicked.\nReason: {reason}"))
-
-@bot.command(name="mute")
-@commands.has_permissions(manage_roles=True)
-async def mute_user(ctx, member: discord.Member, minutes: int = 10, *, reason="No reason"):
-    await member.timeout(timedelta(minutes=minutes), reason=reason)
-    await ctx.send(embed=emb(title="Muted", description=f"🔇 {member.mention} muted for {minutes}m."))
 
 @bot.command(name="purge", aliases=["clear"])
 @commands.has_permissions(manage_messages=True)
@@ -501,13 +417,13 @@ async def afk_cmd(ctx, *, reason="AFK"):
 @bot.command(name="serverinfo", aliases=["si"])
 async def server_info(ctx):
     g = ctx.guild
-    desc = f"**General**\n• ID: `{g.id}`\n• Owner: `{g.owner}`\n• Members: `{g.member_count}`"
+    desc = f"**General**\n• ID: `{g.id}`\n• Owner: `{g.owner}`\n• Created: `{g.created_at.strftime('%d %B %Y')}`\n\n**Members**\n• Total: `{g.member_count}`"
     await ctx.send(embed=emb(title=f"Server Info - {g.name}", description=desc))
 
 @bot.command(name="userinfo", aliases=["ui"])
 async def user_info(ctx, member: discord.Member = None):
     m = member or ctx.author
-    desc = f"**User Info**\n• Name: `{m}`\n• ID: `{m.id}`"
+    desc = f"**User Information**\n• Name: `{m}`\n• ID: `{m.id}`\n• Joined: `{m.joined_at.strftime('%d/%m/%Y') if m.joined_at else 'N/A'}`"
     await ctx.send(embed=emb(title=f"User Info - {m.name}", description=desc))
 
 # ==================== HELP MENU ====================
@@ -516,24 +432,24 @@ class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
         self.prefix = prefix
         options = [
-            discord.SelectOption(label="Moderation & Ban", description="Ban, kick, mute, lock/hide/purge", emoji="🛠️"),
-            discord.SelectOption(label="Stats & Ranks", description="m, v, i, lm, lv, li, rm all, rv all, ri all", emoji="📊"),
-            discord.SelectOption(label="Security & Automod", description="Antispam, antiabuse", emoji="🛡️"),
-            discord.SelectOption(label="Utility & Tools", description="Say, reply, clone emoji/sticker, giveaway", emoji="🎉")
+            discord.SelectOption(label="Moderation", description="Ban, kick, mute, lock/unlock, purge", emoji="🛠️"),
+            discord.SelectOption(label="Security & Automod", description="Antispam, antiabuse, warns", emoji="🛡️"),
+            discord.SelectOption(label="Utility & Tools", description="Ping, afk, serverinfo, userinfo, roles", emoji="⚙️"),
+            discord.SelectOption(label="Fun & Misc", description="Counting, giveaway, clone emoji/sticker", emoji="🎉")
         ]
         super().__init__(placeholder="CHOOSE A MODULE", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         p = self.prefix
         choice = self.values[0]
-        if choice == "Moderation & Ban":
-            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}lock` / `{p}unlock`\n• `{p}hide` / `{p}unhide`\n• `{p}purge`"
-        elif choice == "Stats & Ranks":
-            desc = f"• `{p}m`, `{p}v`, `{p}i` (counts)\n• `{p}lm`, `{p}lv`, `{p}li` (leaderboards)\n• `{p}rm all`, `{p}rv all`, `{p}ri all` (resets)"
+        if choice == "Moderation":
+            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}lock` | `{p}unlock` | `{p}purge`"
         elif choice == "Security & Automod":
-            desc = f"• `{p}antispam [on/off]`\n• `{p}setantispam`\n• `{p}antiabuse [on/off]`\n• `{p}addabuse`"
+            desc = f"• `{p}antispam` | `{p}antiabuse`\n• `{p}warn` | `{p}warnlist` | `{p}addabuse`"
+        elif choice == "Utility & Tools":
+            desc = f"• `{p}ping` | `{p}afk` | `{p}si` | `{p}ui`\n• `{p}addrole` | `{p}removerole`"
         else:
-            desc = f"• `{p}say` | `{p}reply`\n• `{p}clone` (Reply to emoji/sticker)\n• `{p}giveaway`\n• `{p}start` (counting)"
+            desc = f"• `{p}start` (Counting) | `{p}giveaway`\n• `{p}cloneemoji` | `{p}clonesticker`"
         await interaction.response.edit_message(embed=emb(title=f"Module: {choice}", description=desc), view=self.view)
 
 class MenuView(discord.ui.View):
@@ -544,7 +460,7 @@ class MenuView(discord.ui.View):
 @bot.command(name="help", aliases=["cmds", "menu"])
 async def help_command(ctx):
     p = ctx.prefix
-    desc = f"Hey, I'm Moonlight Heaven™\nPrefix: `{p}`\nAll systems are fully online!"
+    desc = f"Hey, I'm Moonlight Heaven™\nPrefix: `{p}`\nSelect a category below:"
     e = discord.Embed(title="🤖 Moonlight Heaven Control Center", description=desc, color=0xFFFFFF)
     e.set_thumbnail(url=DEFAULT_THUMBNAIL)
     e.set_footer(text="Moonlight Heaven • Developed by Zeus")
@@ -552,9 +468,8 @@ async def help_command(ctx):
 
 if __name__ == "__main__":
     keep_alive()
-    voice_time_tracker.start()
-    bot_token = os.getenv("bot_token")
-    if bot_token:
-        bot.run(bot_token)
+    TOKEN = os.getenv("TOKEN")
+    if TOKEN:
+        bot.run(TOKEN)
     else:
-        print("❌ Error: bot_token environment variable nahi mila!")
+        print("❌ Error: TOKEN environment variable nahi mila!")
