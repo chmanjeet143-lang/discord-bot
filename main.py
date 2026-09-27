@@ -3,6 +3,7 @@ import time
 import json
 import random
 import asyncio
+import aiohttp
 import discord
 from discord.ext import commands, tasks
 from flask import Flask
@@ -92,8 +93,8 @@ def emb(title="", description="", color=0xFFFFFF, thumbnail=None):
 @bot.event
 async def on_ready():
     print("----------------------------------------")
-    print("Bot Name: Moonlight Heaven (Emoji/Sticker Clone Edition)")
-    print("Status: All Commands & Trackers Online!")
+    print("Bot Name: Moonlight Heaven (Master Edition)")
+    print("Status: All Systems & Keep-Alive Online!")
     print("----------------------------------------")
 
 @tasks.loop(seconds=60)
@@ -360,7 +361,7 @@ async def leaderboard_voice(ctx):
 async def leaderboard_invites(ctx):
     data = user_invites.get(ctx.guild.id, {})
     sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
-    desc = n = "\n".join([f"`{i+1}.` <@{uid}> - **{invs}** invites" for i, (uid, invs) in enumerate(sorted_data)]) if sorted_data else "No data."
+    desc = "\n".join([f"`{i+1}.` <@{uid}> - **{invs}** invites" for i, (uid, invs) in enumerate(sorted_data)]) if sorted_data else "No data."
     await ctx.send(embed=emb(title="🏆 Invite Leaderboard", description=desc))[span_17](start_span)[span_17](end_span)
 
 # ==================== UTILITY, SAY, REPLY & CLONE (EMOJI/STICKER) ====================
@@ -381,8 +382,6 @@ async def reply_cmd(ctx, msg_id: int, *, message: str):
     except Exception as e:
         await ctx.send(f"Error: {e}")[span_19](start_span)[span_19](end_span)
 
-# Yahan par 'clone' command ko emoji aur sticker cloning ke liye set kiya gaya hai:
-# Agar aap kisi emoji ya sticker message par reply karke `clone` likhenge toh wo aapke server mein add ho jayega.
 @bot.command(name="clone")
 @commands.has_permissions(manage_emojis=True)
 async def clone_cmd(ctx):
@@ -392,14 +391,12 @@ async def clone_cmd(ctx):
     try:
         replied_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
         
-        # 1. Check if replied message has stickers
         if replied_msg.stickers:
             sticker = replied_msg.stickers[0]
             file = await sticker.to_file()
             new_st = await ctx.guild.create_sticker(name=sticker.name, description=sticker.description or "Cloned Sticker", file=file, emoji="⭐")
             return await ctx.send(embed=emb(title="Sticker Cloned", description=f"✅ Successfully cloned sticker **{new_st.name}** into this server!"))
         
-        # 2. Check if message content has custom emojis (e.g. <:name:id> or <a:name:id>)
         content = replied_msg.content
         import re
         custom_emojis = re.findall(r'<a?:([a-zA-Z0-9_]+):([0-9]+)>', content)
@@ -411,7 +408,6 @@ async def clone_cmd(ctx):
                 extension = "gif" if animated else "png"
                 url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}"
                 
-                import aiohttp
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url) as resp:
                         if resp.status == 200:
@@ -422,13 +418,11 @@ async def clone_cmd(ctx):
             if cloned_list:
                 return await ctx.send(embed=emb(title="Emoji Cloned", description=f"✅ Successfully cloned emojis: {' '.join(cloned_list)}"))
         
-        # 3. Agar reaction mein custom emoji ho
         if replied_msg.reactions:
             for reaction in replied_msg.reactions:
                 if not reaction.emoji.is_default():
                     e = reaction.emoji
                     url = e.url
-                    import aiohttp
                     async with aiohttp.ClientSession() as session:
                         async with session.get(url) as resp:
                             if resp.status == 200:
@@ -550,7 +544,7 @@ class MenuView(discord.ui.View):
 @bot.command(name="help", aliases=["cmds", "menu"])
 async def help_command(ctx):
     p = ctx.prefix
-    desc = f"Hey, I'm Moonlight Heaven™\nPrefix: `{p}`\nEmoji/Sticker clone command is active!"
+    desc = f"Hey, I'm Moonlight Heaven™\nPrefix: `{p}`\nAll systems are fully online!"
     e = discord.Embed(title="🤖 Moonlight Heaven Control Center", description=desc, color=0xFFFFFF)
     e.set_thumbnail(url=DEFAULT_THUMBNAIL)
     e.set_footer(text="Moonlight Heaven • Developed by Zeus")
