@@ -28,6 +28,7 @@ intents.members = True
 intents.voice_states = True
 intents.guilds = True
 intents.presences = True
+intents.invites = True
 
 DATA_FILE = "bot_database.json"
 
@@ -95,6 +96,8 @@ bot.remove_command("help")
 
 afk_users = {}
 user_message_times = {}
+voice_joindata = {}  # Tracks voice connection timestamps: {(guild_id, user_id): timestamp}
+cached_invites = {}  # Tracks server invites for invite counter
 
 DEFAULT_THUMBNAIL = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 
@@ -110,6 +113,59 @@ async def on_ready():
     print("Bot Name: Moonlight Heaven (Ultimate Full Edition)")
     print("Status: All Old & New Commands Loaded Successfully!")
     print("----------------------------------------")
+    for guild in bot.guilds:
+        try:
+            cached_invites[guild.id] = await guild.invites()
+        except:
+            pass
+
+@bot.event
+async def on_member_join(member):
+    guild = member.guild
+    try:
+        old_invites = cached_invites.get(guild.id, [])
+        new_invites = await guild.invites()
+        cached_invites[guild.id] = new_invites
+        
+        inviter = None
+        for inv in new_invites:
+            for old in old_invites:
+                if inv.code == old.code and inv.uses > old.uses:
+                    inviter = inv.inviter
+                    break
+            if inviter:
+                break
+        
+        if inviter:
+            g_id = guild.id
+            if g_id not in user_invites: user_invites[g_id] = {}
+            inv_id = str(inviter.id)
+            if inv_id not in user_invites[g_id]:
+                user_invites[g_id][inv_id] = {"total": 0, "joins": []}
+            user_invites[g_id][inv_id]["total"] += 1
+            user_invites[g_id][inv_id]["joins"].append(member.id)
+            save_data()
+    except Exception as e:
+        print(f"Invite Tracking Error: {e}")
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.bot or not member.guild:
+        return
+    g_id = member.guild.id
+    u_id = member.id
+    key = (g_id, u_id)
+    
+    # Joined a voice channel
+    if before.channel is None and after.channel is not None:
+        voice_joindata[key] = time.time()
+    # Left a voice channel
+    elif before.channel is not None and after.channel is None:
+        if key in voice_joindata:
+            elapsed = int(time.time() - voice_joindata.pop(key))
+            if g_id not in user_voice_time: user_voice_time[g_id] = {}
+            user_voice_time[g_id][str(u_id)] = user_voice_time[g_id].get(str(u_id), 0) + elapsed
+            save_data()
 
 @bot.event
 async def on_message(message):
@@ -217,14 +273,6 @@ async def anti_spam_toggle(ctx, status: str):
     else:
         await ctx.send(embed=emb(title="Error", description="Use `&antispam on` or `&antispam off`."))
 
-@bot.command(name="setantispam")
-@commands.has_permissions(administrator=True)
-async def set_anti_spam(ctx, seconds: int, messages: int, timeout_minutes: int):
-    g_id = ctx.guild.id
-    guild_antispam_config[g_id] = {"seconds": seconds, "messages": messages, "timeout": timeout_minutes}
-    save_data()
-    await ctx.send(embed=emb(title="Anti-Spam Configured", description=f"✅ Updated rules: `{seconds}s`, `{messages} msgs`, `{timeout_minutes}m timeout`"))
-
 @bot.command(name="antiabuse")
 @commands.has_permissions(administrator=True)
 async def anti_abuse_toggle(ctx, status: str):
@@ -267,17 +315,151 @@ async def list_abuses(ctx):
     desc = ", ".join([f"`{w}`" for w in words]) if words else "No abuse words added."
     await ctx.send(embed=emb(title="🛡️ Abuse Word List", description=desc))
 
-@bot.command(name="setabusepunishment")
-@commands.has_permissions(administrator=True)
-async def set_abuse_punishment(ctx, punishment_type: str, time_mins: int = 60):
-    p = punishment_type.lower()
-    if p not in ["timeout", "kick", "ban"]:
-        return await ctx.send(embed=emb(title="Error", description="Choose: `timeout`, `kick`, `ban`"))
-    guild_antiabuse_config[ctx.guild.id] = {"punishment": p, "time": time_mins}
-    save_data()
-    await ctx.send(embed=emb(title="Punishment Updated", description=f"Anti-Abuse action set to: **{p.upper()}**"))
+# ==================== NEW IMAGE COMMANDS & UTILITIES ====================
 
-# ==================== ALL OLD & NEW MODERATION/UTILITY COMMANDS ====================
+@bot.command(name="hide")
+@commands.has_permissions(manage_channels=True)
+async def hide_channel(ctx, channel: discord.TextChannel = None):
+    ch = channel or ctx.channel
+    await ch.set_permissions(ctx.guild.default_role, view_channel=False)
+    await ctx.send(embed=emb(title="Channel Hidden", description=f"🔒 {ch.mention} has been hidden."))
+
+@bot.command(name="unhide")
+@commands.has_permissions(manage_channels=True)
+async def unhide_channel(ctx, channel: discord.TextChannel = None):
+    ch = channel or ctx.channel
+    await ch.set_permissions(ctx.guild.default_role, view_channel=True)
+    await ctx.send(embed=emb(title="Channel Unhidden", description=f"🔓 {ch.mention} is now visible."))
+
+@bot.command(name="m", aliases=["messagecount"])
+async def message_count_cmd(ctx, member: discord.Member = None):
+    m = member or ctx.author
+    g_id = ctx.guild.id
+    count = user_messages.get(g_id, {}).get(str(m.id), 0)
+    await ctx.send(embed=emb(title="Message Count", description=f"📊 {m.mention} has sent **{count}** messages."))
+
+@bot.command(name="v", aliases=["voicetime"])
+async def voice_time_cmd(ctx, member: discord.Member = None):
+    m = member or ctx.author
+    g_id = ctx.guild.id
+    total_sec = user_voice_time.get(g_id, {}).get(str(m.id), 0)
+    # Include currently active session if user is in voice
+    key = (g_id, m.id)
+    if key in voice_joindata:
+        total_sec += int(time.time() - voice_joindata[key])
+    
+    hours = total_sec // 3600
+    minutes = (total_sec % 3600) // 60
+    await ctx.send(embed=emb(title="Voice Timing Count", description=f"🎙️ {m.mention} has spent **{hours}h {minutes}m** in voice channels."))
+
+@bot.command(name="i", aliases=["invitecount"])
+async def invite_count_cmd(ctx, member: discord.Member = None):
+    m = member or ctx.author
+    g_id = ctx.guild.id
+    invs = user_invites.get(g_id, {}).get(str(m.id), {}).get("total", 0)
+    await ctx.send(embed=emb(title="Invite Count", description=f"🎟️ {m.mention} has invited **{invs}** members."))
+
+# Reset Commands: rm all, rv all, ri all
+@bot.command(name="rm")
+@commands.has_permissions(administrator=True)
+async def reset_messages(ctx, target: str):
+    if target.lower() == "all":
+        g_id = ctx.guild.id
+        user_messages[g_id] = {}
+        save_data()
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All user message counters have been reset."))
+    else:
+        await ctx.send(embed=emb(title="Error", description="Use `&rm all` to reset all messages."))
+
+@bot.command(name="rv")
+@commands.has_permissions(administrator=True)
+async def reset_voice(ctx, target: str):
+    if target.lower() == "all":
+        g_id = ctx.guild.id
+        user_voice_time[g_id] = {}
+        save_data()
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All user voice time counters have been reset."))
+    else:
+        await ctx.send(embed=emb(title="Error", description="Use `&rv all` to reset all voice times."))
+
+@bot.command(name="ri")
+@commands.has_permissions(administrator=True)
+async def reset_invites(ctx, target: str):
+    if target.lower() == "all":
+        g_id = ctx.guild.id
+        user_invites[g_id] = {}
+        save_data()
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All user invite counters have been reset."))
+    else:
+        await ctx.send(embed=emb(title="Error", description="Use `&ri all` to reset all invites."))
+
+# Leaderboard Commands: lm, lv, li
+@bot.command(name="lm")
+async def leaderboard_messages(ctx):
+    g_id = ctx.guild.id
+    m_data = user_messages.get(g_id, {})
+    if not m_data:
+        return await ctx.send(embed=emb(title="Message Leaderboard", description="No message data recorded yet."))
+    
+    sorted_users = sorted(m_data.items(), key=lambda x: x[1], reverse=True)[:10]
+    desc = ""
+    for idx, (uid, count) in enumerate(sorted_users, 1):
+        desc += f"`#{idx}` <@{uid}> — **{count}** msgs\n"
+    await ctx.send(embed=emb(title="🏆 Message Leaderboard", description=desc))
+
+@bot.command(name="lv")
+async def leaderboard_voice(ctx):
+    g_id = ctx.guild.id
+    v_data = user_voice_time.get(g_id, {})
+    if not v_data:
+        return await ctx.send(embed=emb(title="Voice Leaderboard", description="No voice data recorded yet."))
+    
+    sorted_users = sorted(v_data.items(), key=lambda x: x[1], reverse=True)[:10]
+    desc = ""
+    for idx, (uid, sec) in enumerate(sorted_users, 1):
+        h = sec // 3600
+        m = (sec % 3600) // 60
+        desc += f"`#{idx}` <@{uid}> — **{h}h {m}m**\n"
+    await ctx.send(embed=emb(title="🏆 Voice Time Leaderboard", description=desc))
+
+@bot.command(name="li")
+async def leaderboard_invites(ctx):
+    g_id = ctx.guild.id
+    i_data = user_invites.get(g_id, {})
+    if not i_data:
+        return await ctx.send(embed=emb(title="Invite Leaderboard", description="No invite data recorded yet."))
+    
+    sorted_users = sorted(i_data.items(), key=lambda x: x[1].get("total", 0), reverse=True)[:10]
+    desc = ""
+    for idx, (uid, data) in enumerate(sorted_users, 1):
+        total = data.get("total", 0)
+        desc += f"`#{idx}` <@{uid}> — **{total}** invites\n"
+    await ctx.send(embed=emb(title="🏆 Invite Leaderboard", description=desc))
+
+@bot.command(name="say")
+@commands.has_permissions(manage_messages=True)
+async def say_cmd(ctx, *, message: str):
+    await ctx.message.delete()
+    await ctx.send(message)
+
+@bot.command(name="reply")
+@commands.has_permissions(manage_messages=True)
+async def reply_cmd(ctx, message_id: int, *, message: str):
+    try:
+        msg = await ctx.channel.fetch_message(message_id)
+        await msg.reply(message)
+        await ctx.message.delete()
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=f"Could not reply: {e}"))
+
+@bot.command(name="clone")
+@commands.has_permissions(manage_channels=True)
+async def clone_channel(ctx, channel: discord.TextChannel = None):
+    ch = channel or ctx.channel
+    new_ch = await ch.clone(reason=f"Cloned by {ctx.author}")
+    await ctx.send(embed=emb(title="Channel Cloned", description=f"✅ Successfully cloned {ch.mention} into {new_ch.mention}!"))
+
+# ==================== EXISTING MODERATION & UTILITY COMMANDS ====================
 
 @bot.command(name="ping")
 async def ping_cmd(ctx):
@@ -348,27 +530,12 @@ async def remove_role(ctx, member: discord.Member, role: discord.Role):
     await member.remove_roles(role)
     await ctx.send(embed=emb(title="Role Removed", description=f"❌ Removed {role.mention} from {member.mention}."))
 
-@bot.command(name="roleicon")
-@commands.has_permissions(manage_roles=True)
-async def role_icon(ctx, role: discord.Role, emoji: str):
-    try:
-        await ctx.send(embed=emb(title="Role Icon", description=f"Role icon configuration for {role.mention} processed."))
-    except Exception as e:
-        await ctx.send(embed=emb(title="Error", description=str(e)))
-
 @bot.command(name="cloneemoji")
 @commands.has_permissions(manage_emojis=True)
 async def clone_emoji(ctx, emoji: discord.Emoji):
     img = await emoji.read()
     new_emoji = await ctx.guild.create_custom_emoji(name=emoji.name, image=img)
     await ctx.send(embed=emb(title="Emoji Cloned", description=f"✅ Successfully cloned {new_emoji}!"))
-
-@bot.command(name="clonesticker")
-@commands.has_permissions(manage_emojis=True)
-async def clone_sticker(ctx, sticker: discord.Sticker):
-    file = await sticker.to_file()
-    new_st = await ctx.guild.create_sticker(name=sticker.name, description=sticker.description or "Cloned", file=file, emoji="⭐")
-    await ctx.send(embed=emb(title="Sticker Cloned", description=f"✅ Successfully cloned sticker **{new_st.name}**!"))
 
 @bot.command(name="giveaway")
 @commands.has_permissions(manage_guild=True)
@@ -432,10 +599,10 @@ class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
         self.prefix = prefix
         options = [
-            discord.SelectOption(label="Moderation", description="Ban, kick, mute, lock/unlock, purge", emoji="🛠️"),
+            discord.SelectOption(label="Moderation", description="Ban, kick, mute, lock/unlock, hide/unhide", emoji="🛠️"),
             discord.SelectOption(label="Security & Automod", description="Antispam, antiabuse, warns", emoji="🛡️"),
-            discord.SelectOption(label="Utility & Tools", description="Ping, afk, serverinfo, userinfo, roles", emoji="⚙️"),
-            discord.SelectOption(label="Fun & Misc", description="Counting, giveaway, clone emoji/sticker", emoji="🎉")
+            discord.SelectOption(label="Stats & Trackers", description="Message, voice & invite stats/leaderboards", emoji="📊"),
+            discord.SelectOption(label="Utility & Fun", description="Ping, afk, say, reply, clone, giveaway", emoji="🎉")
         ]
         super().__init__(placeholder="CHOOSE A MODULE", min_values=1, max_values=1, options=options)
 
@@ -443,13 +610,13 @@ class MenuSelect(discord.ui.Select):
         p = self.prefix
         choice = self.values[0]
         if choice == "Moderation":
-            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}lock` | `{p}unlock` | `{p}purge`"
+            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}lock` | `{p}unlock` | `{p}purge`\n• `{p}hide` | `{p}unhide`"
         elif choice == "Security & Automod":
             desc = f"• `{p}antispam` | `{p}antiabuse`\n• `{p}warn` | `{p}warnlist` | `{p}addabuse`"
-        elif choice == "Utility & Tools":
-            desc = f"• `{p}ping` | `{p}afk` | `{p}si` | `{p}ui`\n• `{p}addrole` | `{p}removerole`"
+        elif choice == "Stats & Trackers":
+            desc = f"• `{p}m` (Msgs) | `{p}v` (Voice) | `{p}i` (Invites)\n• `{p}lm` | `{p}lv` | `{p}li` (Leaderboards)\n• `{p}rm all` | `{p}rv all` | `{p}ri all` (Resets)"
         else:
-            desc = f"• `{p}start` (Counting) | `{p}giveaway`\n• `{p}cloneemoji` | `{p}clonesticker`"
+            desc = f"• `{p}say` | `{p}reply` | `{p}clone`\n• `{p}start` (Counting) | `{p}giveaway`"
         await interaction.response.edit_message(embed=emb(title=f"Module: {choice}", description=desc), view=self.view)
 
 class MenuView(discord.ui.View):
