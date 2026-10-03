@@ -228,7 +228,7 @@ async def on_message(message):
     content = message.content.strip()
     content_lower = content.lower()
 
-    # --- PREFIXLESS BOT CHANNEL SYSTEM ---
+    # --- PREFIXLESS BOT CHANNEL SHORTCUT SYSTEM ---
     designated_channel_id = guild_bot_channels.get(g_id)
     if designated_channel_id and message.channel.id == designated_channel_id:
         if content_lower in ["m", "message", "messages"]:
@@ -258,9 +258,6 @@ async def on_message(message):
                     await message.reply(embed=create_embed(title="❌ Error Occurred", description=f"Failed to change nickname: {e}", ctx=message))
             else:
                 await message.reply(embed=create_embed(title="⚠️ Invalid Syntax", description="Please write properly: `change nickname YourNewName`", ctx=message))
-            return
-        else:
-            await message.reply(embed=create_embed(title="ℹ️ Bot Channel Guidelines", description="Use these shortcuts here:\n• `m` - Message count\n• `v` - Voice time\n• `i` - Invite count\n• `change nickname [name]` - Change nickname", ctx=message))
             return
 
     # --- COUNTING SYSTEM ---
@@ -293,6 +290,7 @@ async def on_message(message):
     user_messages[g_id][str(u_id)] = user_messages[g_id].get(str(u_id), 0) + 1
     save_data()
 
+    # --- IMPORTANT: PROCESS ALL COMMANDS GLOBALLY ACROSS ALL CHANNELS ---
     await bot.process_commands(message)
 
 # =====================================================================
@@ -381,7 +379,7 @@ async def message_stats_cmd(ctx, member: discord.Member = None):
     target = member or ctx.author
     g_id = ctx.guild.id
     count = user_messages.get(g_id, {}).get(str(target.id), 0)
-    await ctx.send(embed=create_embed(title="Message Analytics", description=f"📊 {target.mention} has accumulated **{count}** messages.", ctx=ctx))[span_0](start_span)[span_0](end_span)
+    await ctx.send(embed=create_embed(title="Message Analytics", description=f"📊 {target.mention} has accumulated **{count}** messages.", ctx=ctx))
 
 @bot.command(name="v", aliases=["voicetime", "voice timing count"])
 async def voice_stats_cmd(ctx, member: discord.Member = None):
@@ -392,14 +390,14 @@ async def voice_stats_cmd(ctx, member: discord.Member = None):
     if key in voice_joindata:
         total_sec += int(time.time() - voice_joindata[key])
     hours, minutes = total_sec // 3600, (total_sec % 3600) // 60
-    await ctx.send(embed=create_embed(title="Voice Time Analytics", description=f"🎙️ {target.mention} has logged **{hours}h {minutes}m** in voice channels.", ctx=ctx))[span_1](start_span)[span_1](end_span)
+    await ctx.send(embed=create_embed(title="Voice Time Analytics", description=f"🎙️ {target.mention} has logged **{hours}h {minutes}m** in voice channels.", ctx=ctx))
 
 @bot.command(name="i", aliases=["invitecount"])
 async def invite_stats_cmd(ctx, member: discord.Member = None):
     target = member or ctx.author
     g_id = ctx.guild.id
     invs = user_invites.get(g_id, {}).get(str(target.id), {}).get("total", 0)
-    await ctx.send(embed=create_embed(title="Invite Tracker Analytics", description=f"🎟️ {target.mention} has successfully brought in **{invs}** invites.", ctx=ctx))[span_2](start_span)[span_2](end_span)
+    await ctx.send(embed=create_embed(title="Invite Tracker Analytics", description=f"🎟️ {target.mention} has successfully brought in **{invs}** invites.", ctx=ctx))
 
 # 6. RESET COMMANDS (`rm all`, `rv all`, `ri all`)
 @bot.command(name="rm")
@@ -443,31 +441,31 @@ async def reset_invites_cmd(ctx, option: str = None):
 async def leaderboard_messages_cmd(ctx):
     g_id = ctx.guild.id
     data = user_messages.get(g_id, {})
-    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No message logs available yet.", ctx=ctx))[span_3](start_span)[span_3](end_span)
+    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No message logs available yet.", ctx=ctx))
     sorted_users = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
     desc = "".join([f"`#{idx}` <@{uid}> — **{count}** messages\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
-    await ctx.send(embed=create_embed(title="🏆 Message Activity Leaderboard", description=desc, ctx=ctx))[span_4](start_span)[span_4](end_span)
+    await ctx.send(embed=create_embed(title="🏆 Message Activity Leaderboard", description=desc, ctx=ctx))
 
 @bot.command(name="lv", aliases=["leaderboard voice"])
 async def leaderboard_voice_cmd(ctx):
     g_id = ctx.guild.id
     data = user_voice_time.get(g_id, {})
-    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No voice time logs available yet.", ctx=ctx))[span_5](start_span)[span_5](end_span)
+    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No voice time logs available yet.", ctx=ctx))
     sorted_users = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
     desc = ""
     for idx, (uid, sec) in enumerate(sorted_users, 1):
         h, m = sec // 3600, (sec % 3600) // 60
         desc += f"`#{idx}` <@{uid}> — **{h}h {m}m**\n"
-    await ctx.send(embed=create_embed(title="🏆 Voice Activity Leaderboard", description=desc, ctx=ctx))[span_6](start_span)[span_6](end_span)
+    await ctx.send(embed=create_embed(title="🏆 Voice Activity Leaderboard", description=desc, ctx=ctx))
 
 @bot.command(name="li", aliases=["leaderboard invite"])
 async def leaderboard_invites_cmd(ctx):
     g_id = ctx.guild.id
     data = user_invites.get(g_id, {})
-    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No invite logs available yet.", ctx=ctx))[span_7](start_span)[span_7](end_span)
+    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No invite logs available yet.", ctx=ctx))
     sorted_users = sorted(data.items(), key=lambda x: x[1].get("total", 0), reverse=True)[:10]
     desc = "".join([f"`#{idx}` <@{uid}> — **{d.get('total', 0)}** invites\n" for idx, (uid, d) in enumerate(sorted_users, 1)])
-    await ctx.send(embed=create_embed(title="🏆 Invite Tracking Leaderboard", description=desc, ctx=ctx))[span_8](start_span)[span_8](end_span)
+    await ctx.send(embed=create_embed(title="🏆 Invite Tracking Leaderboard", description=desc, ctx=ctx))
 
 # 8. UTILITIES & GAMES (`say`, `reply`, `clone`, `giveaway`, `start`)
 @bot.command(name="say")
