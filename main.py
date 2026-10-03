@@ -45,7 +45,7 @@ def load_data():
         "welcome": {}, "messages": {}, "voice_time": {}, "invites": {},
         "nickname_setup": {}, "counting": {}, "autoresponder": {}, "antinuke": {}, 
         "reaction_roles": {}, "abuse_words": {}, "antispam_status": {}, "antiabuse_status": {},
-        "antispam_config": {}, "antiabuse_config": {}
+        "antispam_config": {}, "antiabuse_config": {}, "command_logs": {}, "ghost_ping": {}
     }
 
 def save_data():
@@ -57,7 +57,8 @@ def save_data():
         "nickname_setup": guild_nicknames, "counting": guild_counting, "autoresponder": guild_autoresponder,
         "antinuke": guild_antinuke, "reaction_roles": guild_reaction_roles, "abuse_words": guild_abuse_words,
         "antispam_status": guild_antispam_status, "antiabuse_status": guild_antiabuse_status,
-        "antispam_config": guild_antispam_config, "antiabuse_config": guild_antiabuse_config
+        "antispam_config": guild_antispam_config, "antiabuse_config": guild_antiabuse_config,
+        "command_logs": guild_command_logs, "ghost_ping": guild_ghost_ping
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -85,6 +86,8 @@ guild_antispam_status = {int(k): v for k, v in db.get("antispam_status", {}).ite
 guild_antiabuse_status = {int(k): v for k, v in db.get("antiabuse_status", {}).items()}
 guild_antispam_config = {int(k): v for k, v in db.get("antispam_config", {}).items()}
 guild_antiabuse_config = {int(k): v for k, v in db.get("antiabuse_config", {}).items()}
+guild_command_logs = {int(k): v for k, v in db.get("command_logs", {}).items()}
+guild_ghost_ping = {int(k): v for k, v in db.get("ghost_ping", {}).items()}
 
 def get_prefix(bot, message):
     if not message.guild:
@@ -96,8 +99,8 @@ bot.remove_command("help")
 
 afk_users = {}
 user_message_times = {}
-voice_joindata = {}  # Tracks voice connection timestamps: {(guild_id, user_id): timestamp}
-cached_invites = {}  # Tracks server invites for invite counter
+voice_joindata = {}
+cached_invites = {}
 
 DEFAULT_THUMBNAIL = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 
@@ -111,7 +114,7 @@ def emb(title="", description="", color=0xFFFFFF, thumbnail=None):
 async def on_ready():
     print("----------------------------------------")
     print("Bot Name: Moonlight Heaven (Ultimate Full Edition)")
-    print("Status: All Old & New Commands Loaded Successfully!")
+    print("Status: All Commands & Systems Loaded Successfully!")
     print("----------------------------------------")
     for guild in bot.guilds:
         try:
@@ -156,16 +159,73 @@ async def on_voice_state_update(member, before, after):
     u_id = member.id
     key = (g_id, u_id)
     
-    # Joined a voice channel
     if before.channel is None and after.channel is not None:
         voice_joindata[key] = time.time()
-    # Left a voice channel
     elif before.channel is not None and after.channel is None:
         if key in voice_joindata:
             elapsed = int(time.time() - voice_joindata.pop(key))
             if g_id not in user_voice_time: user_voice_time[g_id] = {}
             user_voice_time[g_id][str(u_id)] = user_voice_time[g_id].get(str(u_id), 0) + elapsed
             save_data()
+
+# ==================== NEW FEATURE 1: COMMAND AUDIT LOG ====================
+
+@bot.event
+async def on_command(ctx):
+    if not ctx.guild:
+        return
+    g_id = ctx.guild.id
+    log_channel_id = guild_command_logs.get(g_id)
+    if log_channel_id:
+        ch = ctx.guild.get_channel(log_channel_id)
+        if ch:
+            e = emb(
+                title="⚙️ Command Executed Log",
+                description=f"**User:** {ctx.author.mention} (`{ctx.author.id}`)\n**Command:** `{ctx.command.name}`\n**Channel:** {ctx.channel.mention}\n**Full Content:** `{ctx.message.content}`"
+            )
+            try:
+                await ch.send(embed=e)
+            except:
+                pass
+
+@bot.command(name="setcmdlog")
+@commands.has_permissions(administrator=True)
+async def set_command_log(ctx, channel: discord.TextChannel):
+    g_id = ctx.guild.id
+    guild_command_logs[g_id] = channel.id
+    save_data()
+    await ctx.send(embed=emb(title="Command Log Setup", description=f"✅ Command auditing channel set to {channel.mention}."))
+
+# ==================== NEW FEATURE 2: MESSAGE DELETE SNIFFER ====================
+
+@bot.event
+async def on_message_delete(message):
+    if not message.guild or message.author.bot:
+        return
+    g_id = message.guild.id
+    log_channel_id = guild_ghost_ping.get(g_id)
+    if log_channel_id:
+        ch = message.guild.get_channel(log_channel_id)
+        if ch and ch.id != message.channel.id:
+            content = message.content if message.content else "*[No Text Content / Embedded or Attachment]*"
+            e = emb(
+                title="🗑️ Deleted Message Recovered",
+                description=f"**Author:** {message.author.mention} (`{message.author.id}`)\n**Channel:** {message.channel.mention}\n**Deleted Message:**\n{content}"
+            )
+            try:
+                await ch.send(embed=e)
+            except:
+                pass
+
+@bot.command(name="setdeletelog")
+@commands.has_permissions(administrator=True)
+async def set_delete_log(ctx, channel: discord.TextChannel):
+    g_id = ctx.guild.id
+    guild_ghost_ping[g_id] = channel.id
+    save_data()
+    await ctx.send(embed=emb(title="Delete Logger Setup", description=f"✅ Deleted message logs will now be sent to {channel.mention}."))
+
+# ==================== EXISTING BOT CODE CONTINUES ====================
 
 @bot.event
 async def on_message(message):
@@ -186,22 +246,22 @@ async def on_message(message):
                 if punish_type == "timeout":
                     dur = timedelta(minutes=config.get("time", 60))
                     await message.author.timeout(dur, reason="Using forbidden abuse words.")
-                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you wanted to abuse, but you couldn't! Timeout given."))
+                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you tried to use banned words! Timeout given."))
                 elif punish_type == "kick":
                     await message.author.kick(reason="Using abuse words.")
-                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you wanted to abuse, but you couldn't! Kicked."))
+                    await message.channel.send(embed=emb(title="⚠️️ Anti-Abuse Triggered", description=f"{message.author.mention}, kicked for using forbidden words."))
                 elif punish_type == "ban":
                     await message.author.ban(reason="Using abuse words.")
-                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you wanted to abuse, but you couldn't! Banned."))
+                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, banned for using forbidden words."))
                 return
             except Exception as e:
                 print(f"Anti-Abuse Error: {e}")
 
     # 2. Anti-Spam Check
     if message.guild and guild_antispam_status.get(g_id, False) and not message.author.guild_permissions.manage_messages:
-        config = guild_antispam_config.get(g_id, {"seconds": 5, "messages": 3, "timeout": 5})
+        config = guild_antispam_config.get(g_id, {"seconds": 5, "messages": 5, "timeout": 5})
         limit_sec = config.get("seconds", 5)
-        limit_msg = config.get("messages", 3)
+        limit_msg = config.get("messages", 5)
         timeout_min = config.get("timeout", 5)
 
         now = time.time()
@@ -217,7 +277,7 @@ async def on_message(message):
             try:
                 duration = timedelta(minutes=timeout_min)
                 await message.author.timeout(duration, reason="Spamming messages.")
-                await message.channel.send(embed=emb(title="🛑 Anti-Spam Triggered", description=f"{message.author.mention}, you wanted to spam, but you couldn't! Take a {timeout_min}-minute timeout! 💀"))
+                await message.channel.send(embed=emb(title="🛑 Anti-Spam Triggered", description=f"{message.author.mention}, slow down! Take a {timeout_min}-minute timeout for spamming. 💀"))
                 return
             except Exception as e:
                 print(f"Anti-Spam Error: {e}")
@@ -255,7 +315,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ==================== ADVANCED SECURITY ====================
+# ==================== AUTOMOD & SECURITY COMMANDS ====================
 
 @bot.command(name="antispam")
 @commands.has_permissions(administrator=True)
@@ -266,12 +326,18 @@ async def anti_spam_toggle(ctx, status: str):
         guild_antispam_status[g_id] = True
         save_data()
         await ctx.send(embed=emb(title="Anti-Spam Status", description="🛡️ Anti-Spam protection is now **ENABLED**."))
-    elif st in ["off", "disable", "false"]:
+    else:
         guild_antispam_status[g_id] = False
         save_data()
         await ctx.send(embed=emb(title="Anti-Spam Status", description="⚠️ Anti-Spam protection is now **DISABLED**."))
-    else:
-        await ctx.send(embed=emb(title="Error", description="Use `&antispam on` or `&antispam off`."))
+
+@bot.command(name="setantispam")
+@commands.has_permissions(administrator=True)
+async def set_anti_spam(ctx, seconds: int, messages: int, timeout_minutes: int):
+    g_id = ctx.guild.id
+    guild_antispam_config[g_id] = {"seconds": seconds, "messages": messages, "timeout": timeout_minutes}
+    save_data()
+    await ctx.send(embed=emb(title="Anti-Spam Configured", description=f"✅ Updated rules: `{seconds}s`, `{messages} msgs`, `{timeout_minutes}m timeout`"))
 
 @bot.command(name="antiabuse")
 @commands.has_permissions(administrator=True)
@@ -315,155 +381,7 @@ async def list_abuses(ctx):
     desc = ", ".join([f"`{w}`" for w in words]) if words else "No abuse words added."
     await ctx.send(embed=emb(title="🛡️ Abuse Word List", description=desc))
 
-# ==================== NEW IMAGE COMMANDS & UTILITIES ====================
-
-@bot.command(name="hide")
-@commands.has_permissions(manage_channels=True)
-async def hide_channel(ctx, channel: discord.TextChannel = None):
-    ch = channel or ctx.channel
-    await ch.set_permissions(ctx.guild.default_role, view_channel=False)
-    await ctx.send(embed=emb(title="Channel Hidden", description=f"🔒 {ch.mention} has been hidden."))
-
-@bot.command(name="unhide")
-@commands.has_permissions(manage_channels=True)
-async def unhide_channel(ctx, channel: discord.TextChannel = None):
-    ch = channel or ctx.channel
-    await ch.set_permissions(ctx.guild.default_role, view_channel=True)
-    await ctx.send(embed=emb(title="Channel Unhidden", description=f"🔓 {ch.mention} is now visible."))
-
-@bot.command(name="m", aliases=["messagecount"])
-async def message_count_cmd(ctx, member: discord.Member = None):
-    m = member or ctx.author
-    g_id = ctx.guild.id
-    count = user_messages.get(g_id, {}).get(str(m.id), 0)
-    await ctx.send(embed=emb(title="Message Count", description=f"📊 {m.mention} has sent **{count}** messages."))
-
-@bot.command(name="v", aliases=["voicetime"])
-async def voice_time_cmd(ctx, member: discord.Member = None):
-    m = member or ctx.author
-    g_id = ctx.guild.id
-    total_sec = user_voice_time.get(g_id, {}).get(str(m.id), 0)
-    # Include currently active session if user is in voice
-    key = (g_id, m.id)
-    if key in voice_joindata:
-        total_sec += int(time.time() - voice_joindata[key])
-    
-    hours = total_sec // 3600
-    minutes = (total_sec % 3600) // 60
-    await ctx.send(embed=emb(title="Voice Timing Count", description=f"🎙️ {m.mention} has spent **{hours}h {minutes}m** in voice channels."))
-
-@bot.command(name="i", aliases=["invitecount"])
-async def invite_count_cmd(ctx, member: discord.Member = None):
-    m = member or ctx.author
-    g_id = ctx.guild.id
-    invs = user_invites.get(g_id, {}).get(str(m.id), {}).get("total", 0)
-    await ctx.send(embed=emb(title="Invite Count", description=f"🎟️ {m.mention} has invited **{invs}** members."))
-
-# Reset Commands: rm all, rv all, ri all
-@bot.command(name="rm")
-@commands.has_permissions(administrator=True)
-async def reset_messages(ctx, target: str):
-    if target.lower() == "all":
-        g_id = ctx.guild.id
-        user_messages[g_id] = {}
-        save_data()
-        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All user message counters have been reset."))
-    else:
-        await ctx.send(embed=emb(title="Error", description="Use `&rm all` to reset all messages."))
-
-@bot.command(name="rv")
-@commands.has_permissions(administrator=True)
-async def reset_voice(ctx, target: str):
-    if target.lower() == "all":
-        g_id = ctx.guild.id
-        user_voice_time[g_id] = {}
-        save_data()
-        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All user voice time counters have been reset."))
-    else:
-        await ctx.send(embed=emb(title="Error", description="Use `&rv all` to reset all voice times."))
-
-@bot.command(name="ri")
-@commands.has_permissions(administrator=True)
-async def reset_invites(ctx, target: str):
-    if target.lower() == "all":
-        g_id = ctx.guild.id
-        user_invites[g_id] = {}
-        save_data()
-        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All user invite counters have been reset."))
-    else:
-        await ctx.send(embed=emb(title="Error", description="Use `&ri all` to reset all invites."))
-
-# Leaderboard Commands: lm, lv, li
-@bot.command(name="lm")
-async def leaderboard_messages(ctx):
-    g_id = ctx.guild.id
-    m_data = user_messages.get(g_id, {})
-    if not m_data:
-        return await ctx.send(embed=emb(title="Message Leaderboard", description="No message data recorded yet."))
-    
-    sorted_users = sorted(m_data.items(), key=lambda x: x[1], reverse=True)[:10]
-    desc = ""
-    for idx, (uid, count) in enumerate(sorted_users, 1):
-        desc += f"`#{idx}` <@{uid}> — **{count}** msgs\n"
-    await ctx.send(embed=emb(title="🏆 Message Leaderboard", description=desc))
-
-@bot.command(name="lv")
-async def leaderboard_voice(ctx):
-    g_id = ctx.guild.id
-    v_data = user_voice_time.get(g_id, {})
-    if not v_data:
-        return await ctx.send(embed=emb(title="Voice Leaderboard", description="No voice data recorded yet."))
-    
-    sorted_users = sorted(v_data.items(), key=lambda x: x[1], reverse=True)[:10]
-    desc = ""
-    for idx, (uid, sec) in enumerate(sorted_users, 1):
-        h = sec // 3600
-        m = (sec % 3600) // 60
-        desc += f"`#{idx}` <@{uid}> — **{h}h {m}m**\n"
-    await ctx.send(embed=emb(title="🏆 Voice Time Leaderboard", description=desc))
-
-@bot.command(name="li")
-async def leaderboard_invites(ctx):
-    g_id = ctx.guild.id
-    i_data = user_invites.get(g_id, {})
-    if not i_data:
-        return await ctx.send(embed=emb(title="Invite Leaderboard", description="No invite data recorded yet."))
-    
-    sorted_users = sorted(i_data.items(), key=lambda x: x[1].get("total", 0), reverse=True)[:10]
-    desc = ""
-    for idx, (uid, data) in enumerate(sorted_users, 1):
-        total = data.get("total", 0)
-        desc += f"`#{idx}` <@{uid}> — **{total}** invites\n"
-    await ctx.send(embed=emb(title="🏆 Invite Leaderboard", description=desc))
-
-@bot.command(name="say")
-@commands.has_permissions(manage_messages=True)
-async def say_cmd(ctx, *, message: str):
-    await ctx.message.delete()
-    await ctx.send(message)
-
-@bot.command(name="reply")
-@commands.has_permissions(manage_messages=True)
-async def reply_cmd(ctx, message_id: int, *, message: str):
-    try:
-        msg = await ctx.channel.fetch_message(message_id)
-        await msg.reply(message)
-        await ctx.message.delete()
-    except Exception as e:
-        await ctx.send(embed=emb(title="Error", description=f"Could not reply: {e}"))
-
-@bot.command(name="clone")
-@commands.has_permissions(manage_channels=True)
-async def clone_channel(ctx, channel: discord.TextChannel = None):
-    ch = channel or ctx.channel
-    new_ch = await ch.clone(reason=f"Cloned by {ctx.author}")
-    await ctx.send(embed=emb(title="Channel Cloned", description=f"✅ Successfully cloned {ch.mention} into {new_ch.mention}!"))
-
-# ==================== EXISTING MODERATION & UTILITY COMMANDS ====================
-
-@bot.command(name="ping")
-async def ping_cmd(ctx):
-    await ctx.send(embed=emb(title="Latency", description=f"Response time: {round(bot.latency * 1000)}ms"))
+# ==================== MODERATION & CHANNEL COMMANDS ====================
 
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
@@ -479,9 +397,12 @@ async def kick_user(ctx, member: discord.Member, *, reason="No reason"):
 
 @bot.command(name="mute")
 @commands.has_permissions(manage_roles=True)
-async def mute_user(ctx, member: discord.Member, minutes: int = 10, *, reason="No reason"):
-    await member.timeout(timedelta(minutes=minutes), reason=reason)
-    await ctx.send(embed=emb(title="Muted / Timed out", description=f"{member.mention} has been muted for {minutes} minutes.\nReason: {reason}"))
+async def mute_user(ctx, member: discord.Member, minutes: int = 10, *, reason: str = "No reason"):
+    try:
+        await member.timeout(timedelta(minutes=minutes), reason=reason)
+        await ctx.send(embed=emb(title="Muted / Timed out", description=f"✅ {member.mention} has been muted for `{minutes} minutes`.\n**Reason:** {reason}"))
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=f"Could not mute user: {e}"))
 
 @bot.command(name="warn")
 @commands.has_permissions(manage_messages=True)
@@ -518,40 +439,19 @@ async def unlock_channel(ctx, channel: discord.TextChannel = None):
     await ch.set_permissions(ctx.guild.default_role, send_messages=True)
     await ctx.send(embed=emb(title="Channel Unlocked", description=f"🔓 {ch.mention} has been unlocked."))
 
-@bot.command(name="addrole")
-@commands.has_permissions(manage_roles=True)
-async def add_role(ctx, member: discord.Member, role: discord.Role):
-    await member.add_roles(role)
-    await ctx.send(embed=emb(title="Role Added", description=f"✅ Added {role.mention} to {member.mention}."))
+@bot.command(name="hide")
+@commands.has_permissions(manage_channels=True)
+async def hide_channel(ctx, channel: discord.TextChannel = None):
+    ch = channel or ctx.channel
+    await ch.set_permissions(ctx.guild.default_role, view_channel=False)
+    await ctx.send(embed=emb(title="Channel Hidden", description=f"🔒 {ch.mention} has been hidden."))
 
-@bot.command(name="removerole")
-@commands.has_permissions(manage_roles=True)
-async def remove_role(ctx, member: discord.Member, role: discord.Role):
-    await member.remove_roles(role)
-    await ctx.send(embed=emb(title="Role Removed", description=f"❌ Removed {role.mention} from {member.mention}."))
-
-@bot.command(name="cloneemoji")
-@commands.has_permissions(manage_emojis=True)
-async def clone_emoji(ctx, emoji: discord.Emoji):
-    img = await emoji.read()
-    new_emoji = await ctx.guild.create_custom_emoji(name=emoji.name, image=img)
-    await ctx.send(embed=emb(title="Emoji Cloned", description=f"✅ Successfully cloned {new_emoji}!"))
-
-@bot.command(name="giveaway")
-@commands.has_permissions(manage_guild=True)
-async def start_giveaway(ctx, minutes: int, *, prize: str):
-    e = emb(title="🎉 GIVEAWAY 🎉", description=f"Prize: **{prize}**\nDuration: `{minutes} minutes`\nReact with 🎉 to enter!")
-    msg = await ctx.send(embed=e)
-    await msg.add_reaction("🎉")
-    await asyncio.sleep(minutes * 60)
-    
-    new_msg = await ctx.channel.fetch_message(msg.id)
-    users = [u async for u in new_msg.reactions[0].users() if not u.bot]
-    if users:
-        winner = random.choice(users)
-        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description=f"Winner: {winner.mention} won **{prize}**! 🎁"))
-    else:
-        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description="No valid entries found."))
+@bot.command(name="unhide")
+@commands.has_permissions(manage_channels=True)
+async def unhide_channel(ctx, channel: discord.TextChannel = None):
+    ch = channel or ctx.channel
+    await ch.set_permissions(ctx.guild.default_role, view_channel=True)
+    await ctx.send(embed=emb(title="Channel Unhidden", description=f"🔓 {ch.mention} is now visible."))
 
 @bot.command(name="purge", aliases=["clear"])
 @commands.has_permissions(manage_messages=True)
@@ -561,12 +461,137 @@ async def purge_msgs(ctx, amount: int):
     await asyncio.sleep(3)
     await msg.delete()
 
-@bot.command(name="setprefix")
+# ==================== STATS & LEADERBOARDS ====================
+
+@bot.command(name="m", aliases=["messagecount"])
+async def message_count_cmd(ctx, member: discord.Member = None):
+    m = member or ctx.author
+    g_id = ctx.guild.id
+    count = user_messages.get(g_id, {}).get(str(m.id), 0)
+    await ctx.send(embed=emb(title="Message Count", description=f"📊 {m.mention} has sent **{count}** messages."))
+
+@bot.command(name="v", aliases=["voicetime"])
+async def voice_time_cmd(ctx, member: discord.Member = None):
+    m = member or ctx.author
+    g_id = ctx.guild.id
+    total_sec = user_voice_time.get(g_id, {}).get(str(m.id), 0)
+    key = (g_id, m.id)
+    if key in voice_joindata:
+        total_sec += int(time.time() - voice_joindata[key])
+    
+    hours = total_sec // 3600
+    minutes = (total_sec % 3600) // 60
+    await ctx.send(embed=emb(title="Voice Timing Count", description=f"🎙️ {m.mention} has spent **{hours}h {minutes}m** in voice channels."))
+
+@bot.command(name="i", aliases=["invitecount"])
+async def invite_count_cmd(ctx, member: discord.Member = None):
+    m = member or ctx.author
+    g_id = ctx.guild.id
+    invs = user_invites.get(g_id, {}).get(str(m.id), {}).get("total", 0)
+    await ctx.send(embed=emb(title="Invite Count", description=f"🎟️ {m.mention} has invited **{invs}** members."))
+
+@bot.command(name="rm")
 @commands.has_permissions(administrator=True)
-async def set_prefix(ctx, prefix: str):
-    guild_prefixes[ctx.guild.id] = prefix
-    save_data()
-    await ctx.send(embed=emb(title="Prefix Updated", description=f"New prefix: {prefix}"))
+async def reset_messages(ctx, target: str):
+    if target.lower() == "all":
+        user_messages[ctx.guild.id] = {}
+        save_data()
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All message counters reset."))
+
+@bot.command(name="rv")
+@commands.has_permissions(administrator=True)
+async def reset_voice(ctx, target: str):
+    if target.lower() == "all":
+        user_voice_time[ctx.guild.id] = {}
+        save_data()
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All voice time counters reset."))
+
+@bot.command(name="ri")
+@commands.has_permissions(administrator=True)
+async def reset_invites(ctx, target: str):
+    if target.lower() == "all":
+        user_invites[ctx.guild.id] = {}
+        save_data()
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All invite counters reset."))
+
+@bot.command(name="lm")
+async def leaderboard_messages(ctx):
+    g_id = ctx.guild.id
+    m_data = user_messages.get(g_id, {})
+    if not m_data: return await ctx.send(embed=emb(title="Message Leaderboard", description="No data found."))
+    sorted_users = sorted(m_data.items(), key=lambda x: x[1], reverse=True)[:10]
+    desc = "".join([f"`#{idx}` <@{uid}> — **{count}** msgs\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
+    await ctx.send(embed=emb(title="🏆 Message Leaderboard", description=desc))
+
+@bot.command(name="lv")
+async def leaderboard_voice(ctx):
+    g_id = ctx.guild.id
+    v_data = user_voice_time.get(g_id, {})
+    if not v_data: return await ctx.send(embed=emb(title="Voice Leaderboard", description="No data found."))
+    sorted_users = sorted(v_data.items(), key=lambda x: x[1], reverse=True)[:10]
+    desc = ""
+    for idx, (uid, sec) in enumerate(sorted_users, 1):
+        h, m = sec // 3600, (sec % 3600) // 60
+        desc += f"`#{idx}` <@{uid}> — **{h}h {m}m**\n"
+    await ctx.send(embed=emb(title="🏆 Voice Time Leaderboard", description=desc))
+
+@bot.command(name="li")
+async def leaderboard_invites(ctx):
+    g_id = ctx.guild.id
+    i_data = user_invites.get(g_id, {})
+    if not i_data: return await ctx.send(embed=emb(title="Invite Leaderboard", description="No data found."))
+    sorted_users = sorted(i_data.items(), key=lambda x: x[1].get("total", 0), reverse=True)[:10]
+    desc = "".join([f"`#{idx}` <@{uid}> — **{data.get('total', 0)}** invites\n" for idx, (uid, data) in enumerate(sorted_users, 1)])
+    await ctx.send(embed=emb(title="🏆 Invite Leaderboard", description=desc))
+
+# ==================== UTILITY & FUN COMMANDS ====================
+
+@bot.command(name="say")
+@commands.has_permissions(manage_messages=True)
+async def say_cmd(ctx, *, message: str):
+    await ctx.message.delete()
+    await ctx.send(message)
+
+@bot.command(name="reply")
+@commands.has_permissions(manage_messages=True)
+async def reply_cmd(ctx, message_id: int, *, message: str):
+    try:
+        msg = await ctx.channel.fetch_message(message_id)
+        await msg.reply(message)
+        await ctx.message.delete()
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=str(e)))
+
+@bot.command(name="clone")
+@commands.has_permissions(manage_channels=True)
+async def clone_channel(ctx, channel: discord.TextChannel = None):
+    ch = channel or ctx.channel
+    new_ch = await ch.clone(reason=f"Cloned by {ctx.author}")
+    await ctx.send(embed=emb(title="Channel Cloned", description=f"✅ Cloned {ch.mention} into {new_ch.mention}!"))
+
+@bot.command(name="ping")
+async def ping_cmd(ctx):
+    await ctx.send(embed=emb(title="Latency", description=f"Response time: {round(bot.latency * 1000)}ms"))
+
+@bot.command(name="afk")
+async def afk_cmd(ctx, *, reason="AFK"):
+    afk_users[ctx.author.id] = reason
+    await ctx.send(embed=emb(title="AFK Activated", description=f"{ctx.author.mention} is now AFK.\nReason: {reason}"))
+
+@bot.command(name="giveaway")
+@commands.has_permissions(manage_guild=True)
+async def start_giveaway(ctx, minutes: int, *, prize: str):
+    e = emb(title="🎉 GIVEAWAY 🎉", description=f"Prize: **{prize}**\nDuration: `{minutes} minutes`\nReact with 🎉 to enter!")
+    msg = await ctx.send(embed=e)
+    await msg.add_reaction("🎉")
+    await asyncio.sleep(minutes * 60)
+    new_msg = await ctx.channel.fetch_message(msg.id)
+    users = [u async for u in new_msg.reactions[0].users() if not u.bot]
+    if users:
+        winner = random.choice(users)
+        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description=f"Winner: {winner.mention} won **{prize}**! 🎁"))
+    else:
+        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description="No valid entries found."))
 
 @bot.command(name="start", aliases=["counting"])
 @commands.has_permissions(administrator=True)
@@ -576,22 +601,12 @@ async def start_counting(ctx, amount: int = 1, channel: discord.TextChannel = No
     save_data()
     await ctx.send(embed=emb(title="Counting Initialized", description=f"Started in {target_channel.mention} at number {amount}."))
 
-@bot.command(name="afk")
-async def afk_cmd(ctx, *, reason="AFK"):
-    afk_users[ctx.author.id] = reason
-    await ctx.send(embed=emb(title="AFK Activated", description=f"{ctx.author.mention} is now AFK.\nReason: {reason}"))
-
-@bot.command(name="serverinfo", aliases=["si"])
-async def server_info(ctx):
-    g = ctx.guild
-    desc = f"**General**\n• ID: `{g.id}`\n• Owner: `{g.owner}`\n• Created: `{g.created_at.strftime('%d %B %Y')}`\n\n**Members**\n• Total: `{g.member_count}`"
-    await ctx.send(embed=emb(title=f"Server Info - {g.name}", description=desc))
-
-@bot.command(name="userinfo", aliases=["ui"])
-async def user_info(ctx, member: discord.Member = None):
-    m = member or ctx.author
-    desc = f"**User Information**\n• Name: `{m}`\n• ID: `{m.id}`\n• Joined: `{m.joined_at.strftime('%d/%m/%Y') if m.joined_at else 'N/A'}`"
-    await ctx.send(embed=emb(title=f"User Info - {m.name}", description=desc))
+@bot.command(name="setprefix")
+@commands.has_permissions(administrator=True)
+async def set_prefix(ctx, prefix: str):
+    guild_prefixes[ctx.guild.id] = prefix
+    save_data()
+    await ctx.send(embed=emb(title="Prefix Updated", description=f"New prefix: {prefix}"))
 
 # ==================== HELP MENU ====================
 
