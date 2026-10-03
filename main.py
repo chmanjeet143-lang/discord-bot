@@ -15,7 +15,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "🤖 Moonlight Heaven Detailed Bot is Online & Active!"
+    return "🤖 Moonlight Heaven Bot is Online & Fully Active!"
 
 def run():
     app.run(host="0.0.0.0", port=10000)
@@ -87,13 +87,9 @@ voice_joindata = {}
 cached_invites = {}
 
 # =====================================================================
-#                 SCREENSHOT MATCHED EMBED HELPER
+#                 CLEAN EMBED HELPER
 # =====================================================================
-def create_embed(title="", description="", ctx=None, color=0x5865F2):
-    """
-    Creates a sleek modern embed matching the user's screenshot style:
-    Clean borders, beautiful header formatting, and professional user context footer.
-    """
+def create_embed(title="", description="", ctx=None, color=0x2B2D31):
     embed = discord.Embed(title=title, description=description, color=color)
     if ctx and hasattr(ctx, "author") and ctx.author:
         embed.set_footer(
@@ -101,8 +97,61 @@ def create_embed(title="", description="", ctx=None, color=0x5865F2):
             icon_url=ctx.author.display_avatar.url
         )
     else:
-        embed.set_footer(text="Moonlight Heaven • System Security")
+        embed.set_footer(text="Moonlight Heaven • Security & Utility")
     return embed
+
+# =====================================================================
+#                 INTERACTIVE HELP MENU (BUTTONS & SELECT)
+# =====================================================================
+class HelpSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="🏠 Home Menu", description="Main dashboard overview", emoji="🏠"),
+            discord.SelectOption(label="🛡 Moderation & Setup", description="Roles, channels, reset tools", emoji="🛡️"),
+            discord.SelectOption(label="👤 Member & Stats", description="Messages, voice time, invites & leaderboards", emoji="📊"),
+            discord.SelectOption(label="⚙ Utility & Games", description="Say, reply, clone, giveaway, counting", emoji="🎮")
+        ]
+        super().__init__(placeholder="📂 Select a command category...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        val = self.values[0]
+        embed = discord.Embed(color=0x2B2D31)
+        
+        if "Home" in val:
+            embed.title = "🌟 Moonlight Heaven • Command Center"
+            embed.description = "Welcome to the interactive help panel! Select a category from the dropdown menu below."
+            embed.add_field(name="Modules Available", value="• Moderation & Reset Tools\n• Member Stats & Leaderboards\n• Utility & Mini Games", inline=False)
+        elif "Moderation" in val:
+            embed.title = "🛡️ Moderation, Setup & Reset Commands"
+            embed.description = "Manage server structures and data resets."
+            embed.add_field(name="`&addrole / &removerole`", value="Manage user roles.\n*Usage:* `&addrole @User @Role`", inline=False)
+            embed.add_field(name="`&hide / &unhide`", value="Toggle channel visibility.", inline=False)
+            embed.add_field(name="`&lock / &unlock`", value="Toggle channel chat permissions.", inline=False)
+            embed.add_field(name="`&rm all`", value="Reset all user message tracking data.", inline=False)
+            embed.add_field(name="`&rv all`", value="Reset all user voice time tracking data.", inline=False)
+            embed.add_field(name="`&ri all`", value="Reset all user invite tracking data.", inline=False)
+        elif "Member" in val:
+            embed.title = "👤 Member Stats & Leaderboards"
+            embed.description = "Track individual activity and check server rankings."
+            embed.add_field(name="`&m / &v / &i`", value="Check message, voice time or invite counts.\n*Usage:* `&m` or `&m @User`", inline=False)
+            embed.add_field(name="`&lm / &lv / &li`", value="View server leaderboards for messages, voice & invites.", inline=False)
+            embed.add_field(name="`&setupbotchannel`", value="Setup prefixless bot channel.", inline=False)
+        elif "Utility" in val:
+            embed.title = "⚙️ Utility, Fun & Mini Games"
+            embed.description = "Broadcast messages, reply, clone, giveaways and counting."
+            embed.add_field(name="`&say [message]`", value="Send announcement text.", inline=False)
+            embed.add_field(name="`&reply [message_id] [text]`", value="Reply to a specific message.", inline=False)
+            embed.add_field(name="`&clone`", value="Clone current channel layout.", inline=False)
+            embed.add_field(name="`&giveaway [minutes] [prize]`", value="Start a giveaway.", inline=False)
+            embed.add_field(name="`&start [number] [channel] [emoji]`", value="Start counting game.", inline=False)
+
+        embed.set_footer(text=f"Requested by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
+        await interaction.response.edit_message(embed=embed)
+
+class HelpView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(HelpSelect())
 
 # =====================================================================
 #                      BOT EVENTS & LISTENERS
@@ -111,7 +160,7 @@ def create_embed(title="", description="", ctx=None, color=0x5865F2):
 async def on_ready():
     print(f"==========================================")
     print(f" Logged in as: {bot.user.name} ({bot.user.id})")
-    print(f" Status: Online and Fully Loaded (~700+ Lines)")
+    print(f" Status: Online with Full Command Suite")
     print(f"==========================================")
     for guild in bot.guilds:
         try:
@@ -182,7 +231,6 @@ async def on_message(message):
     # --- PREFIXLESS BOT CHANNEL SYSTEM ---
     designated_channel_id = guild_bot_channels.get(g_id)
     if designated_channel_id and message.channel.id == designated_channel_id:
-        # Message is NOT deleted as requested!
         if content_lower in ["m", "message", "messages"]:
             count = user_messages.get(g_id, {}).get(str(u_id), 0)
             await message.reply(embed=create_embed(title="📊 Message Count", description=f"{message.author.mention}, you have sent **{count}** messages in this server.", ctx=message))
@@ -193,7 +241,7 @@ async def on_message(message):
             if key in voice_joindata:
                 total_sec += int(time.time() - voice_joindata[key])
             hours, minutes = total_sec // 3600, (total_sec % 3600) // 60
-            await message.reply(embed=create_embed(title="🎙️️ Voice Time Report", description=f"{message.author.mention}, you have spent **{hours} hours** and **{minutes} minutes** in voice channels.", ctx=message))
+            await message.reply(embed=create_embed(title="🎙 Voice Time Report", description=f"{message.author.mention}, you have spent **{hours} hours** and **{minutes} minutes** in voice channels.", ctx=message))
             return
         elif content_lower in ["i", "invite", "invites"]:
             invs = user_invites.get(g_id, {}).get(str(u_id), {}).get("total", 0)
@@ -212,8 +260,7 @@ async def on_message(message):
                 await message.reply(embed=create_embed(title="⚠️ Invalid Syntax", description="Please write properly: `change nickname YourNewName`", ctx=message))
             return
         else:
-            # Wrong text entered in bot channel -> bot replies with instructions without deleting user message
-            await message.reply(embed=create_embed(title="ℹ️ Bot Channel Guidelines", description="In this designated channel, you can use these shortcuts without a prefix:\n• `m` - Check message count\n• `v` - Check voice activity time\n• `i` - Check invite statistics\n• `change nickname [name]` - Change your server nickname", ctx=message))
+            await message.reply(embed=create_embed(title="ℹ️ Bot Channel Guidelines", description="Use these shortcuts here:\n• `m` - Message count\n• `v` - Voice time\n• `i` - Invite count\n• `change nickname [name]` - Change nickname", ctx=message))
             return
 
     # --- COUNTING SYSTEM ---
@@ -224,18 +271,19 @@ async def on_message(message):
                 number = int(content)
                 expected = c_data.get("next_number", 1)
                 last_user = c_data.get("last_user", 0)
+                success_emoji = c_data.get("emoji", "✅")
                 
                 if number == expected and u_id != last_user:
                     c_data["next_number"] = expected + 1
                     c_data["last_user"] = u_id
                     save_data()
                     try:
-                        await message.add_reaction("✅")
+                        await message.add_reaction(success_emoji)
                     except Exception:
                         pass
                 else:
                     await message.add_reaction("❌")
-                    await message.channel.send(embed=create_embed(title="❌ Counting Error", description=f"{message.author.mention}, incorrect number sequence or consecutive message! Resetting count back to `{expected}`.", ctx=message), delete_after=6)
+                    await message.channel.send(embed=create_embed(title="❌ Counting Error", description=f"{message.author.mention}, incorrect number or consecutive message! Next expected number is `{expected}`.", ctx=message), delete_after=6)
             except ValueError:
                 pass
 
@@ -248,53 +296,20 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # =====================================================================
-#                      COMMANDS MODULE (EXTENSIVE)
+#                      COMMANDS MODULE
 # =====================================================================
 
-# 1. MENU / HELP COMMAND (SEPARATED ADMIN & MEMBERS)
+# 1. HELP / MENU COMMAND
 @bot.command(name="menu", aliases=["help"])
 async def menu_command(ctx):
     embed = discord.Embed(
         title="🌟 Moonlight Heaven • Command Center", 
-        description="Here is the structured list of all available modules and commands for this server.",
+        description="Welcome to the interactive help panel! Select a category from the dropdown menu below.",
         color=0x2B2D31
     )
-    
-    embed.add_field(
-        name="👤 Member Commands (Prefix: `&`)",
-        value=(
-            "• `&m` or `&m @User` — View message activity[span_0](start_span)[span_0](end_span)\n"
-            "• `&v` or `&v @User` — View voice channel time[span_1](start_span)[span_1](end_span)\n"
-            "• `&i` or `&i @User` — View invite statistics[span_2](start_span)[span_2](end_span)\n"
-            "• `&lm` — Top message leaderboards[span_3](start_span)[span_3](end_span)\n"
-            "• `&lv` — Top voice activity leaderboards[span_4](start_span)[span_4](end_span)\n"
-            "• `&li` — Top invite leaderboards[span_5](start_span)[span_5](end_span)\n"
-            "• `&menu` — Opens this command center"
-        ),
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🛠️ Administrator & Management Commands",
-        value=(
-            "• `&setupbotchannel` — Automatically provisions the bot chat channel[span_6](start_span)[span_6](end_span)\n"
-            "• `&addrole @User @Role` — Assigns a role to a member\n"
-            "• `&removerole @User @Role` — Strips a role from a member\n"
-            "• `&hide` / `&unhide` — Toggles channel view permissions\n"
-            "• `&lock` / `&unlock` — Toggles channel message permissions\n"
-            "• `&rm all` / `&rv all` / `&ri all` — Respective data resets\n"
-            "• `&say [text]` — Broadcasts custom announcements\n"
-            "• `&reply [id] [text]` — Sends a target response reply\n"
-            "• `&clone` — Clones the existing text channel layout\n"
-            "• `&giveaway [min] [prize]` — Initiates a server giveaway\n"
-            "• `&start [number]` — Sets up the automated counting game\n"
-            "• `&spam [count] [text]` — Rapid-fire message delivery (Admin)"
-        ),
-        inline=False
-    )
-    
+    embed.add_field(name="Modules Available", value="• Moderation & Reset Tools\n• Member Stats & Leaderboards\n• Utility & Mini Games", inline=False)
     embed.set_footer(text=f"Requested by @{ctx.author.name}", icon_url=ctx.author.display_avatar.url)
-    await ctx.send(embed=embed)
+    await ctx.send(embed=embed, view=HelpView())
 
 # 2. SETUP BOT CHANNEL
 @bot.command(name="setupbotchannel", aliases=["botchannel"])
@@ -310,7 +325,7 @@ async def setup_bot_channel_cmd(ctx):
     
     guild_bot_channels[guild.id] = existing_channel.id
     save_data()
-    await ctx.send(embed=create_embed(title="Bot Channel Initialized", description=f"✅ Successfully configured {existing_channel.mention}!\nMembers can type `m`, `v`, `i` or `change nickname [name]` directly here without prefixes.", ctx=ctx))
+    await ctx.send(embed=create_embed(title="Bot Channel Initialized", description=f"✅ Successfully configured {existing_channel.mention}!", ctx=ctx))
 
 # 3. ROLE MANAGEMENT
 @bot.command(name="addrole", aliases=["giverole"])
@@ -318,7 +333,7 @@ async def setup_bot_channel_cmd(ctx):
 async def add_role_cmd(ctx, member: discord.Member, role: discord.Role):
     try:
         await member.add_roles(role)
-        await ctx.send(embed=create_embed(title="Role Assigned", description=f"✅ Successfully granted {role.mention} to {member.mention}.", ctx=ctx))
+        await ctx.send(embed=create_embed(title="Role Assigned", description=f"✅ Granted {role.mention} to {member.mention}.", ctx=ctx))
     except Exception as e:
         await ctx.send(embed=create_embed(title="Action Failed", description=str(e), ctx=ctx))
 
@@ -327,49 +342,48 @@ async def add_role_cmd(ctx, member: discord.Member, role: discord.Role):
 async def remove_role_cmd(ctx, member: discord.Member, role: discord.Role):
     try:
         await member.remove_roles(role)
-        await ctx.send(embed=create_embed(title="Role Revoked", description=f"❌ Successfully removed {role.mention} from {member.mention}.", ctx=ctx))
+        await ctx.send(embed=create_embed(title="Role Revoked", description=f"❌ Removed {role.mention} from {member.mention}.", ctx=ctx))
     except Exception as e:
         await ctx.send(embed=create_embed(title="Action Failed", description=str(e), ctx=ctx))
 
-# 4. CHANNEL VISIBILITY (HIDE / UNHIDE)
+# 4. CHANNEL VISIBILITY & PERMISSIONS
 @bot.command(name="hide")
 @commands.has_permissions(manage_channels=True)
 async def hide_channel_cmd(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, view_channel=False)
-    await ctx.send(embed=create_embed(title="Channel Secured", description=f"🔒 {ch.mention} has been hidden from public access.", ctx=ctx))
+    await ctx.send(embed=create_embed(title="Channel Secured", description=f"🔒 {ch.mention} has been hidden.", ctx=ctx))
 
 @bot.command(name="unhide")
 @commands.has_permissions(manage_channels=True)
 async def unhide_channel_cmd(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, view_channel=True)
-    await ctx.send(embed=create_embed(title="Channel Public", description=f"🔓 {ch.mention} is now visible to members.", ctx=ctx))
+    await ctx.send(embed=create_embed(title="Channel Public", description=f"🔓 {ch.mention} is now visible.", ctx=ctx))
 
-# 5. CHANNEL LOCK / UNLOCK
 @bot.command(name="lock")
 @commands.has_permissions(manage_channels=True)
 async def lock_channel_cmd(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send(embed=create_embed(title="Channel Locked", description=f"🔒 {ch.mention} has been locked down.", ctx=ctx))
+    await ctx.send(embed=create_embed(title="Channel Locked", description=f"🔒 {ch.mention} has been locked.", ctx=ctx))
 
 @bot.command(name="unlock")
 @commands.has_permissions(manage_channels=True)
 async def unlock_channel_cmd(ctx, channel: discord.TextChannel = None):
     ch = channel or ctx.channel
     await ch.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send(embed=create_embed(title="Channel Unlocked", description=f"🔓 {ch.mention} messaging permissions restored.", ctx=ctx))
+    await ctx.send(embed=create_embed(title="Channel Unlocked", description=f"🔓 {ch.mention} messaging restored.", ctx=ctx))
 
-# 6. USER STATS (M, V, I)
+# 5. USER STATS COMMANDS (`m`, `v`, `i`)
 @bot.command(name="m", aliases=["messagecount"])
 async def message_stats_cmd(ctx, member: discord.Member = None):
     target = member or ctx.author
     g_id = ctx.guild.id
     count = user_messages.get(g_id, {}).get(str(target.id), 0)
-    await ctx.send(embed=create_embed(title="Message Analytics", description=f"📊 {target.mention} has accumulated **{count}** messages.", ctx=ctx))[span_7](start_span)[span_7](end_span)
+    await ctx.send(embed=create_embed(title="Message Analytics", description=f"📊 {target.mention} has accumulated **{count}** messages.", ctx=ctx))[span_0](start_span)[span_0](end_span)
 
-@bot.command(name="v", aliases=["voicetime"])
+@bot.command(name="v", aliases=["voicetime", "voice timing count"])
 async def voice_stats_cmd(ctx, member: discord.Member = None):
     target = member or ctx.author
     g_id = ctx.guild.id
@@ -378,72 +392,84 @@ async def voice_stats_cmd(ctx, member: discord.Member = None):
     if key in voice_joindata:
         total_sec += int(time.time() - voice_joindata[key])
     hours, minutes = total_sec // 3600, (total_sec % 3600) // 60
-    await ctx.send(embed=create_embed(title="Voice Time Analytics", description=f"🎙️ {target.mention} has logged **{hours}h {minutes}m** in voice channels.", ctx=ctx))[span_8](start_span)[span_8](end_span)
+    await ctx.send(embed=create_embed(title="Voice Time Analytics", description=f"🎙️ {target.mention} has logged **{hours}h {minutes}m** in voice channels.", ctx=ctx))[span_1](start_span)[span_1](end_span)
 
 @bot.command(name="i", aliases=["invitecount"])
 async def invite_stats_cmd(ctx, member: discord.Member = None):
     target = member or ctx.author
     g_id = ctx.guild.id
     invs = user_invites.get(g_id, {}).get(str(target.id), {}).get("total", 0)
-    await ctx.send(embed=create_embed(title="Invite Tracker Analytics", description=f"🎟️ {target.mention} has successfully brought in **{invs}** invites.", ctx=ctx))[span_9](start_span)[span_9](end_span)
+    await ctx.send(embed=create_embed(title="Invite Tracker Analytics", description=f"🎟️ {target.mention} has successfully brought in **{invs}** invites.", ctx=ctx))[span_2](start_span)[span_2](end_span)
 
-# 7. ADMIN RESET MODULES
+# 6. RESET COMMANDS (`rm all`, `rv all`, `ri all`)
 @bot.command(name="rm")
 @commands.has_permissions(administrator=True)
-async def reset_messages_cmd(ctx, target: str):
-    if target.lower() == "all":
-        user_messages[ctx.guild.id] = {}
-        save_data()
-        await ctx.send(embed=create_embed(title="Database Purged", description="✅ All message count records have been reset.", ctx=ctx))
+async def reset_messages_cmd(ctx, option: str = None):
+    if option and option.lower() == "all":
+        g_id = ctx.guild.id
+        if g_id in user_messages:
+            user_messages[g_id] = {}
+            save_data()
+        await ctx.send(embed=create_embed(title="Data Reset Successful", description="✅ All user message logs have been reset to 0.", ctx=ctx))
+    else:
+        await ctx.send(embed=create_embed(title="Invalid Syntax", description="Please use: `&rm all`", ctx=ctx))
 
 @bot.command(name="rv")
 @commands.has_permissions(administrator=True)
-async def reset_voice_cmd(ctx, target: str):
-    if target.lower() == "all":
-        user_voice_time[ctx.guild.id] = {}
-        save_data()
-        await ctx.send(embed=create_embed(title="Database Purged", description="✅ All voice time analytics have been reset.", ctx=ctx))
+async def reset_voice_cmd(ctx, option: str = None):
+    if option and option.lower() == "all":
+        g_id = ctx.guild.id
+        if g_id in user_voice_time:
+            user_voice_time[g_id] = {}
+            save_data()
+        await ctx.send(embed=create_embed(title="Data Reset Successful", description="✅ All user voice time logs have been reset to 0.", ctx=ctx))
+    else:
+        await ctx.send(embed=create_embed(title="Invalid Syntax", description="Please use: `&rv all`", ctx=ctx))
 
 @bot.command(name="ri")
 @commands.has_permissions(administrator=True)
-async def reset_invites_cmd(ctx, target: str):
-    if target.lower() == "all":
-        user_invites[ctx.guild.id] = {}
-        save_data()
-        await ctx.send(embed=create_embed(title="Database Purged", description="✅ All invite tracking records have been reset.", ctx=ctx))
+async def reset_invites_cmd(ctx, option: str = None):
+    if option and option.lower() == "all":
+        g_id = ctx.guild.id
+        if g_id in user_invites:
+            user_invites[g_id] = {}
+            save_data()
+        await ctx.send(embed=create_embed(title="Data Reset Successful", description="✅ All user invite logs have been reset to 0.", ctx=ctx))
+    else:
+        await ctx.send(embed=create_embed(title="Invalid Syntax", description="Please use: `&ri all`", ctx=ctx))
 
-# 8. LEADERBOARDS (LM, LV, LI)
-@bot.command(name="lm")
+# 7. LEADERBOARDS (`lm`, `lv`, `li`)
+@bot.command(name="lm", aliases=["leaderboard msg"])
 async def leaderboard_messages_cmd(ctx):
     g_id = ctx.guild.id
     data = user_messages.get(g_id, {})
-    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No message logs available yet.", ctx=ctx))[span_10](start_span)[span_10](end_span)
+    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No message logs available yet.", ctx=ctx))[span_3](start_span)[span_3](end_span)
     sorted_users = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
     desc = "".join([f"`#{idx}` <@{uid}> — **{count}** messages\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
-    await ctx.send(embed=create_embed(title="🏆 Message Activity Leaderboard", description=desc, ctx=ctx))[span_11](start_span)[span_11](end_span)
+    await ctx.send(embed=create_embed(title="🏆 Message Activity Leaderboard", description=desc, ctx=ctx))[span_4](start_span)[span_4](end_span)
 
-@bot.command(name="lv")
+@bot.command(name="lv", aliases=["leaderboard voice"])
 async def leaderboard_voice_cmd(ctx):
     g_id = ctx.guild.id
     data = user_voice_time.get(g_id, {})
-    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No voice time logs available yet.", ctx=ctx))[span_12](start_span)[span_12](end_span)
+    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No voice time logs available yet.", ctx=ctx))[span_5](start_span)[span_5](end_span)
     sorted_users = sorted(data.items(), key=lambda x: x[1], reverse=True)[:10]
     desc = ""
     for idx, (uid, sec) in enumerate(sorted_users, 1):
         h, m = sec // 3600, (sec % 3600) // 60
         desc += f"`#{idx}` <@{uid}> — **{h}h {m}m**\n"
-    await ctx.send(embed=create_embed(title="🏆 Voice Activity Leaderboard", description=desc, ctx=ctx))[span_13](start_span)[span_13](end_span)
+    await ctx.send(embed=create_embed(title="🏆 Voice Activity Leaderboard", description=desc, ctx=ctx))[span_6](start_span)[span_6](end_span)
 
-@bot.command(name="li")
+@bot.command(name="li", aliases=["leaderboard invite"])
 async def leaderboard_invites_cmd(ctx):
     g_id = ctx.guild.id
     data = user_invites.get(g_id, {})
-    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No invite logs available yet.", ctx=ctx))[span_14](start_span)[span_14](end_span)
+    if not data: return await ctx.send(embed=create_embed(title="Leaderboards", description="No invite logs available yet.", ctx=ctx))[span_7](start_span)[span_7](end_span)
     sorted_users = sorted(data.items(), key=lambda x: x[1].get("total", 0), reverse=True)[:10]
     desc = "".join([f"`#{idx}` <@{uid}> — **{d.get('total', 0)}** invites\n" for idx, (uid, d) in enumerate(sorted_users, 1)])
-    await ctx.send(embed=create_embed(title="🏆 Invite Tracking Leaderboard", description=desc, ctx=ctx))[span_15](start_span)[span_15](end_span)
+    await ctx.send(embed=create_embed(title="🏆 Invite Tracking Leaderboard", description=desc, ctx=ctx))[span_8](start_span)[span_8](end_span)
 
-# 9. UTILITY & ENGAGEMENT TOOLS
+# 8. UTILITIES & GAMES (`say`, `reply`, `clone`, `giveaway`, `start`)
 @bot.command(name="say")
 @commands.has_permissions(manage_messages=True)
 async def say_command(ctx, *, message: str):
@@ -453,14 +479,14 @@ async def say_command(ctx, *, message: str):
 
 @bot.command(name="reply")
 @commands.has_permissions(manage_messages=True)
-async def reply_command(ctx, message_id: int, *, message: str):
+async def reply_command(ctx, message_id: int, *, text: str):
     try:
         msg = await ctx.channel.fetch_message(message_id)
-        await msg.reply(message)
+        await msg.reply(text)
         try: await ctx.message.delete()
         except Exception: pass
     except Exception as e:
-        await ctx.send(embed=create_embed(title="Execution Error", description=str(e), ctx=ctx))
+        await ctx.send(embed=create_embed(title="Reply Failed", description=f"Could not find message ID: {e}", ctx=ctx), delete_after=5)
 
 @bot.command(name="clone")
 @commands.has_permissions(manage_channels=True)
@@ -472,7 +498,7 @@ async def clone_channel_cmd(ctx, channel: discord.TextChannel = None):
 @bot.command(name="giveaway")
 @commands.has_permissions(manage_guild=True)
 async def giveaway_command(ctx, minutes: int, *, prize: str):
-    embed = create_embed(title="🎉 SERVER GIVEAWAY", description=f"Prize: **{prize}**\nDuration: `{minutes} minutes`\nReact with 🎉 to enter the sweepstakes!", ctx=ctx)
+    embed = create_embed(title="🎉 SERVER GIVEAWAY", description=f"Prize: **{prize}**\nDuration: `{minutes} minutes`\nReact with 🎉 to enter!", ctx=ctx)
     msg = await ctx.send(embed=embed)
     await msg.add_reaction("🎉")
     await asyncio.sleep(minutes * 60)
@@ -481,30 +507,23 @@ async def giveaway_command(ctx, minutes: int, *, prize: str):
         users = [u async for u in refreshed.reactions[0].users() if not u.bot]
         if users:
             winner = random.choice(users)
-            await ctx.send(embed=create_embed(title="🎉 Giveaway Concluded", description=f"Congratulations {winner.mention}! You have won **{prize}**!", ctx=ctx))
+            await ctx.send(embed=create_embed(title="🎉 Giveaway Concluded", description=f"Congratulations {winner.mention}! You won **{prize}**!", ctx=ctx))
         else:
-            await ctx.send(embed=create_embed(title="🎉 Giveaway Concluded", description="No valid participants entered the giveaway.", ctx=ctx))
+            await ctx.send(embed=create_embed(title="🎉 Giveaway Concluded", description="No valid participants entered.", ctx=ctx))
     except Exception:
         pass
 
-@bot.command(name="start", aliases=["counting"])
-async def start_counting_cmd(ctx, amount: int = 1, channel: discord.TextChannel = None):
-    if not ctx.author.guild_permissions.administrator:
-        return await ctx.send(embed=create_embed(title="Access Denied", description="Administrator permissions required to configure counting.", ctx=ctx))
-    target_channel = channel or ctx.channel
-    guild_counting[ctx.guild.id] = {"channel_id": target_channel.id, "next_number": amount, "last_user": 0}
-    save_data()
-    await ctx.send(embed=create_embed(title="Counting Module Started", description=f"Game initialized in {target_channel.mention} starting from target `{amount}`.", ctx=ctx))
-
-@bot.command(name="spam")
+@bot.command(name="start")
 @commands.has_permissions(administrator=True)
-async def spam_command(ctx, count: int, *, message: str):
-    try: await ctx.message.delete()
-    except Exception: pass
-    if count > 20: count = 20
-    for _ in range(count):
-        await ctx.send(message)
-        await asyncio.sleep(0.3)
+async def start_counting_cmd(ctx, number: int, channel: discord.TextChannel, emoji: str):
+    guild_counting[ctx.guild.id] = {
+        "channel_id": channel.id, 
+        "next_number": number, 
+        "last_user": 0,
+        "emoji": emoji
+    }
+    save_data()
+    await ctx.send(embed=create_embed(title="Counting Module Started", description=f"✅ Counting game successfully initialized in {channel.mention} starting from `{number}` with success emoji {emoji}.", ctx=ctx))
 
 # =====================================================================
 #                      BOT EXECUTION LAUNCHER
