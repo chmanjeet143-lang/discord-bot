@@ -3,6 +3,7 @@ import time
 import json
 import random
 import asyncio
+import aiohttp
 import discord
 from discord.ext import commands, tasks
 from flask import Flask
@@ -268,7 +269,7 @@ async def anti_spam_toggle(ctx, status: str):
     else:
         guild_antispam_status[g_id] = False
         save_data()
-        await ctx.send(embed=emb(title="Anti-Spam Status", description="⚠️ Anti-Spam protection is now **DISABLED**."))
+        await ctx.send(embed=emb(title="Anti-Spam Status", description="⚠️️ Anti-Spam protection is now **DISABLED**."))
 
 @bot.command(name="setantispam")
 @commands.has_permissions(administrator=True)
@@ -320,7 +321,7 @@ async def list_abuses(ctx):
     desc = ", ".join([f"`{w}`" for w in words]) if words else "No abuse words added."
     await ctx.send(embed=emb(title="🛡️ Abuse Word List", description=desc))
 
-# ==================== MODERATION & CHANNEL COMMANDS ====================
+# ==================== MODERATION & ROLE COMMANDS ====================
 
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
@@ -342,6 +343,28 @@ async def mute_user(ctx, member: discord.Member, minutes: int = 10, *, reason: s
         await ctx.send(embed=emb(title="Muted / Timed out", description=f"✅ {member.mention} has been muted for `{minutes} minutes`.\n**Reason:** {reason}"))
     except Exception as e:
         await ctx.send(embed=emb(title="Error", description=f"Could not mute user: {e}"))
+
+@bot.command(name="role", aliases=["addrole"])
+@commands.has_permissions(manage_roles=True)
+async def give_role(ctx, member: discord.Member, *, role: discord.Role):
+    if role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        return await ctx.send(embed=emb(title="Error", description="Aap is role ko assign nahi kar sakte kyunki yeh aapke ya usse upar ke role level ka hai!"))
+    try:
+        await member.add_roles(role)
+        await ctx.send(embed=emb(title="Role Added", description=f"✅ Successfully {member.mention} ko {role.mention} role de diya gaya hai."))
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=f"Role assign karne mein error aayi: {e}"))
+
+@bot.command(name="unrole", aliases=["removerole", "takerole"])
+@commands.has_permissions(manage_roles=True)
+async def remove_role(ctx, member: discord.Member, *, role: discord.Role):
+    if role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        return await ctx.send(embed=emb(title="Error", description="Aap is role ko remove nahi kar sakte kyunki yeh aapke ya usse upar ke role level ka hai!"))
+    try:
+        await member.remove_roles(role)
+        await ctx.send(embed=emb(title="Role Removed", description=f"❌ Successfully {member.mention} se {role.mention} role hata diya gaya hai."))
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=f"Role remove karne mein error aayi: {e}"))
 
 @bot.command(name="warn")
 @commands.has_permissions(manage_messages=True)
@@ -400,6 +423,110 @@ async def purge_msgs(ctx, amount: int):
     await asyncio.sleep(3)
     await msg.delete()
 
+# ==================== EMOJI & STICKER UTILITIES ====================
+
+@bot.command(name="emojiadd", aliases=["addemoji"])
+@commands.has_permissions(manage_emojis=True)
+async def emoji_add(ctx, emoji_or_url: str, name: str = None):
+    """Kisi bhi emoji, sticker ya image URL ko server mein Emoji / GIF Emoji ke taur par add karein"""
+    url = None
+    emoji_name = name
+
+    # 1. Check if it's a Custom Discord Emoji (e.g. <:name:id> or <a:name:id>)
+    if emoji_or_url.startswith("<") and emoji_or_url.endswith(">"):
+        is_animated = emoji_or_url.startswith("<a:")
+        parts = emoji_or_url.split(":")
+        if len(parts) >= 3:
+            e_name = parts[1]
+            e_id = parts[2].rstrip(">")
+            url = f"https://cdn.discordapp.com/emojis/{e_id}.{'gif' if is_animated else 'png'}"
+            if not emoji_name:
+                emoji_name = e_name
+
+    # 2. Check if it's a URL
+    elif emoji_or_url.startswith("http://") or emoji_or_url.startswith("https://"):
+        url = emoji_or_url
+        if not emoji_name:
+            emoji_name = "added_emoji"
+
+    # 3. Check attachments if any
+    elif ctx.message.attachments:
+        url = ctx.message.attachments[0].url
+        if not emoji_name:
+            emoji_name = ctx.message.attachments[0].filename.split(".")[0]
+
+    if not url:
+        return await ctx.send(embed=emb(title="Error", description="❌ Kripya koi valid custom emoji, sticker, image URL ya attachment dein!"))
+
+    if not emoji_name:
+        emoji_name = "emoji"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return await ctx.send(embed=emb(title="Error", description="❌ Image/Emoji download karne mein asafal rahe."))
+                image_bytes = await resp.read()
+
+        new_emoji = await ctx.guild.create_custom_emoji(name=emoji_name, image=image_bytes)
+        await ctx.send(embed=emb(title="Emoji Added", description=f"✅ Successfully emoji add ho gaya: {new_emoji} (`:{new_emoji.name}:`)"))
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=f"Emoji add karte waqt error aayi: {e}"))
+
+@bot.command(name="stickeradd", aliases=["addsticker"])
+@commands.has_permissions(manage_emojis=True)
+async def sticker_add(ctx, emoji_or_url: str = None, *, name: str = "MoonlightSticker"):
+    """Kisi bhi emoji ya image ko server mein Sticker ke taur par add karein"""
+    url = None
+
+    # 1. Check if it's a Custom Emoji (ko sticker mein convert karega)
+    if emoji_or_url and emoji_or_url.startswith("<") and emoji_or_url.endswith(">"):
+        is_animated = emoji_or_url.startswith("<a:")
+        parts = emoji_or_url.split(":")
+        if len(parts) >= 3:
+            e_name = parts[1]
+            e_id = parts[2].rstrip(">")
+            url = f"https://cdn.discordapp.com/emojis/{e_id}.{'gif' if is_animated else 'png'}"
+            name = e_name
+
+    # 2. Check if it's a direct URL
+    elif emoji_or_url and (emoji_or_url.startswith("http://") or emoji_or_url.startswith("https://")):
+        url = emoji_or_url
+
+    # 3. Check attachments
+    elif ctx.message.attachments:
+        url = ctx.message.attachments[0].url
+        if ctx.message.attachments[0].filename:
+            name = ctx.message.attachments[0].filename.split(".")[0]
+
+    if not url:
+        return await ctx.send(embed=emb(title="Error", description="❌ Kripya koi emoji, image URL ya attachment dein jise sticker banana hai!"))
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return await ctx.send(embed=emb(title="Error", description="❌ Media download nahi ho paya."))
+                image_bytes = await resp.read()
+
+        file = discord.File(fp=io.BytesIO(image_bytes) if 'io' in globals() else discord.File(io.BytesIO(image_bytes), filename="sticker.png")) # Safe fallback
+        # Wait, let's use io properly or discord.File directly from bytes buffer:
+        import io
+        buffer = io.BytesIO(image_bytes)
+        discord_file = discord.File(buffer, filename="sticker.png")
+
+        new_sticker = await ctx.guild.create_sticker(name=name, description="Added via Moonlight Heaven Bot", emoji="✨", file=discord_file)
+        await ctx.send(embed=emb(title="Sticker Added", description=f"✅ Successfully sticker add ho gaya: **{new_sticker.name}**"))
+    except Exception as e:
+        # Fallback handling for file io if needed
+        try:
+            import io
+            buffer = io.BytesIO(image_bytes)
+            new_sticker = await ctx.guild.create_sticker(name=name, description="Added via Moonlight Heaven", emoji="✨", file=discord.File(buffer, filename="sticker.png"))
+            await ctx.send(embed=emb(title="Sticker Added", description=f"✅ Successfully sticker add ho gaya: **{new_sticker.name}**"))
+        except Exception as ex:
+            await ctx.send(embed=emb(title="Error", description=f"Sticker add karte waqt error aayi: {ex}"))
+
 # ==================== STATS & LEADERBOARDS ====================
 
 @bot.command(name="m", aliases=["messagecount"])
@@ -427,7 +554,7 @@ async def invite_count_cmd(ctx, member: discord.Member = None):
     m = member or ctx.author
     g_id = ctx.guild.id
     invs = user_invites.get(g_id, {}).get(str(m.id), {}).get("total", 0)
-    await ctx.send(embed=emb(title="Invite Count", description=f"🎟️ {m.mention} has invited **{invs}** members."))
+    await ctx.send(embed=emb(title="Invite Count", description=f"🎟️️ {m.mention} has invited **{invs}** members."))
 
 @bot.command(name="rm")
 @commands.has_permissions(administrator=True)
@@ -435,7 +562,7 @@ async def reset_messages(ctx, target: str):
     if target.lower() == "all":
         user_messages[ctx.guild.id] = {}
         save_data()
-        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All message counters reset."))
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️️ All message counters reset."))
 
 @bot.command(name="rv")
 @commands.has_permissions(administrator=True)
@@ -557,7 +684,7 @@ class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
         self.prefix = prefix
         options = [
-            discord.SelectOption(label="Moderation", description="Ban, kick, mute, lock/unlock, hide/unhide", emoji="🛠️"),
+            discord.SelectOption(label="Moderation & Roles", description="Ban, kick, mute, role/unrole, emojis/stickers", emoji="🛠️"),
             discord.SelectOption(label="Security & Automod", description="Antispam, antiabuse, warns", emoji="🛡️"),
             discord.SelectOption(label="Stats & Trackers", description="Message, voice & invite stats/leaderboards", emoji="📊"),
             discord.SelectOption(label="Utility & Fun", description="Ping, afk, say, reply, clone, giveaway", emoji="🎉")
@@ -567,8 +694,8 @@ class MenuSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         p = self.prefix
         choice = self.values[0]
-        if choice == "Moderation":
-            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}lock` | `{p}unlock` | `{p}purge`\n• `{p}hide` | `{p}unhide`"
+        if choice == "Moderation & Roles":
+            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}role` | `{p}unrole`\n• `{p}emojiadd` | `{p}stickeradd`\n• `{p}lock` | `{p}unlock` | `{p}purge`"
         elif choice == "Security & Automod":
             desc = f"• `{p}antispam` | `{p}antiabuse`\n• `{p}warn` | `{p}warnlist` | `{p}addabuse`"
         elif choice == "Stats & Trackers":
