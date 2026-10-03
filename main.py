@@ -1,4 +1,4 @@
-Import os
+import os
 import time
 import json
 import random
@@ -167,14 +167,15 @@ async def on_voice_state_update(member, before, after):
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
+    if message.author.bot or not message.guild:
+        await bot.process_commands(message)
         return
     
-    g_id = message.guild.id if message.guild else 0
+    g_id = message.guild.id
     u_id = message.author.id
 
     # 1. Anti-Abuse Check
-    if message.guild and guild_antiabuse_status.get(g_id, False):
+    if guild_antiabuse_status.get(g_id, False):
         abuse_list = guild_abuse_words.get(g_id, [])
         content_lower = message.content.lower()
         if any(word in content_lower for word in abuse_list):
@@ -196,7 +197,7 @@ async def on_message(message):
                 print(f"Anti-Abuse Error: {e}")
 
     # 2. Anti-Spam Check
-    if message.guild and guild_antispam_status.get(g_id, False) and not message.author.guild_permissions.manage_messages:
+    if guild_antispam_status.get(g_id, False) and not message.author.guild_permissions.manage_messages:
         config = guild_antispam_config.get(g_id, {"seconds": 5, "messages": 5, "timeout": 5})
         limit_sec = config.get("seconds", 5)
         limit_msg = config.get("messages", 5)
@@ -248,7 +249,7 @@ async def on_message(message):
     save_data()
 
     if u_id in afk_users:
-        reason = afk_users.pop(u_id)
+        afk_users.pop(u_id)
         await message.channel.send(embed=emb(title="Welcome Back", description=f"Welcome back, {message.author.mention}! Your AFK status has been cleared."))
 
     await bot.process_commands(message)
@@ -523,13 +524,17 @@ async def start_giveaway(ctx, minutes: int, *, prize: str):
     msg = await ctx.send(embed=e)
     await msg.add_reaction("🎉")
     await asyncio.sleep(minutes * 60)
-    new_msg = await ctx.channel.fetch_message(msg.id)
-    users = [u async for u in new_msg.reactions[0].users() if not u.bot]
-    if users:
-        winner = random.choice(users)
-        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description=f"Winner: {winner.mention} won **{prize}**! 🎁"))
-    else:
-        await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description="No valid entries found."))
+    
+    try:
+        new_msg = await ctx.channel.fetch_message(msg.id)
+        users = [u async for u in new_msg.reactions[0].users() if not u.bot]
+        if users:
+            winner = random.choice(users)
+            await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description=f"Winner: {winner.mention} won **{prize}**! 🎁"))
+        else:
+            await ctx.send(embed=emb(title="🎉 Giveaway Ended!", description="No valid entries found."))
+    except Exception as ex:
+        print(f"Giveaway Error: {ex}")
 
 @bot.command(name="start", aliases=["counting"])
 @commands.has_permissions(administrator=True)
