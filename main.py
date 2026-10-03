@@ -4,6 +4,7 @@ import json
 import random
 import asyncio
 import aiohttp
+import io
 import discord
 from discord.ext import commands, tasks
 from flask import Flask
@@ -269,7 +270,7 @@ async def anti_spam_toggle(ctx, status: str):
     else:
         guild_antispam_status[g_id] = False
         save_data()
-        await ctx.send(embed=emb(title="Anti-Spam Status", description="⚠️️ Anti-Spam protection is now **DISABLED**."))
+        await ctx.send(embed=emb(title="Anti-Spam Status", description="⚠️ Anti-Spam protection is now **DISABLED**."))
 
 @bot.command(name="setantispam")
 @commands.has_permissions(administrator=True)
@@ -423,17 +424,38 @@ async def purge_msgs(ctx, amount: int):
     await asyncio.sleep(3)
     await msg.delete()
 
-# ==================== EMOJI & STICKER UTILITIES ====================
+# ==================== EMOJI & STICKER UTILITIES (WITH REPLY SUPPORT) ====================
 
 @bot.command(name="emojiadd", aliases=["addemoji"])
 @commands.has_permissions(manage_emojis=True)
-async def emoji_add(ctx, emoji_or_url: str, name: str = None):
-    """Kisi bhi emoji, sticker ya image URL ko server mein Emoji / GIF Emoji ke taur par add karein"""
+async def emoji_add(ctx, emoji_or_url: str = None, name: str = None):
+    """Kisi bhi emoji, sticker ya image URL ko server mein Emoji ke taur par add karein (Reply support ke sath)"""
     url = None
     emoji_name = name
 
-    # 1. Check if it's a Custom Discord Emoji (e.g. <:name:id> or <a:name:id>)
-    if emoji_or_url.startswith("<") and emoji_or_url.endswith(">"):
+    # Agar user ne kisi message par reply kiya hai aur argument nahi diya
+    if not emoji_or_url and ctx.message.reference:
+        try:
+            replied_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+            content = replied_msg.content
+            # Agar replied message mein custom emoji hai
+            if content.startswith("<") and content.endswith(">"):
+                emoji_or_url = content
+            # Agar replied message mein sticker hai
+            elif replied_msg.stickers:
+                url = replied_msg.stickers[0].url
+                if not emoji_name:
+                    emoji_name = replied_msg.stickers[0].name
+            # Agar replied message mein attachment hai
+            elif replied_msg.attachments:
+                url = replied_msg.attachments[0].url
+                if not emoji_name:
+                    emoji_name = replied_msg.attachments[0].filename.split(".")[0]
+        except Exception:
+            pass
+
+    # 1. Check if it's a Custom Discord Emoji
+    if emoji_or_url and emoji_or_url.startswith("<") and emoji_or_url.endswith(">"):
         is_animated = emoji_or_url.startswith("<a:")
         parts = emoji_or_url.split(":")
         if len(parts) >= 3:
@@ -443,20 +465,20 @@ async def emoji_add(ctx, emoji_or_url: str, name: str = None):
             if not emoji_name:
                 emoji_name = e_name
 
-    # 2. Check if it's a URL
-    elif emoji_or_url.startswith("http://") or emoji_or_url.startswith("https://"):
+    # 2. Check if it's a direct URL
+    elif emoji_or_url and (emoji_or_url.startswith("http://") or emoji_or_url.startswith("https://")):
         url = emoji_or_url
         if not emoji_name:
             emoji_name = "added_emoji"
 
-    # 3. Check attachments if any
+    # 3. Check attachments in current message
     elif ctx.message.attachments:
         url = ctx.message.attachments[0].url
         if not emoji_name:
             emoji_name = ctx.message.attachments[0].filename.split(".")[0]
 
     if not url:
-        return await ctx.send(embed=emb(title="Error", description="❌ Kripya koi valid custom emoji, sticker, image URL ya attachment dein!"))
+        return await ctx.send(embed=emb(title="Error", description="❌ Kripya koi valid emoji, sticker, image URL dein ya kisi emoji/sticker par reply karke `&emojiadd` likhein!"))
 
     if not emoji_name:
         emoji_name = "emoji"
@@ -476,31 +498,54 @@ async def emoji_add(ctx, emoji_or_url: str, name: str = None):
 @bot.command(name="stickeradd", aliases=["addsticker"])
 @commands.has_permissions(manage_emojis=True)
 async def sticker_add(ctx, emoji_or_url: str = None, *, name: str = "MoonlightSticker"):
-    """Kisi bhi emoji ya image ko server mein Sticker ke taur par add karein"""
+    """Kisi bhi sticker, emoji ya image ko server mein Sticker ke taur par add karein (Reply support ke sath)"""
     url = None
 
-    # 1. Check if it's a Custom Emoji (ko sticker mein convert karega)
+    # Agar user ne kisi message par reply kiya hai
+    if not emoji_or_url and ctx.message.reference:
+        try:
+            replied_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+            content = replied_msg.content
+            # Agar replied message mein sticker hai
+            if replied_msg.stickers:
+                url = replied_msg.stickers[0].url
+                name = replied_msg.stickers[0].name
+            # Agar replied message mein custom emoji hai (emoji ko sticker banana)
+            elif content.startswith("<") and content.endswith(">"):
+                is_animated = content.startswith("<a:")
+                parts = content.split(":")
+                if len(parts) >= 3:
+                    name = parts[1]
+                    e_id = parts[2].rstrip(">")
+                    url = f"https://cdn.discordapp.com/emojis/{e_id}.{'gif' if is_animated else 'png'}"
+            # Agar replied message mein attachment hai
+            elif replied_msg.attachments:
+                url = replied_msg.attachments[0].url
+                name = replied_msg.attachments[0].filename.split(".")[0]
+        except Exception:
+            pass
+
+    # 1. Check if input is a Custom Emoji
     if emoji_or_url and emoji_or_url.startswith("<") and emoji_or_url.endswith(">"):
         is_animated = emoji_or_url.startswith("<a:")
         parts = emoji_or_url.split(":")
         if len(parts) >= 3:
-            e_name = parts[1]
+            name = parts[1]
             e_id = parts[2].rstrip(">")
             url = f"https://cdn.discordapp.com/emojis/{e_id}.{'gif' if is_animated else 'png'}"
-            name = e_name
 
-    # 2. Check if it's a direct URL
+    # 2. Check if input is a direct URL
     elif emoji_or_url and (emoji_or_url.startswith("http://") or emoji_or_url.startswith("https://")):
         url = emoji_or_url
 
-    # 3. Check attachments
+    # 3. Check attachments in current message
     elif ctx.message.attachments:
         url = ctx.message.attachments[0].url
         if ctx.message.attachments[0].filename:
             name = ctx.message.attachments[0].filename.split(".")[0]
 
     if not url:
-        return await ctx.send(embed=emb(title="Error", description="❌ Kripya koi emoji, image URL ya attachment dein jise sticker banana hai!"))
+        return await ctx.send(embed=emb(title="Error", description="❌ Kripya koi sticker, emoji, image URL dein ya kisi sticker/emoji par reply karke `&stickeradd` likhein!"))
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -509,23 +554,13 @@ async def sticker_add(ctx, emoji_or_url: str = None, *, name: str = "MoonlightSt
                     return await ctx.send(embed=emb(title="Error", description="❌ Media download nahi ho paya."))
                 image_bytes = await resp.read()
 
-        file = discord.File(fp=io.BytesIO(image_bytes) if 'io' in globals() else discord.File(io.BytesIO(image_bytes), filename="sticker.png")) # Safe fallback
-        # Wait, let's use io properly or discord.File directly from bytes buffer:
-        import io
         buffer = io.BytesIO(image_bytes)
         discord_file = discord.File(buffer, filename="sticker.png")
 
         new_sticker = await ctx.guild.create_sticker(name=name, description="Added via Moonlight Heaven Bot", emoji="✨", file=discord_file)
         await ctx.send(embed=emb(title="Sticker Added", description=f"✅ Successfully sticker add ho gaya: **{new_sticker.name}**"))
-    except Exception as e:
-        # Fallback handling for file io if needed
-        try:
-            import io
-            buffer = io.BytesIO(image_bytes)
-            new_sticker = await ctx.guild.create_sticker(name=name, description="Added via Moonlight Heaven", emoji="✨", file=discord.File(buffer, filename="sticker.png"))
-            await ctx.send(embed=emb(title="Sticker Added", description=f"✅ Successfully sticker add ho gaya: **{new_sticker.name}**"))
-        except Exception as ex:
-            await ctx.send(embed=emb(title="Error", description=f"Sticker add karte waqt error aayi: {ex}"))
+    except Exception as ex:
+        await ctx.send(embed=emb(title="Error", description=f"Sticker add karte waqt error aayi: {ex}"))
 
 # ==================== STATS & LEADERBOARDS ====================
 
@@ -562,7 +597,7 @@ async def reset_messages(ctx, target: str):
     if target.lower() == "all":
         user_messages[ctx.guild.id] = {}
         save_data()
-        await ctx.send(embed=emb(title="Reset Complete", description="🗑️️ All message counters reset."))
+        await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All message counters reset."))
 
 @bot.command(name="rv")
 @commands.has_permissions(administrator=True)
