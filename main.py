@@ -168,7 +168,7 @@ async def on_voice_state_update(member, before, after):
             user_voice_time[g_id][str(u_id)] = user_voice_time[g_id].get(str(u_id), 0) + elapsed
             save_data()
 
-# ==================== NEW FEATURE 1: COMMAND AUDIT LOG ====================
+# ==================== FEATURE 1: COMMAND AUDIT LOG ====================
 
 @bot.event
 async def on_command(ctx):
@@ -196,7 +196,7 @@ async def set_command_log(ctx, channel: discord.TextChannel):
     save_data()
     await ctx.send(embed=emb(title="Command Log Setup", description=f"✅ Command auditing channel set to {channel.mention}."))
 
-# ==================== NEW FEATURE 2: MESSAGE DELETE SNIFFER ====================
+# ==================== FEATURE 2: MESSAGE DELETE SNIFFER ====================
 
 @bot.event
 async def on_message_delete(message):
@@ -225,7 +225,7 @@ async def set_delete_log(ctx, channel: discord.TextChannel):
     save_data()
     await ctx.send(embed=emb(title="Delete Logger Setup", description=f"✅ Deleted message logs will now be sent to {channel.mention}."))
 
-# ==================== EXISTING BOT CODE CONTINUES ====================
+# ==================== ON MESSAGE HANDLING ====================
 
 @bot.event
 async def on_message(message):
@@ -249,7 +249,7 @@ async def on_message(message):
                     await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, you tried to use banned words! Timeout given."))
                 elif punish_type == "kick":
                     await message.author.kick(reason="Using abuse words.")
-                    await message.channel.send(embed=emb(title="⚠️️ Anti-Abuse Triggered", description=f"{message.author.mention}, kicked for using forbidden words."))
+                    await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, kicked for using forbidden words."))
                 elif punish_type == "ban":
                     await message.author.ban(reason="Using abuse words.")
                     await message.channel.send(embed=emb(title="⚠️ Anti-Abuse Triggered", description=f"{message.author.mention}, banned for using forbidden words."))
@@ -404,6 +404,28 @@ async def mute_user(ctx, member: discord.Member, minutes: int = 10, *, reason: s
     except Exception as e:
         await ctx.send(embed=emb(title="Error", description=f"Could not mute user: {e}"))
 
+@bot.command(name="addrole", aliases=["giverole"])
+@commands.has_permissions(manage_roles=True)
+async def add_role(ctx, member: discord.Member, role: discord.Role, *, reason="No reason"):
+    if ctx.author.top_role <= role and ctx.author != ctx.guild.owner:
+        return await ctx.send(embed=emb(title="Error", description="Aap is role ko assign nahi kar sakte kyunki ye aapke top role se upar ya barabar hai!"))
+    try:
+        await member.add_roles(role, reason=reason)
+        await ctx.send(embed=emb(title="Role Added", description=f"✅ Successfully added {role.mention} to {member.mention}.\n**Reason:** {reason}"))
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=f"Role add nahi ho saka. Error: {e}"))
+
+@bot.command(name="removerole", aliases=["takerole"])
+@commands.has_permissions(manage_roles=True)
+async def remove_role(ctx, member: discord.Member, role: discord.Role, *, reason="No reason"):
+    if ctx.author.top_role <= role and ctx.author != ctx.guild.owner:
+        return await ctx.send(embed=emb(title="Error", description="Aap is role ko remove nahi kar sakte kyunki ye aapke top role se upar ya barabar hai!"))
+    try:
+        await member.remove_roles(role, reason=reason)
+        await ctx.send(embed=emb(title="Role Removed", description=f"❌ Successfully removed {role.mention} from {member.mention}.\n**Reason:** {reason}"))
+    except Exception as e:
+        await ctx.send(embed=emb(title="Error", description=f"Role remove nahi ho saka. Error: {e}"))
+
 @bot.command(name="warn")
 @commands.has_permissions(manage_messages=True)
 async def warn_user(ctx, member: discord.Member, *, reason="No reason"):
@@ -514,7 +536,7 @@ async def reset_invites(ctx, target: str):
         save_data()
         await ctx.send(embed=emb(title="Reset Complete", description="🗑️ All invite counters reset."))
 
-@bot.command(name="lm")
+@bot.command(name="lm", aliases=["leaderboard_msg"])
 async def leaderboard_messages(ctx):
     g_id = ctx.guild.id
     m_data = user_messages.get(g_id, {})
@@ -523,7 +545,7 @@ async def leaderboard_messages(ctx):
     desc = "".join([f"`#{idx}` <@{uid}> — **{count}** msgs\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
     await ctx.send(embed=emb(title="🏆 Message Leaderboard", description=desc))
 
-@bot.command(name="lv")
+@bot.command(name="lv", aliases=["leaderboard_voice"])
 async def leaderboard_voice(ctx):
     g_id = ctx.guild.id
     v_data = user_voice_time.get(g_id, {})
@@ -535,7 +557,7 @@ async def leaderboard_voice(ctx):
         desc += f"`#{idx}` <@{uid}> — **{h}h {m}m**\n"
     await ctx.send(embed=emb(title="🏆 Voice Time Leaderboard", description=desc))
 
-@bot.command(name="li")
+@bot.command(name="li", aliases=["leaderboard_invite"])
 async def leaderboard_invites(ctx):
     g_id = ctx.guild.id
     i_data = user_invites.get(g_id, {})
@@ -614,8 +636,8 @@ class MenuSelect(discord.ui.Select):
     def __init__(self, prefix):
         self.prefix = prefix
         options = [
-            discord.SelectOption(label="Moderation", description="Ban, kick, mute, lock/unlock, hide/unhide", emoji="🛠️"),
-            discord.SelectOption(label="Security & Automod", description="Antispam, antiabuse, warns", emoji="🛡️"),
+            discord.SelectOption(label="Moderation", description="Ban, kick, mute, addrole, removerole, lock/unlock, hide/unhide", emoji="🛠️"),
+            discord.SelectOption(label="Security & Automod", description="Antispam, antiabuse, cmdlog, deletelog, warns", emoji="🛡️"),
             discord.SelectOption(label="Stats & Trackers", description="Message, voice & invite stats/leaderboards", emoji="📊"),
             discord.SelectOption(label="Utility & Fun", description="Ping, afk, say, reply, clone, giveaway", emoji="🎉")
         ]
@@ -625,9 +647,9 @@ class MenuSelect(discord.ui.Select):
         p = self.prefix
         choice = self.values[0]
         if choice == "Moderation":
-            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}lock` | `{p}unlock` | `{p}purge`\n• `{p}hide` | `{p}unhide`"
+            desc = f"• `{p}ban` | `{p}kick` | `{p}mute`\n• `{p}addrole` | `{p}removerole`\n• `{p}lock` | `{p}unlock` | `{p}purge`\n• `{p}hide` | `{p}unhide`"
         elif choice == "Security & Automod":
-            desc = f"• `{p}antispam` | `{p}antiabuse`\n• `{p}warn` | `{p}warnlist` | `{p}addabuse`"
+            desc = f"• `{p}antispam` | `{p}antiabuse`\n• `{p}setcmdlog` | `{p}setdeletelog`\n• `{p}warn` | `{p}warnlist` | `{p}addabuse`"
         elif choice == "Stats & Trackers":
             desc = f"• `{p}m` (Msgs) | `{p}v` (Voice) | `{p}i` (Invites)\n• `{p}lm` | `{p}lv` | `{p}li` (Leaderboards)\n• `{p}rm all` | `{p}rv all` | `{p}ri all` (Resets)"
         else:
