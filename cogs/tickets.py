@@ -5,7 +5,6 @@ import asyncio
 
 DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 
-# Unified Embed Helper Function (Server Icon or Clean Thumbnail, No User Avatar)
 def create_embed(guild, title="", description="", color=0x2B2D31):
     thumbnail_url = guild.icon.url if guild and guild.icon else DEFAULT_AVATAR
     embed = discord.Embed(title=title, description=description, color=color)
@@ -13,22 +12,54 @@ def create_embed(guild, title="", description="", color=0x2B2D31):
     embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
     return embed
 
-class StaffTicketButtonView(ui.View):
+class SupportTicketSelect(ui.Select):
     def __init__(self):
-        super().__init__(timeout=None)
+        options = [
+            discord.SelectOption(
+                label="Staff Complaint",
+                description="Report or complain about a staff member.",
+                emoji="⚖️",
+                value="staff_complaint"
+            ),
+            discord.SelectOption(
+                label="Promo & Sponsorship",
+                description="Inquiries for promotions or partnerships.",
+                emoji="🤝",
+                value="promo_sponsor"
+            ),
+            discord.SelectOption(
+                label="Giveaway Claim",
+                description="Claim your won giveaway prize.",
+                emoji="🎁",
+                value="giveaway_claim"
+            )
+        ]
+        super().__init__(placeholder="Make a selection to open a ticket...", min_values=1, max_values=1, options=options, custom_id="support_ticket_dropdown")
 
-    @ui.button(label="Apply for Staff", style=discord.ButtonStyle.primary, emoji="🎫", custom_id="open_staff_ticket_btn")
-    async def open_staff_ticket(self, interaction: discord.Interaction, button: ui.Button):
+    async def callback(self, interaction: discord.Interaction):
         guild = interaction.guild
-        category_name = "Staff Applications"
+        val = self.values[0]
         
-        # Category find ya create karna
+        if val == "staff_complaint":
+            category_name = "Staff Complaints"
+            role_id = 1558070324229316731
+            channel_prefix = "complaint"
+            auto_msg = f"Thank you for bringing this to our notice, {interaction.user.mention}. Management will review your complaint shortly. Please share all the details and proofs below."
+        elif val == "promo_sponsor":
+            category_name = "Promotions & Partnerships"
+            role_id = 1558070509256581170
+            channel_prefix = "promo"
+            auto_msg = f"Thanks for reaching out for a promo/partnership with **Moonlight Heaven**, {interaction.user.mention}! Our partnership team will connect with you soon. Please share your proposal or link below."
+        else: # giveaway_claim
+            category_name = "Giveaway Claims"
+            role_id = 1558070577527390248
+            channel_prefix = "giveaway"
+            auto_msg = f"Congratulations on winning the giveaway, {interaction.user.mention}! 🎉 Our team will verify your win and deliver your prize shortly. Please share the giveaway message link or screenshot below."
+
         category = discord.utils.get(guild.categories, name=category_name)
         if not category:
             category = await guild.create_category(category_name)
 
-        # Specific Role ID jo aapne di hai (<@&1558065387600617603>)
-        role_id = 1558065387600617603
         support_role = guild.get_role(role_id)
 
         overwrites = {
@@ -39,54 +70,37 @@ class StaffTicketButtonView(ui.View):
         if support_role:
             overwrites[support_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
 
-        # Ticket Channel Name
-        channel_name = f"staff-ticket-{interaction.user.name}"
         ticket_channel = await guild.create_text_channel(
-            name=channel_name,
+            name=f"{channel_prefix}-{interaction.user.name}",
             category=category,
             overwrites=overwrites,
-            topic=f"Staff Application Ticket by {interaction.user.id}"
+            topic=f"Support Ticket ({val}) by {interaction.user.id}"
         )
 
         role_mention = support_role.mention if support_role else f"<@&{role_id}>"
-        
-        # Ticket open hone ke baad andar ka message aur guidelines
-        description_text = (
-            f"Thank you for applying to the staff team at **Moonlight Heaven**, {interaction.user.mention}! Our staff will contact you soon.\n\n"
-            f"⚠️ **Important Guidelines:**\n"
-            f"• Do not share any false information in your application.\n"
-            f"• Once the ticket is open, please be patient; our management team will review it shortly.\n\n"
-            f"While you wait, please share the following details to speed up the process:\n\n"
-            f"1. **Your Age & Timezone:**\n"
-            f"2. **Previous staff/moderation experience (if any):**\n"
-            f"3. **How active can you be on the server daily?**"
-        )
 
         embed = create_embed(
             guild,
-            title="📝 Staff Application Form",
-            description=description_text
+            title="🎫 Ticket Opened",
+            description=auto_msg
         )
 
-        close_view = TicketControlView()
+        view = TicketControlView()
+        await ticket_channel.send(content=f"{interaction.user.mention} {role_mention}", embed=embed, view=view)
+        await interaction.response.send_message(f"✅ Your ticket has been created: {ticket_channel.mention}", ephemeral=True)
 
-        # Bot tag karke embed bhejega with exact role ID
-        await ticket_channel.send(
-            content=f"{interaction.user.mention} {role_mention}",
-            embed=embed,
-            view=close_view
-        )
-
-        await interaction.response.send_message(f"✅ Your staff application ticket has been created: {ticket_channel.mention}", ephemeral=True)
+class SupportDropdownView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(SupportTicketSelect())
 
 class TicketControlView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_staff_ticket_btn")
+    @ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_support_ticket_btn")
     async def close_ticket(self, interaction: discord.Interaction, button: ui.Button):
-        guild = interaction.guild
-        embed = create_embed(guild, title="Closing Ticket", description="⚠️ This ticket channel will be deleted in 5 seconds...", color=0xED4245)
+        embed = create_embed(interaction.guild, title="Closing Ticket", description="⚠️ This ticket channel will be deleted in 5 seconds...", color=0xED4245)
         await interaction.response.send_message(embed=embed, ephemeral=True)
         await asyncio.sleep(5)
         try:
@@ -94,25 +108,25 @@ class TicketControlView(ui.View):
         except:
             pass
 
-class Tickets(commands.Cog):
+class SupportTickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="ticketsetupstaff")
+    @commands.command(name="ticketsetsupport")
     @commands.has_permissions(administrator=True)
-    async def ticket_setup_staff(self, ctx):
-        """Creates the Staff Recruitment Panel."""
-        title = "📝 Moonlight Heaven | Staff Recruitment"
+    async def ticket_set_support(self, ctx):
+        """Creates the Support & Management Dropdown Ticket Panel."""
+        title = "🛡️ Moonlight Heaven | Support Center"
         description = (
-            "Want to join the **Moonlight Heaven** staff team and help our community grow?\n\n"
-            "⚠️ **Important Guidelines:**\n"
-            "• Do not share any false information in your application.\n"
-            "• Once the ticket is open, please be patient; our management team will review it shortly.\n\n"
-            "🎫 Click the button below to open your application ticket!"
+            "Welcome to **Moonlight Heaven** Support Center! Please select the appropriate category from the dropdown menu below depending on what you need assistance with.\n\n"
+            "⚖️ **Staff Complaint** - Report any issues or unfair treatment.\n"
+            "🤝 **Promo & Sponsorship** - Partner or promote with us.\n"
+            "🎁 **Giveaway Claim** - Claim your won prizes.\n\n"
+            "⚠️ **Please make sure to select the correct category to avoid delays!**"
         )
         
         embed = create_embed(ctx.guild, title=title, description=description)
-        await ctx.send(embed=embed, view=StaffTicketButtonView())
+        await ctx.send(embed=embed, view=SupportDropdownView())
 
 async def setup(bot):
-    await bot.add_cog(Tickets(bot))
+    await bot.add_cog(SupportTickets(bot))
