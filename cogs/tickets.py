@@ -3,7 +3,16 @@ from discord.ext import commands
 from discord import ui
 import asyncio
 
-# Dynamic Ticket Modal for Customizing Open Message
+DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
+
+# Unified Embed Helper Function
+def create_embed(ctx_or_user, title="", description="", color=0x2B2D31, thumbnail=None):
+    avatar_url = thumbnail or getattr(ctx_or_user, 'display_avatar', None) and ctx_or_user.display_avatar.url or DEFAULT_AVATAR
+    embed = discord.Embed(title=title, description=description, color=color)
+    embed.set_thumbnail(url=avatar_url)
+    embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+    return embed
+
 class TicketReasonModal(ui.Modal, title="Provide Ticket Details"):
     reason = ui.TextInput(
         label="Please describe your issue",
@@ -27,7 +36,7 @@ class TicketReasonModal(ui.Modal, title="Provide Ticket Details"):
         if not category:
             category = await guild.create_category(category_name)
 
-        # Role find karna jo tag hoga
+        # Support role find karna jo tag hoga
         support_role = discord.utils.get(guild.roles, name=self.role_to_tag) or discord.utils.get(guild.roles, name="Support Team")
 
         overwrites = {
@@ -47,24 +56,23 @@ class TicketReasonModal(ui.Modal, title="Provide Ticket Details"):
             topic=f"Ticket by {interaction.user.id} | Category: {self.category_name}"
         )
 
-        # Apne hisaab se set ki gayi ticket open description
-        embed = discord.Embed(
-            title=f"🎫 Ticket: {self.category_name}",
+        tag_text = support_role.mention if support_role else "@support"
+        
+        # Unified Embed Design for Ticket Open
+        embed = create_embed(
+            interaction.user,
+            title=f"🎫 Ticket Category: {self.category_name}",
             description=(
-                f"Hello {interaction.user.mention},\n\n"
-                f"**Your Issue / Details:**\n{self.reason.value}\n\n"
-                "A staff member will be with you shortly. Please stay patient."
-            ),
-            color=0x5865F2
+                f"Hello {interaction.user.mention}, wait sometime our {tag_text} team contact soon!!\n\n"
+                f"**Your Details / Issue:**\n{self.reason.value}"
+            )
         )
-        embed.set_footer(text="Moonlight Heaven Support System")
 
         view = TicketControlView()
-        tag_text = support_role.mention if support_role else "@here"
 
-        # Role tag aur custom message
+        # Bot tag karke embed bhejega
         await ticket_channel.send(
-            content=f"{tag_text} - New ticket opened by {interaction.user.mention}!",
+            content=f"{interaction.user.mention} {tag_text}",
             embed=embed,
             view=view
         )
@@ -96,7 +104,6 @@ class TicketSelect(ui.Select):
         super().__init__(placeholder="Make a selection to open a ticket", min_values=1, max_values=1, options=options, custom_id="custom_ticket_select")
 
     async def callback(self, interaction: discord.Interaction):
-        # Yahan aap define kar sakte hain ki kis option par kaun sa role tag hoga
         selected_value = self.values[0]
         role_mapping = {
             "Staff Complaint": "Staff Team",
@@ -118,7 +125,8 @@ class TicketControlView(ui.View):
 
     @ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
     async def close_ticket(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_message("⚠️ This ticket will be deleted in 5 seconds...", ephemeral=True)
+        embed = create_embed(interaction.user, title="Closing Ticket", description="⚠️ This ticket will be deleted in 5 seconds...", color=0xED4245)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         await asyncio.sleep(5)
         try:
             await interaction.channel.delete()
@@ -133,12 +141,7 @@ class Tickets(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ticket_setup(self, ctx, title: str = "Support Center", *, description: str = "Please select a category from the dropdown menu below to open a support ticket."):
         """Usage: &ticketsetup [Title] | [Description]"""
-        embed = discord.Embed(
-            title=title,
-            description=description,
-            color=0x2B2D31
-        )
-        embed.set_footer(text="Moonlight Heaven Ticket System")
+        embed = create_embed(ctx.author, title=title, description=description)
         
         await ctx.send(embed=embed, view=TicketDropdownView())
         try:
