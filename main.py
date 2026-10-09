@@ -1,26 +1,28 @@
 import os
+import time
+import json
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from flask import Flask
-import threading
+from threading import Thread
+from datetime import datetime, timedelta
 
-# Flask server for Render uptime
+# 1. Flask server to keep bot alive on Render 24/7
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Moonlight Heaven Bot is online!"
+    return "🤖 Moonlight Heaven is Alive and Running!"
 
-def run_flask():
-    try:
-        port = int(os.environ.get("PORT", 10000))
-        app.run(host='0.0.0.0', port=port)
-    except Exception as e:
-        print(f"Flask Server Error: {e}")
+def run():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
-threading.Thread(target=run_flask, daemon=True).start()
+def keep_alive():
+    t = Thread(target=run, daemon=True)
+    t.start()
 
-# Intents Setup
+# 2. Bot Intents & Configuration
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
@@ -37,8 +39,8 @@ async def on_ready():
 
 async def setup_hook():
     initial_cogs = [
-        "cogs.tickets",
-        "cogs.support_tickets"
+        "cogs.tickets",          # Staff Recruitment Button Panel
+        "cogs.support_tickets"   # Support Center Dropdown Panel
     ]
     for cog in initial_cogs:
         try:
@@ -47,12 +49,13 @@ async def setup_hook():
         except Exception as e:
             print(f"❌ Failed to load Cog {cog}: {e}")
 
-# Main execution using Render Environment Variable
+# 3. Main Execution
 if __name__ == "__main__":
-    try:
-        TOKEN = os.getenv("TOKEN")
-        if not TOKEN:
-            raise ValueError("TOKEN environment variable not found!")
-        bot.run(TOKEN)
-    except Exception as e:
-        print(f"❌ Critical Error starting bot: {e}")
+    # Flask Keep-Alive server ko sabse pehle start karte hain
+    keep_alive()
+    
+    # Render Environment Variable se token utha kar bot run karna
+    TOKEN = os.getenv("TOKEN")
+    if not TOKEN:
+        raise ValueError("TOKEN environment variable is missing!")
+    bot.run(TOKEN)
