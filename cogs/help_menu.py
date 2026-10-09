@@ -1,93 +1,89 @@
 import discord
 from discord.ext import commands
 
+DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 
-class HelpDropdown(discord.ui.Select):
+# Unified Embed Helper Function
+def create_embed(ctx_or_user, title="", description="", color=0x2B2D31, thumbnail=None):
+    avatar_url = thumbnail or getattr(ctx_or_user, 'display_avatar', None) and ctx_or_user.display_avatar.url or DEFAULT_AVATAR
+    embed = discord.Embed(title=title, description=description, color=color)
+    embed.set_thumbnail(url=avatar_url)
+    embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+    return embed
 
-  def __init__(self):
-    options = [
-        discord.SelectOption(
-            label="Moderation",
-            description="Kick, ban, clear and mute commands",
-            emoji="🛡️",
-        ),
-        discord.SelectOption(
-            label="Music",
-            description="Play, skip and queue songs",
-            emoji="🎵",
-        ),
-        discord.SelectOption(
-            label="Fun Commands",
-            description="Games and entertainment features",
-            emoji="✨",
-        ),
-    ]
-    super().__init__(
-        placeholder="Select a module to see...",
-        min_values=1,
-        max_values=1,
-        options=options,
-    )
+class HelpMenu(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-  async def callback(self, interaction: discord.Interaction):
-    if self.values[0] == "Moderation":
-      embed = discord.Embed(
-          title="🛡️ Moderation Commands",
-          description=(
-              "Server control commands:\n\n`.kick` - Member ko kick"
-              " karein\n`.ban` - Member ko ban karein\n`.clear` - Messages delete"
-              " karein"
-          ),
-          color=discord.Color.red(),
-      )
-      await interaction.response.edit_message(embed=embed, view=self.view)
+    @commands.command(name="help")
+    async def help_cmd(self, ctx):
+        """Displays all commands in the unified Moonlight Heaven embed format."""
+        description = (
+            "Welcome to the help center! Here are all available commands categorized for your assistance.\n\n"
+            "🔹 **Prefix:** `&`\n"
+        )
 
-    elif self.values[0] == "Music":
-      embed = discord.Embed(
-          title="🎵 Music Commands",
-          description=(
-              "Music player commands:\n\n`.play` - Gaana play"
-              " karein\n`.skip` - Song skip karein\n`.stop` - Music rokein"
-          ),
-          color=discord.Color.blue(),
-      )
-      await interaction.response.edit_message(embed=embed, view=self.view)
+        embed = create_embed(ctx.author, title="✨ Moonlight Heaven • Help Menu", description=description)
 
-    elif self.values[0] == "Fun Commands":
-      embed = discord.Embed(
-          title="✨ Fun Commands",
-          description="Entertainment commands jald hi add honge!",
-          color=discord.Color.gold(),
-      )
-      await interaction.response.edit_message(embed=embed, view=self.view)
+        # 1. Ticket System
+        embed.add_field(
+            name="🎫 Ticket System",
+            value="`&ticketsetup` - Setup the interactive dropdown ticket panel.",
+            inline=False
+        )
+        
+        # 2. Utility & Games
+        embed.add_field(
+            name="🛠️ Utility & Games",
+            value=(
+                "`&say <message>` - Make the bot say a message.\n"
+                "`&reply <msg_id> <msg>` - Reply to a specific message.\n"
+                "`&start <num> [channel] [emoji]` - Start the counting game.\n"
+                "`&emojiadd <url> <name>` - Add a custom emoji.\n"
+                "`&stickeradd <name>` - Add a custom sticker."
+            ),
+            inline=False
+        )
+        
+        # 3. Information Commands
+        embed.add_field(
+            name="ℹ️ Information Commands",
+            value=(
+                "`&avatar [member]` - View user avatar (PNG/JPG/WEBP)[span_3](start_span)[span_3](end_span).\n"
+                "`&userinfo [member]` - View detailed user profile[span_4](start_span)[span_4](end_span).\n"
+                "`&serverinfo` - View server statistics.\n"
+                "`&botinfo` - View bot system information[span_5](start_span)[span_5](end_span)."
+            ),
+            inline=False
+        )
 
+        # 4. Statistics & Tracking
+        embed.add_field(
+            name="📊 Statistics Tracking",
+            value=(
+                "`&m [member]` - Check message count.\n"
+                "`&v [member]` - Check voice channel time.\n"
+                "`&i [member]` - Check invite count."
+            ),
+            inline=False
+        )
 
-class HelpView(discord.ui.View):
+        # 5. Admin Resets
+        embed.add_field(
+            name="⚙️ Admin Reset Commands",
+            value=(
+                "`&rm all` - Reset all message statistics.\n"
+                "`&rv all` - Reset all voice statistics.\n"
+                "`&ri all` - Reset all invite statistics."
+            ),
+            inline=False
+        )
 
-  def __init__(self):
-    super().__init__()
-    self.add_item(HelpDropdown())
-
-
-class HelpCog(commands.Cog):
-
-  def __init__(self, bot):
-    self.bot = bot
-
-  @commands.command(name="help")
-  async def help(self, ctx):
-    embed = discord.Embed(
-        title="🤖 Custom Bot Help Menu",
-        description=(
-            "• My prefix for this server is `.` (ya jo aapne set kiya ho)\n•"
-            " Total modules: 3 active categories\n\nSelect a module from the"
-            " dropdown below 👇"
-        ),
-        color=discord.Color.blurple(),
-    )
-    view = HelpView()
-    await ctx.reply(embed=embed, view=view)
-
+        await ctx.send(embed=embed)
+        try:
+            await ctx.message.delete()
+        except:
+            pass
 
 async def setup(bot):
-  await bot.add_cog(HelpCog(bot))
+    await bot.add_cog(HelpMenu(bot))
