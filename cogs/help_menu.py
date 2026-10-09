@@ -4,6 +4,8 @@ from discord.ext import commands
 class HelpMenu(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        # Discord ka default help command hata dete hain taaki hamara custom embed chale
+        self.bot.remove_command('help')
 
     @commands.command(name="help")
     async def help_command(self, ctx, *, category: str = None):
@@ -11,9 +13,10 @@ class HelpMenu(commands.Cog):
         embed = discord.Embed(
             title="✨ Moonlight Heaven — Help Menu",
             description="Type `&help [command]` for more info on a specific command.\nType `&help [category]` for a category's details.",
-            color=discord.Color.from_rgb(138, 43, 226) # Ek pyara sa Purple shade
+            color=discord.Color.from_rgb(138, 43, 226)
         )
-        embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
+        if self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
         
         # Agar koi specific category mangi ho
         if category:
@@ -32,7 +35,7 @@ class HelpMenu(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        # Main help menu with all categories (Embed format)
+        # Main help menu with all categories in Embed format
         embed.add_field(
             name="📂 Info",
             value="`avatar`, `botinfo`, `serverinfo`, `userinfo`",
