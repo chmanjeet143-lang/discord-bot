@@ -1,11 +1,12 @@
 import discord
 from discord.ext import commands
-import asyncio
 import os
 import json
 import time
+import io
 
 DATA_FILE = "bot_database.json"
+DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -14,27 +15,23 @@ def load_data():
                 return json.load(f)
         except:
             pass
-    return {"messages": {}, "vc_time": {}, "invites": {}, "counting": {}, "prefixes": {}}
+    return {"messages": {}, "vc_time": {}, "invites": {}, "counting": {}}
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
-                json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4)
+
+def create_embed(title="", description="", color=0x2B2D31, thumbnail=None):
+    embed = discord.Embed(title=title, description=description, color=color)
+    embed.set_thumbnail(url=thumbnail or DEFAULT_AVATAR)
+    embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+    return embed
 
 class Utility(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.vc_sessions = {} # {user_id: start_timestamp}
-        self.invites_cache = {}
+        self.vc_sessions = {}
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        for guild in self.bot.guilds:
-            try:
-                self.invites_cache[guild.id] = await guild.invites()
-            except:
-                pass
-
-    # --- TRACKERS (Messages, Counting, VC, Invites) ---
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
@@ -44,7 +41,7 @@ class Utility(commands.Cog):
         guild_id = str(message.guild.id)
         user_id = str(message.author.id)
 
-        # 1. Message Stats Tracking (&m)
+        # 1. Message Stats Tracking
         if guild_id not in data["messages"]:
             data["messages"][guild_id] = {}
         data["messages"][guild_id][user_id] = data["messages"][guild_id].get(user_id, 0) + 1
@@ -65,7 +62,12 @@ class Utility(commands.Cog):
                     save_data(data)
                     await message.add_reaction(emoji)
                 else:
-                    await message.channel.send(f"❌ {message.author.mention}, wrong number or consecutive message! Counting reset to `1`.")
+                    embed = create_embed(
+                        title="⚠️ Counting Failed",
+                        description=f"❌ {message.author.mention}, wrong number or consecutive message! Counting reset to `1`.",
+                        color=0xED4245
+                    )
+                    await message.channel.send(embed=embed)
                     counting_info["next_number"] = 1
                     counting_info["last_user"] = None
                     save_data(data)
@@ -79,10 +81,8 @@ class Utility(commands.Cog):
         user_id = str(member.id)
         current_time = time.time()
 
-        # Joined a VC
         if before.channel is None and after.channel is not None:
             self.vc_sessions[user_id] = current_time
-        # Left a VC
         elif before.channel is not None and after.channel is None:
             if user_id in self.vc_sessions:
                 elapsed = int(current_time - self.vc_sessions[user_id])
@@ -113,7 +113,8 @@ class Utility(commands.Cog):
             try: await ctx.message.delete()
             except: pass
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = create_embed(title="Error", description=f"❌ {e}", color=0xED4245)
+            await ctx.send(embed=embed)
 
     @commands.command(name="start", aliases=["counting"])
     @commands.has_permissions(administrator=True)
@@ -130,7 +131,8 @@ class Utility(commands.Cog):
             "emoji": emoji
         }
         save_data(data)
-        await ctx.send(f"✅ Counting game initialized in {target_channel.mention} starting from `{amount}` with reaction `{emoji}`!")
+        embed = create_embed(title="Counting Initialized", description=f"✅ Counting game started in {target_channel.mention} from `{amount}` with reaction `{emoji}`!")
+        await ctx.send(embed=embed)
 
     @commands.command(name="emojiadd")
     @commands.has_permissions(manage_emojis=True)
@@ -140,11 +142,12 @@ class Utility(commands.Cog):
                 if resp.status == 200:
                     image_bytes = await resp.read()
                     emoji = await ctx.guild.create_custom_emoji(name=name, image=image_bytes)
-                    await ctx.send(f"✅ Successfully added emoji: {emoji}")
+                    embed = create_embed(title="Emoji Added", description=f"✅ Successfully added emoji: {emoji}", thumbnail=url)
+                    await ctx.send(embed=embed)
                 else:
-                    await ctx.send("❌ Failed to fetch image from URL.")
+                    await ctx.send(embed=create_embed(title="Error", description="❌ Failed to fetch image from URL.", color=0xED4245))
         except Exception as e:
-            await ctx.send(f"❌ Error adding emoji: {e}")
+            await ctx.send(embed=create_embed(title="Error", description=f"❌ Error adding emoji: {e}", color=0xED4245))
 
     @commands.command(name="stickeradd")
     @commands.has_permissions(manage_emojis=True)
@@ -152,23 +155,32 @@ class Utility(commands.Cog):
         if not url and ctx.message.attachments:
             url = ctx.message.attachments[0].url
         if not url:
-            await ctx.send("❌ Please provide an image URL or attach an image for the sticker.")
+            await ctx.send(embed=create_embed(title="Error", description="❌ Please provide an image URL or attach an image for the sticker.", color=0xED4245))
             return
         try:
             async with ctx.bot.session.get(url) as resp:
                 image_bytes = await resp.read()
                 file = discord.File(fp=io.BytesIO(image_bytes), filename="sticker.png")
                 sticker = await ctx.guild.create_sticker(name=name, description="Added via bot", file=file, emoji="✨")
-                await ctx.send(f"✅ Successfully added sticker: **{sticker.name}**")
+                embed = create_embed(title="Sticker Added", description=f"✅ Successfully added sticker: **{sticker.name}**", thumbnail=url)
+                await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"❌ Error adding sticker: {e}")
+            await ctx.send(embed=create_embed(title="Error", description=f"❌ Error adding sticker: {e}", color=0xED4245))
 
     @commands.command(name="m")
     async def message_stats(self, ctx, member: discord.Member = None):
         target = member or ctx.author
         data = load_data()
         count = data.get("messages", {}).get(str(ctx.guild.id), {}).get(str(target.id), 0)
-        await ctx.send(f"📊 **{target.name}** has sent **{count}** messages in this server.")
+        
+        embed = create_embed(
+            title=f"Message Statistics",
+            description=f"📊 **{target.mention}** has sent **{count}** messages in this server.",
+            thumbnail=target.display_avatar.url
+        )
+        await ctx.send(embed=embed)
+        try: await ctx.message.delete()
+        except: pass
 
     @commands.command(name="v")
     async def voice_stats(self, ctx, member: discord.Member = None):
@@ -177,14 +189,30 @@ class Utility(commands.Cog):
         seconds = data.get("vc_time", {}).get(str(ctx.guild.id), {}).get(str(target.id), 0)
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
-        await ctx.send(f"🎙️ **{target.name}** has spent **{hours} hours and {minutes} minutes** in voice channels.")
+        
+        embed = create_embed(
+            title=f"Voice Statistics",
+            description=f"🎙️ **{target.mention}** has spent **{hours} hours and {minutes} minutes** in voice channels.",
+            thumbnail=target.display_avatar.url
+        )
+        await ctx.send(embed=embed)
+        try: await ctx.message.delete()
+        except: pass
 
     @commands.command(name="i")
     async def invite_stats(self, ctx, member: discord.Member = None):
         target = member or ctx.author
         data = load_data()
         invs = data.get("invites", {}).get(str(ctx.guild.id), {}).get(str(target.id), {"uses": 0})
-        await ctx.send(f"✉️ **{target.name}** has invited **{invs['uses']}** members to the server.")
+        
+        embed = create_embed(
+            title=f"Invite Statistics",
+            description=f"✉️ **{target.mention}** has invited **{invs['uses']}** members to the server.",
+            thumbnail=target.display_avatar.url
+        )
+        await ctx.send(embed=embed)
+        try: await ctx.message.delete()
+        except: pass
 
     # --- RESET COMMANDS ---
     @commands.command(name="rm")
@@ -195,7 +223,8 @@ class Utility(commands.Cog):
             if str(ctx.guild.id) in data.get("messages", {}):
                 data["messages"][str(ctx.guild.id)] = {}
                 save_data(data)
-            await ctx.send("✅ Successfully reset all message statistics!")
+            embed = create_embed(title="Stats Reset", description="✅ Successfully reset all message statistics!")
+            await ctx.send(embed=embed)
 
     @commands.command(name="rv")
     @commands.has_permissions(administrator=True)
@@ -205,7 +234,8 @@ class Utility(commands.Cog):
             if str(ctx.guild.id) in data.get("vc_time", {}):
                 data["vc_time"][str(ctx.guild.id)] = {}
                 save_data(data)
-            await ctx.send("✅ Successfully reset all voice channel statistics!")
+            embed = create_embed(title="Stats Reset", description="✅ Successfully reset all voice channel statistics!")
+            await ctx.send(embed=embed)
 
     @commands.command(name="ri")
     @commands.has_permissions(administrator=True)
@@ -215,8 +245,8 @@ class Utility(commands.Cog):
             if str(ctx.guild.id) in data.get("invites", {}):
                 data["invites"][str(ctx.guild.id)] = {}
                 save_data(data)
-            await ctx.send("✅ Successfully reset all invite statistics!")
+            embed = create_embed(title="Stats Reset", description="✅ Successfully reset all invite statistics!")
+            await ctx.send(embed=embed)
 
 async def setup(bot):
-    import io
     await bot.add_cog(Utility(bot))
