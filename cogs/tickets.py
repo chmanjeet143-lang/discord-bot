@@ -3,32 +3,22 @@ from discord.ext import commands
 from discord import ui
 import asyncio
 
-# Dropdown Menu for Categories
-class TicketSelect(ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(
-                label="Staff Complaint",
-                description="Report or complain about a staff member.",
-                emoji="⚠️",
-                value="staff_complaint"
-            ),
-            discord.SelectOption(
-                label="Partnership & Sponsorship",
-                description="Inquiries regarding partnerships and sponsorships.",
-                emoji="🤝",
-                value="partnership"
-            ),
-            discord.SelectOption(
-                label="Zeus Management / Owner Contact",
-                description="Urgent matters directly related to server management.",
-                emoji="⚡",
-                value="management"
-            )
-        ]
-        super().__init__(placeholder="Make a selection", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
+# Dynamic Ticket Modal for Customizing Open Message
+class TicketReasonModal(ui.Modal, title="Provide Ticket Details"):
+    reason = ui.TextInput(
+        label="Please describe your issue",
+        style=discord.TextStyle.paragraph,
+        placeholder="Type your issue or details here...",
+        required=True,
+        max_length=1000
+    )
 
-    async def callback(self, interaction: discord.Interaction):
+    def __init__(self, category_name, role_to_tag):
+        super().__init__()
+        self.category_name = category_name
+        self.role_to_tag = role_to_tag
+
+    async def on_submit(self, interaction: discord.Interaction):
         guild = interaction.guild
         category_name = "Tickets"
         
@@ -37,8 +27,8 @@ class TicketSelect(ui.Select):
         if not category:
             category = await guild.create_category(category_name)
 
-        # Support role name yahan apne hisab se badal sakte hain
-        support_role = discord.utils.get(guild.roles, name="Support Team")
+        # Role find karna jo tag hoga
+        support_role = discord.utils.get(guild.roles, name=self.role_to_tag) or discord.utils.get(guild.roles, name="Support Team")
 
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -54,32 +44,68 @@ class TicketSelect(ui.Select):
             name=channel_name,
             category=category,
             overwrites=overwrites,
-            topic=f"Ticket opened by {interaction.user.id} | Type: {self.values[0]}"
+            topic=f"Ticket by {interaction.user.id} | Category: {self.category_name}"
         )
 
-        # Yahan aap apne hisab se ticket open hone par message change kar sakte hain
+        # Apne hisaab se set ki gayi ticket open description
         embed = discord.Embed(
-            title="🎫 Support Ticket Opened",
+            title=f"🎫 Ticket: {self.category_name}",
             description=(
                 f"Hello {interaction.user.mention},\n\n"
-                "Thank you for reaching out to support. Our team members will "
-                "contact you shortly. Please describe your issue clearly in the meantime."
+                f"**Your Issue / Details:**\n{self.reason.value}\n\n"
+                "A staff member will be with you shortly. Please stay patient."
             ),
             color=0x5865F2
         )
-        embed.set_footer(text="Click the close button below to close this ticket.")
+        embed.set_footer(text="Moonlight Heaven Support System")
 
         view = TicketControlView()
         tag_text = support_role.mention if support_role else "@here"
 
-        # Bot tag karke custom message bhejega
+        # Role tag aur custom message
         await ticket_channel.send(
             content=f"{tag_text} - New ticket opened by {interaction.user.mention}!",
             embed=embed,
             view=view
         )
 
-        await interaction.response.send_message(f"✅ Your ticket has been created: {ticket_channel.mention}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Your ticket has been created successfully: {ticket_channel.mention}", ephemeral=True)
+
+class TicketSelect(ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Staff Complaint",
+                description="Report or complain about a staff member.",
+                emoji="⚠️",
+                value="Staff Complaint"
+            ),
+            discord.SelectOption(
+                label="Partnership & Sponsorship",
+                description="Inquiries regarding partnerships and sponsorships.",
+                emoji="🤝",
+                value="Partnership & Sponsorship"
+            ),
+            discord.SelectOption(
+                label="Zeus Management",
+                description="Urgent matters directly related to server management.",
+                emoji="⚡",
+                value="Zeus Management"
+            )
+        ]
+        super().__init__(placeholder="Make a selection to open a ticket", min_values=1, max_values=1, options=options, custom_id="custom_ticket_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        # Yahan aap define kar sakte hain ki kis option par kaun sa role tag hoga
+        selected_value = self.values[0]
+        role_mapping = {
+            "Staff Complaint": "Staff Team",
+            "Partnership & Sponsorship": "Partnership Manager",
+            "Zeus Management": "Management"
+        }
+        target_role = role_mapping.get(selected_value, "Support Team")
+        
+        await interaction.response.send_modal(TicketReasonModal(category_name=selected_value, role_to_tag=target_role))
 
 class TicketDropdownView(ui.View):
     def __init__(self):
@@ -105,11 +131,11 @@ class Tickets(commands.Cog):
 
     @commands.command(name="ticketsetup")
     @commands.has_permissions(administrator=True)
-    async def ticket_setup(self, ctx):
-        """Sends the interactive dropdown ticket panel."""
+    async def ticket_setup(self, ctx, title: str = "Support Center", *, description: str = "Please select a category from the dropdown menu below to open a support ticket."):
+        """Usage: &ticketsetup [Title] | [Description]"""
         embed = discord.Embed(
-            title="Support Center",
-            description="Please select a category from the dropdown menu below to open a support ticket.",
+            title=title,
+            description=description,
             color=0x2B2D31
         )
         embed.set_footer(text="Moonlight Heaven Ticket System")
