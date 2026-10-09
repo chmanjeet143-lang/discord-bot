@@ -1,8 +1,7 @@
 import discord
 from discord.ext import commands
-import asyncio
 
-# Intents Setup (Message content & guilds enabled)
+# Intents Setup
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
@@ -18,8 +17,8 @@ async def on_ready():
     print(f'Moonlight Heaven Bot is 100% Online!')
     print(f'-----------------------------------')
 
-# Function to load all cogs/extensions automatically
-async def load_extensions():
+# Setup Hook to load all cogs automatically before bot starts
+async def setup_hook():
     initial_cogs = [
         "cogs.tickets",          # Staff Recruitment Button Panel
         "cogs.support_tickets",  # Support Center Dropdown Panel
@@ -36,20 +35,5 @@ async def load_extensions():
         except Exception as e:
             print(f"❌ Failed to load Cog {cog}: {e}")
 
-async def main():
-    async with bot:
-        await load_extensions()
-        # Apna Bot Token yahan daalein (ya apna purana token use karein)
-        await bot.run("YOUR_BOT_TOKEN_HERE")
-
-if __name__ == "__main__":
-    # Agar aapka setup_hook wala tarika purana chal raha hai toh niche wala standard run use kar sakte hain:
-    pass
-
-# Alternative Standard Runner (Agar upar wala use na karna ho toh yeh use karein):
-@bot.event
-async def setup_hook():
-    await load_extensions()
-
-# Bot Token (Yahan apna token daal dein jo pehle se tha)
-# bot.run("YOUR_BOT_TOKEN_HERE")
+# Bot Token (Yahan apna wahi purana bot token daal dein)
+bot.run("YOUR_BOT_TOKEN_HERE")
