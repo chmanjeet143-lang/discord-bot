@@ -47,11 +47,12 @@ async def setup_hook():
         except Exception as e:
             print(f"❌ Failed to load Cog {cog}: {e}")
 
-# Main execution with error catching
+# Main execution using Render Environment Variable
 if __name__ == "__main__":
     try:
-        # Yahan apna wahi bot token daal dein jo aap use karte hain
-        TOKEN = "YAHAN_APNA_BOT_TOKEN_PASTE_KREIN"
+        TOKEN = os.getenv("TOKEN")
+        if not TOKEN:
+            raise ValueError("TOKEN environment variable not found!")
         bot.run(TOKEN)
     except Exception as e:
         print(f"❌ Critical Error starting bot: {e}")
