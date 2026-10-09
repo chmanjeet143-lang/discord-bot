@@ -4,18 +4,20 @@ from discord.ext import commands
 from flask import Flask
 import threading
 
-# Flask app taaki Render ka Web Service port active rahe
+# Flask server for Render uptime
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Moonlight Heaven Bot is active!"
+    return "Moonlight Heaven Bot is online!"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    try:
+        port = int(os.environ.get("PORT", 10000))
+        app.run(host='0.0.0.0', port=port)
+    except Exception as e:
+        print(f"Flask Server Error: {e}")
 
-# Flask server ko background thread mein start karna
 threading.Thread(target=run_flask, daemon=True).start()
 
 # Intents Setup
@@ -35,8 +37,8 @@ async def on_ready():
 
 async def setup_hook():
     initial_cogs = [
-        "cogs.tickets",          # Staff Recruitment Button Panel
-        "cogs.support_tickets"   # Support Center Dropdown Panel
+        "cogs.tickets",
+        "cogs.support_tickets"
     ]
     for cog in initial_cogs:
         try:
@@ -45,6 +47,11 @@ async def setup_hook():
         except Exception as e:
             print(f"❌ Failed to load Cog {cog}: {e}")
 
-# Render ke environment variable se 'TOKEN' uthana
-TOKEN = os.getenv("TOKEN")
-bot.run(TOKEN)
+# Main execution with error catching
+if __name__ == "__main__":
+    try:
+        # Yahan apna wahi bot token daal dein jo aap use karte hain
+        TOKEN = "YAHAN_APNA_BOT_TOKEN_PASTE_KREIN"
+        bot.run(TOKEN)
+    except Exception as e:
+        print(f"❌ Critical Error starting bot: {e}")
