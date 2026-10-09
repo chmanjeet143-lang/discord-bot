@@ -1,5 +1,21 @@
 import discord
 from discord.ext import commands
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# Render Web Service ke liye chhota server jo port 10000 par chalega
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Moonlight Heaven Bot is alive!")
+
+def run_server():
+    server = HTTPServer(('0.0.0.0', 10000), SimpleHandler)
+    server.serve_forever()
+
+# Server ko background thread mein start karna
+threading.Thread(target=run_server, daemon=True).start()
 
 # Intents Setup
 intents = discord.Intents.default()
@@ -17,7 +33,7 @@ async def on_ready():
     print(f'Moonlight Heaven Bot is 100% Online!')
     print(f'-----------------------------------')
 
-# Setup Hook to load all cogs automatically before bot starts
+# Setup Hook to load all cogs automatically
 async def setup_hook():
     initial_cogs = [
         "cogs.tickets",          # Staff Recruitment Button Panel
@@ -35,5 +51,5 @@ async def setup_hook():
         except Exception as e:
             print(f"❌ Failed to load Cog {cog}: {e}")
 
-# Bot Token (Yahan apna wahi purana bot token daal dein)
+# Bot Token (Yahan apna wahi token daal dein)
 bot.run("YOUR_BOT_TOKEN_HERE")
