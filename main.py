@@ -40,31 +40,23 @@ async def on_ready():
     print(f'Moonlight Heaven Bot is 100% Online!')
     print(f'-----------------------------------')
 
-# Saare cogs ko load karne ka function (Crash prevention ke sath)
+# AUTOMATIC COG LOADER: Ab cogs/ folder ki har nayi file apne aap load hogi!
 async def setup_hook():
-    initial_cogs = [
-        "cogs.help_menu",
-        "cogs.info",
-        "cogs.moderation",
-        "cogs.support_tickets",
-        "cogs.tickets",
-        "cogs.utility"
-    ]
-    for cog in initial_cogs:
-        try:
-            await bot.load_extension(cog)
-            print(f"✅ Loaded Cog: {cog}")
-        except Exception as e:
-            print(f"❌ Failed to load Cog {cog}: {e}")
+    for filename in os.listdir("./cogs"):
+        if filename.endswith(".py"):
+            cog_name = f"cogs.{filename[:-3]}"
+            try:
+                await bot.load_extension(cog_name)
+                print(f"✅ Automatically Loaded Cog: {cog_name}")
+            except Exception as e:
+                print(f"❌ Failed to load Cog {cog_name}: {e}")
 
 bot.setup_hook = setup_hook
 
 # 3. Main Execution
 if __name__ == "__main__":
-    # Flask Keep-Alive server ko sabse pehle start karte hain
     keep_alive()
     
-    # Render Environment Variable se token utha kar bot run karna
     TOKEN = os.getenv("TOKEN")
     if not TOKEN:
         raise ValueError("TOKEN environment variable is missing!")
