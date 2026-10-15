@@ -35,7 +35,6 @@ class Moderation(commands.Cog):
         self.bot = bot
         self.warnings_file = "warnings.json"
         self.load_warnings()
-        self.bad_words = ["badword1", "badword2", "spamlink.com", "discord.gg/"]
 
     def load_warnings(self):
         if os.path.exists(self.warnings_file):
@@ -53,8 +52,6 @@ class Moderation(commands.Cog):
                 json.dump(self.warnings_store, f, indent=4)
         except Exception as e:
             print(f"Error saving warnings: {e}")
-
-    # ==================== MANUAL MODERATION COMMANDS ====================
 
     @commands.command(name="ban")
     @commands.has_permissions(ban_members=True)
@@ -154,7 +151,7 @@ class Moderation(commands.Cog):
             self.warnings_store[guild_id][user_id] = []
             
         self.warnings_store[guild_id][user_id].append(reason)
-        self.save_warnings()  # Save permanently to JSON
+        self.save_warnings()
         total_warns = len(self.warnings_store[guild_id][user_id])
 
         embed = create_embed(
@@ -239,30 +236,6 @@ class Moderation(commands.Cog):
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
-
-    # ==================== AUTO-MOD LISTENER ====================
-
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if message.author.bot or not message.guild:
-            return
-
-        if message.author.guild_permissions.manage_messages:
-            return
-
-        content_lower = message.content.lower()
-        for word in self.bad_words:
-            if word in content_lower:
-                try:
-                    await message.delete()
-                    warning_msg = await message.channel.send(
-                        f"⚠️ {message.author.mention}, your message was automatically deleted because it contained restricted content."
-                    )
-                    await discord.utils.sleep_until(datetime.datetime.utcnow() + datetime.timedelta(seconds=4))
-                    await warning_msg.delete()
-                except Exception:
-                    pass
-                break
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))
