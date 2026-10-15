@@ -30,6 +30,9 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="&", intents=intents)
 
+# Default help command ko remove karte hain taaki hamara custom help menu chale
+bot.remove_command('help')
+
 @bot.event
 async def on_ready():
     print(f'-----------------------------------')
