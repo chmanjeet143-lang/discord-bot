@@ -18,11 +18,11 @@ class HelpDropdown(discord.ui.Select):
         # Automatically scan all loaded cogs and build dropdown options dynamically
         for cog_name in self.bot.cogs:
             cog = self.bot.get_cog(cog_name)
-            # Skip help cog itself from showing inside options if needed, or keep it
+            # Skip help cog itself from showing inside options
             if cog_name.lower() == "help":
                 continue
             
-            # Format label nicely (e.g., "Moderation" -> "🛡️ Moderation")
+            # Format label nicely with emojis
             emoji_map = {
                 "Moderation": "🛡️",
                 "Information": "📊",
@@ -85,4 +85,12 @@ class HelpCog(commands.Cog):
             title="🌙 Moonlight Heaven • Help Center",
             description=(
                 f"Hello {ctx.author.mention}! Welcome to the interactive help command center.\n\n"
-                f"Please select
+                "Please select a category from the dropdown menu below to view its available commands."
+            ),
+            color=discord.Color.purple()
+        )
+        view = HelpView(self.bot)
+        await ctx.send(embed=embed, view=view)
+
+async def setup(bot):
+    await bot.add_cog(HelpCog(bot))
