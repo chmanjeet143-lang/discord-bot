@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import datetime
 import re
+import json
+import os
 
 DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 
@@ -12,7 +14,6 @@ def create_embed(guild, title="", description="", color=0x2B2D31):
     embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
     return embed
 
-# Helper function to parse time strings like 10s, 5m, 2h, 1d
 def parse_time(time_str: str):
     time_regex = re.compile(r"^(\d+)([smhd])$")
     match = time_regex.match(time_str.lower())
@@ -32,8 +33,28 @@ def parse_time(time_str: str):
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Temporary in-memory warning system {guild_id: {user_id: [reasons]}}
-        self.warnings_store = {}
+        self.warnings_file = "warnings.json"
+        self.load_warnings()
+        self.bad_words = ["badword1", "badword2", "spamlink.com", "discord.gg/"]
+
+    def load_warnings(self):
+        if os.path.exists(self.warnings_file):
+            try:
+                with open(self.warnings_file, "r") as f:
+                    self.warnings_store = json.load(f)
+            except Exception:
+                self.warnings_store = {}
+        else:
+            self.warnings_store = {}
+
+    def save_warnings(self):
+        try:
+            with open(self.warnings_file, "w") as f:
+                json.dump(self.warnings_store, f, indent=4)
+        except Exception as e:
+            print(f"Error saving warnings: {e}")
+
+    # ==================== MANUAL MODERATION COMMANDS ====================
 
     @commands.command(name="ban")
     @commands.has_permissions(ban_members=True)
@@ -124,8 +145,8 @@ class Moderation(commands.Cog):
     @commands.command(name="warn")
     @commands.has_permissions(manage_messages=True)
     async def warn_command(self, ctx, member: discord.Member, *, reason: str = "No reason provided"):
-        guild_id = ctx.guild.id
-        user_id = member.id
+        guild_id = str(ctx.guild.id)
+        user_id = str(member.id)
         
         if guild_id not in self.warnings_store:
             self.warnings_store[guild_id] = {}
@@ -133,6 +154,7 @@ class Moderation(commands.Cog):
             self.warnings_store[guild_id][user_id] = []
             
         self.warnings_store[guild_id][user_id].append(reason)
+        self.save_warnings()  # Save permanently to JSON
         total_warns = len(self.warnings_store[guild_id][user_id])
 
         embed = create_embed(
@@ -146,8 +168,8 @@ class Moderation(commands.Cog):
     @commands.command(name="warnings")
     @commands.has_permissions(manage_messages=True)
     async def warnings_command(self, ctx, member: discord.Member):
-        guild_id = ctx.guild.id
-        user_id = member.id
+        guild_id = str(ctx.guild.id)
+        user_id = str(member.id)
         warns = self.warnings_store.get(guild_id, {}).get(user_id, [])
         
         if not warns:
@@ -217,6 +239,30 @@ class Moderation(commands.Cog):
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
+
+    # ==================== AUTO-MOD LISTENER ====================
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot or not message.guild:
+            return
+
+        if message.author.guild_permissions.manage_messages:
+            return
+
+        content_lower = message.content.lower()
+        for word in self.bad_words:
+            if word in content_lower:
+                try:
+                    await message.delete()
+                    warning_msg = await message.channel.send(
+                        f"⚠️ {message.author.mention}, your message was automatically deleted because it contained restricted content."
+                    )
+                    await discord.utils.sleep_until(datetime.datetime.utcnow() + datetime.timedelta(seconds=4))
+                    await warning_msg.delete()
+                except Exception:
+                    pass
+                break
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))
