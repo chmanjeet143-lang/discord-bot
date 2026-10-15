@@ -18,24 +18,37 @@ class HelpDropdown(discord.ui.Select):
         # Automatically scan all loaded cogs and build dropdown options dynamically
         for cog_name in self.bot.cogs:
             cog = self.bot.get_cog(cog_name)
-            # Skip help cog itself from showing inside options
+            # Skip help cog itself from showing inside options if you want, 
+            # par yahan humne HelpCog ke liye alag se handle kar liya hai
             if cog_name.lower() == "help":
                 continue
             
-            # Format label nicely with emojis
+            # Format label nicely with emojis and clean names
             emoji_map = {
                 "Moderation": "🛡️",
-                "Information": "📊",
+                "Giveaway": "🎉",
+                "Tickets": "🎫",
+                "SupportTickets": "🎫",
+                "Support Ticket": "🎫",
+                "HelpCog": "❓",
+                "Help": "❓",
                 "Utility": "⚙️",
-                "Giveaway": "🎉"
+                "Information": "📊"
             }
             emoji = emoji_map.get(cog_name, "📁")
             
+            # Clean up cog names if they are written together
+            display_name = cog_name
+            if cog_name == "SupportTickets":
+                display_name = "Support Tickets"
+            elif cog_name == "HelpCog":
+                display_name = "Help Menu"
+
             options.append(
                 discord.SelectOption(
-                    label=f"{cog_name} Commands",
+                    label=f"{display_name} Commands",
                     value=cog_name,
-                    description=f"Explore all commands related to {cog_name}.",
+                    description=f"Explore all commands related to {display_name}.",
                     emoji=emoji
                 )
             )
