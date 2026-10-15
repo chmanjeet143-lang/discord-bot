@@ -1,70 +1,85 @@
 import discord
+from discord.ext import commands
+from discord import ui
 
+DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 
-# Dropdown Menu class (agar aapke paas pehle se hai toh aap apne wale ko use kar sakte hain)
-class HelpDropdown(discord.ui.Select):
+def create_embed(guild, title="", description="", color=0x2B2D31):
+    thumbnail_url = guild.icon.url if guild and guild.icon else DEFAULT_AVATAR
+    embed = discord.Embed(title=title, description=description, color=color)
+    embed.set_thumbnail(url=thumbnail_url)
+    embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+    return embed
 
-  def __init__(self):
-    options = [
-        discord.SelectOption(
-            label="Moderation",
-            description="View server moderation commands",
-            emoji="🛡️",
-        ),
-        discord.SelectOption(
-            label="Fun & Games",
-            description="View fun and interactive commands",
-            emoji="🎮",
-        ),
-        discord.SelectOption(
-            label="Utility",
-            description="View utility and general commands",
-            emoji="⚙️",
-        ),
-    ]
-    super().__init__(
-        placeholder="Select a category to view commands...",
-        min_values=1,
-        max_values=1,
-        options=options,
-    )
+class HelpSelect(ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Moderation", description="View server moderation commands.", emoji="🛡️", value="mod"),
+            discord.SelectOption(label="Tickets & Support", description="View ticket and support setup commands.", emoji="🎫", value="tickets"),
+            discord.SelectOption(label="Utility & Games", description="View counting game and utility commands.", emoji="🛠️", value="utility"),
+        ]
+        super().__init__(placeholder="📂 Select a category to view commands...", min_values=1, max_values=1, options=options, custom_id="help_menu_dropdown")
 
-  async def callback(self, interaction: discord.Interaction):
-    # Yahan aap category ke hisaab se logic likh sakte hain
-    await interaction.response.send_message(
-        f"You selected: {self.values[0]}", ephemeral=True
-    )
+    async def callback(self, interaction: discord.Interaction):
+        val = self.values[0]
+        guild = interaction.guild
 
+        if val == "mod":
+            embed = create_embed(
+                guild,
+                title="🛡️ Moderation Commands",
+                description="Here are the available moderation commands to protect and manage the server:\n\n"
+                            "• `&ban` - Ban a member from the server.\n"
+                            "• `&kick` - Kick a member from the server.\n"
+                            "• `&mute` - Mute a disruptive member.\n"
+                            "• `&clear` - Bulk delete chat messages.\n"
+                            "• `&slowmode` - Set channel slowmode.",
+                color=discord.Color.red()
+            )
+        elif val == "tickets":
+            embed = create_embed(
+                guild,
+                title="🎫 Tickets & Support Commands",
+                description="Here are the ticket management and setup commands:\n\n"
+                            "• `&ticketsetsupport` - Setup the Support Center dropdown menu.\n"
+                            "• `&ticketsetupstaff` - Setup the Staff Application button panel.",
+                color=discord.Color.blue()
+            )
+        else:
+            embed = create_embed(
+                guild,
+                title="🛠️ Utility & Games Commands",
+                description="Here are the utility and counting game commands:\n\n"
+                            "• `&start` - Start the counting game in a channel.\n"
+                            "• `&counting` - Check current counting game status.\n"
+                            "• `&m` - Check message statistics.\n"
+                            "• `&v` - Check voice timing count.\n"
+                            "• `&i` - Check invite statistics.\n"
+                            "• `&say` - Make the bot say something.\n"
+                            "• `&reply` - Reply to a specific message.",
+                color=discord.Color.green()
+            )
 
-class HelpView(discord.ui.View):
+        await interaction.response.edit_message(embed=embed)
 
-  def __init__(self):
-    super().__init__(timeout=None)
-    self.add_item(HelpDropdown())
+class HelpView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(HelpSelect())
 
+class HelpMenu(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-# Help Command
-@bot.command(name="help")
-async def help_command(ctx):
-  embed = discord.Embed(
-      title="Moonlight Heaven • Help Center",
-      description=(
-          "👋 Hello there! I am **Moonlight Heaven**, your personal advanced"
-          " Discord bot.\nCreated with love and dedication by **Zeus** to keep"
-          " your server secure, fun, and fully automated.\n\nSelect a category"
-          " from the dropdown menu below to view the commands!"
-      ),
-      color=discord.Color.from_rgb(138, 43, 226),  # Purple aesthetic theme
-  )
+    @commands.command(name="help")
+    async def help_command(self, ctx):
+        intro_desc = (
+            "👋 Hello there! I am **Moonlight Heaven**, your advanced Discord bot.\n"
+            "I was crafted with dedication and passion by **Zeus** to keep your server secure, fun, and fully automated.\n\n"
+            "Please select a category from the dropdown menu below to view the available commands!"
+        )
+        embed = create_embed(ctx.guild, title="🌙 Moonlight Heaven • Help Center", description=intro_desc, color=0x8A2BE2)
+        await ctx.send(embed=embed, view=HelpView())
 
-  # Thumbnail ya image agar set karni ho (screenshot wali styling ke liye)
-  embed.set_thumbnail(
-      url="YOUR_IMAGE_URL_HERE"
-  )  apni image ka link ya remove kar dein
-  embed.set_footer(
-      text="Moonlight Heaven • Developed By Zeus",
-      icon_url=ctx.guild.me.display_avatar.url,
-  )
-
-  view = HelpView()
-  await ctx.send(embed=embed, view=view)
+async def setup(bot):
+    await bot.add_cog(HelpMenu(bot))
