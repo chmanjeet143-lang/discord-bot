@@ -6,6 +6,7 @@ import datetime
 import re
 
 DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
+TICKET_CHANNEL_ID = 1533539817332281495  # Support ticket channel tag
 
 def create_embed(guild, title="", description="", color=0x2B2D31):
     thumbnail_url = guild.icon.url if guild and guild.icon else DEFAULT_AVATAR
@@ -30,19 +31,6 @@ def parse_time(time_str: str):
         return datetime.timedelta(days=amount)
     return None
 
-class GiveawayView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.participants = set()
-
-    @discord.ui.button(label="🎉 Enter Giveaway", style=discord.ButtonStyle.success, custom_id="giveaway_join_button")
-    async def join_giveaway(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id in self.participants:
-            await interaction.response.send_message("You have already entered this giveaway with love!", ephemeral=True)
-        else:
-            self.participants.add(interaction.user.id)
-            await interaction.response.send_message(f"✨ Successfully entered the giveaway! Good luck, {interaction.user.mention}!", ephemeral=True)
-
 class Giveaway(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -66,47 +54,54 @@ class Giveaway(commands.Cog):
                         f"👑 **Winners:** `{winners_count}`\n"
                         f"⏳ **Ends At:** <t:{end_timestamp}:R> (<t:{end_timestamp}:F>)\n"
                         f"hosted by: {ctx.author.mention}\n\n"
-                        f"Click the **🎉 Enter Giveaway** button below to participate!",
+                        f"React with 🎉 below to enter the giveaway!",
             color=discord.Color.gold()
         )
 
-        view = GiveawayView()
-        message = await ctx.send(embed=embed, view=view)
+        message = await ctx.send(embed=embed)
+        await message.add_reaction("🎉")
 
         await asyncio.sleep(delta.total_seconds())
 
-        # Fetch latest message state
+        # Fetch latest message state to get reactions
         try:
             message = await ctx.channel.fetch_message(message.id)
         except:
             return
 
-        participants = list(view.participants)
-        if len(participants) == 0:
+        # Get users who reacted with 🎉 (excluding bots)
+        users = []
+        for reaction in message.reactions:
+            if str(reaction.emoji) == "🎉":
+                async for user in reaction.users():
+                    if not user.bot:
+                        users.append(user.id)
+
+        if len(users) == 0:
             embed.title = "🎉 GIVEAWAY ENDED (No Entries)"
-            embed.description = f"The giveaway for **{prize}** has ended, but unfortunately no one participated."
+            embed.description = f"The giveaway for **{prize}** has ended, but unfortunately no one reacted to participate."
             embed.color = discord.Color.orange()
-            await message.edit(embed=embed, view=None)
+            await message.edit(embed=embed)
             return
 
-        actual_winners_count = min(winners_count, len(participants))
-        winners = random.sample(participants, actual_winners_count)
+        actual_winners_count = min(winners_count, len(users))
+        winners = random.sample(users, actual_winners_count)
         winners_mention = ", ".join([f"<@{w}>" for w in winners])
 
         embed.title = "🎉 GIVEAWAY ENDED 🎉"
         embed.description = (
             f"The giveaway for **{prize}** has concluded!\n\n"
             f"🏆 **Winner(s):** {winners_mention}\n"
-            f"🎁 Congratulations! Please contact {ctx.author.mention} to claim your wonderful prize."
+            f"🎁 Congratulations! Please go to <#{TICKET_CHANNEL_ID}> and open a support ticket to claim your wonderful prize."
         )
         embed.color = discord.Color.green()
-        await message.edit(embed=embed, view=None)
+        await message.edit(embed=embed)
 
-        # Announce winners in chat politely
+        # Announce winners in chat politely with ticket channel instructions
         announcement = create_embed(
             ctx.guild,
             title="🎊 We Have Giveaway Winner(s)! 🎊",
-            description=f"Congratulations to {winners_mention} for winning **{prize}**! Thank you to everyone who participated in **Moonlight Heaven**.",
+            description=f"Congratulations to {winners_mention} for winning **{prize}**!\n\n🎟️ Please head over to <#{TICKET_CHANNEL_ID}> to open a ticket and claim your prize.",
             color=discord.Color.purple()
         )
         await ctx.send(content=winners_mention, embed=announcement)
@@ -120,13 +115,28 @@ class Giveaway(commands.Cog):
             embed = create_embed(ctx.guild, title="🎉 Error", description="Could not find a giveaway message with that ID in this channel.", color=discord.Color.red())
             return await ctx.send(embed=embed)
 
+        # Collect users from reaction
+        users = []
+        for reaction in msg.reactions:
+            if str(reaction.emoji) == "🎉":
+                async for user in reaction.users():
+                    if not user.bot:
+                        users.append(user.id)
+
+        if not users:
+            embed = create_embed(ctx.guild, title="🔄 Reroll Failed", description="No valid participants found on that message to reroll.", color=discord.Color.red())
+            return await ctx.send(embed=embed)
+
+        new_winner = random.choice(users)
+        winner_mention = f"<@{new_winner}>"
+
         embed = create_embed(
             ctx.guild,
             title="🔄 Giveaway Rerolled!",
-            description=f"A new winner has been selected for this giveaway! Check the original message pin or history.",
+            description=f"A new winner has been selected: {winner_mention}!\n\n🎟️ Please head over to <#{TICKET_CHANNEL_ID}> to claim your prize.",
             color=discord.Color.blue()
         )
-        await ctx.send(embed=embed)
+        await ctx.send(content=winner_mention, embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Giveaway(bot))
