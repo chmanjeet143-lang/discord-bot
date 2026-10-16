@@ -115,7 +115,7 @@ class AutoMod(commands.Cog):
             # Warning save karo aur total count lo
             total_warns = self.add_warning_to_file(guild.id, author.id, violation_reason)
 
-            # Agar spam ya abuse hai toh 5 min ka timeout do
+            # Agar spam يا abuse hai toh 5 min ka timeout do
             if give_timeout:
                 try:
                     await author.timeout(datetime.timedelta(minutes=5), reason=violation_reason)
@@ -180,7 +180,16 @@ class AutoMod(commands.Cog):
     @commands.group(name="abuse", invoke_without_command=True)
     @commands.has_permissions(administrator=True)
     async def abuse(self, ctx):
-        await ctx.send("❌ Usage: `&abuse add [word]`, `&abuse remove [word]`, or `&abuse list`.")
+        embed = create_embed(
+            ctx.guild,
+            title="🛑 Abuse Filter Usage",
+            description="Please specify a valid action:\n\n"
+                        "• `&abuse add [word]` — Add a word to the filter\n"
+                        "• `&abuse remove [word]` — Remove a word from the filter\n"
+                        "• `&abuse list` — View all filtered abusive words",
+            color=discord.Color.orange()
+        )
+        await ctx.send(embed=embed)
 
     @abuse.command(name="add")
     @commands.has_permissions(administrator=True)
