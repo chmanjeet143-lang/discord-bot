@@ -164,22 +164,60 @@ class Moderation(commands.Cog):
 
     @commands.command(name="warnings")
     @commands.has_permissions(manage_messages=True)
-    async def warnings_command(self, ctx, member: discord.Member):
+    async def warnings_command(self, ctx, member: discord.Member = None):
         guild_id = str(ctx.guild.id)
-        user_id = str(member.id)
-        warns = self.warnings_store.get(guild_id, {}).get(user_id, [])
+        guild_warns = self.warnings_store.get(guild_id, {})
         
-        if not warns:
-            embed = create_embed(ctx.guild, title="⚠️ Warnings Record", description=f"**{member}** has no active warnings. Clean record!", color=discord.Color.green())
+        # Agar kisi specific member ko tag kiya hai
+        if member:
+            user_id = str(member.id)
+            warns = guild_warns.get(user_id, [])
+            
+            if not warns:
+                embed = create_embed(ctx.guild, title="⚠️ Warnings Record", description=f"**{member}** has no active warnings. Clean record!", color=discord.Color.green())
+                return await ctx.send(embed=embed)
+
+            warn_list = "\n".join([f"`#{idx}` {reason}" for idx, reason in enumerate(warns, 1)])
+            embed = create_embed(
+                ctx.guild,
+                title=f"⚠️ Warnings for {member}",
+                description=f"Here is the warning history:\n\n{warn_list}",
+                color=discord.Color.orange()
+            )
             return await ctx.send(embed=embed)
 
-        warn_list = "\n".join([f"{idx}. {reason}" for idx, reason in enumerate(warns, 1)])
+        # Agar bina mention ke &warnings likha hai toh saare warned users ki list dikhegi
+        if not guild_warns:
+            embed = create_embed(ctx.guild, title="⚠️ Server Warnings", description="No users have been warned in this server yet.", color=discord.Color.green())
+            return await ctx.send(embed=embed)
+
+        description = "Here is the list of all warned users and their reasons:\n\n"
+        for user_id, warns in guild_warns.items():
+            if warns:
+                user_mention = f"<@{user_id}>"
+                reasons_str = ", ".join([f"`{r}`" for r in warns])
+                description += f"👤 {user_mention} — **{len(warns)} warning(s)**\n└ Reasons: {reasons_str}\n\n"
+
         embed = create_embed(
             ctx.guild,
-            title=f"⚠️ Warnings for {member}",
-            description=f"Here is the warning history:\n\n{warn_list}",
+            title="⚠️ Server Warning Records",
+            description=description.strip(),
             color=discord.Color.orange()
         )
+        await ctx.send(embed=embed)
+
+    @commands.command(name="unwarn", aliases=["clearwarns"])
+    @commands.has_permissions(manage_messages=True)
+    async def unwarn_command(self, ctx, member: discord.Member):
+        guild_id = str(ctx.guild.id)
+        user_id = str(member.id)
+        
+        if guild_id in self.warnings_store and user_id in self.warnings_store[guild_id]:
+            del self.warnings_store[guild_id][user_id]
+            self.save_warnings()
+            embed = create_embed(ctx.guild, title="⚠️ Warnings Removed", description=f"Successfully cleared all warnings for **{member.mention}**.", color=discord.Color.green())
+        else:
+            embed = create_embed(ctx.guild, title="⚠️ No Warnings", description=f"**{member.mention}** has no warnings to remove.", color=discord.Color.orange())
         await ctx.send(embed=embed)
 
     @commands.command(name="clear", aliases=["purge"])
