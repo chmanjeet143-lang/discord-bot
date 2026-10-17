@@ -63,20 +63,33 @@ class Utility(commands.Cog):
 
         author_id = message.author.id
 
-        # --- AFK Check & Removal ---
+        # --- AFK Check & Mentions ---
         if message.mentions:
             for mention in message.mentions:
                 if mention.id in self.afk_users:
                     reason = self.afk_users[mention.id]
-                    await message.channel.send(f"💤 **{mention.name}** is currently AFK: {reason}", delete_after=10)
+                    embed_afk = create_embed(
+                        message.guild,
+                        title="💤 User is AFK",
+                        description=f"**{mention.name}** is currently AFK: {reason}",
+                        color=discord.Color.blue()
+                    )
+                    await message.channel.send(embed=embed_afk, delete_after=10)
 
-        if author_id in self.afk_users:
+        # --- AFK Removal (Ignore &afk command itself) ---
+        if author_id in self.afk_users and not message.content.lower().startswith("&afk"):
             del self.afk_users[author_id]
             try:
-                await message.channel.send(f"👋 Welcome back {message.author.mention}, I have removed your AFK status!", delete_after=6)
+                embed_back = create_embed(
+                    message.guild,
+                    title="👋 Welcome Back!",
+                    description=f"Welcome back {message.author.mention}, I have removed your AFK status!",
+                    color=discord.Color.green()
+                )
+                await message.channel.send(embed=embed_back, delete_after=6)
             except:
                 pass
-        # ---------------------------
+        # ---------------------------------------------
 
         self.message_counts[author_id] = self.message_counts.get(author_id, 0) + 1
 
