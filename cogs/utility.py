@@ -182,6 +182,38 @@ class Utility(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    # --- REMOVE / RESET COMMANDS (`&rm all`, `&rv all`, `&ri all`) ---
+    @commands.command(name="rm")
+    @commands.has_permissions(manage_messages=True)
+    async def remove_messages_all(self, ctx, action: str = None):
+        if action and action.lower() == "all":
+            self.message_counts.clear()
+            embed = create_embed(ctx.guild, title="💬 Messages Reset", description="Successfully cleared message counts for all users.", color=discord.Color.red())
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("❌ Usage: `&rm all`")
+
+    @commands.command(name="rv")
+    @commands.has_permissions(manage_messages=True)
+    async def remove_voice_all(self, ctx, action: str = None):
+        if action and action.lower() == "all":
+            self.voice_time_seconds.clear()
+            self.vc_joins.clear()
+            embed = create_embed(ctx.guild, title="🎙️ Voice Time Reset", description="Successfully cleared voice time counts for all users.", color=discord.Color.red())
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("❌ Usage: `&rv all`")
+
+    @commands.command(name="ri")
+    @commands.has_permissions(manage_messages=True)
+    async def remove_invites_all(self, ctx, action: str = None):
+        if action and action.lower() == "all":
+            self.invite_counts.clear()
+            embed = create_embed(ctx.guild, title="✉️ Invites Reset", description="Successfully cleared invite counts for all users.", color=discord.Color.red())
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("❌ Usage: `&ri all`")
+
     # Leaderboards (`&lm`, `&lv`, `&li`)
     @commands.command(name="lm")
     async def leaderboard_messages(self, ctx):
