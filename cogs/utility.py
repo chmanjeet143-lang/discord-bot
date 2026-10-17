@@ -34,6 +34,9 @@ class Utility(commands.Cog):
         self.invite_counts = {}
         self.voice_time_seconds = {}
         self.vc_joins = {}
+        
+        # AFK storage dictionary {user_id: reason}
+        self.afk_users = {}
 
     @commands.command(name="start")
     @commands.has_permissions(manage_channels=True)
@@ -55,10 +58,26 @@ class Utility(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot:
+        if message.author.bot or not message.guild:
             return
 
         author_id = message.author.id
+
+        # --- AFK Check & Removal ---
+        if message.mentions:
+            for mention in message.mentions:
+                if mention.id in self.afk_users:
+                    reason = self.afk_users[mention.id]
+                    await message.channel.send(f"💤 **{mention.name}** is currently AFK: {reason}", delete_after=10)
+
+        if author_id in self.afk_users:
+            del self.afk_users[author_id]
+            try:
+                await message.channel.send(f"👋 Welcome back {message.author.mention}, I have removed your AFK status!", delete_after=6)
+            except:
+                pass
+        # ---------------------------
+
         self.message_counts[author_id] = self.message_counts.get(author_id, 0) + 1
 
         if self.counting_channel and message.channel.id == self.counting_channel.id:
@@ -100,6 +119,18 @@ class Utility(commands.Cog):
                 self.voice_time_seconds[member.id] = self.voice_time_seconds.get(member.id, 0) + duration
                 del self.vc_joins[member.id]
 
+    # --- AFK COMMAND ---
+    @commands.command(name="afk")
+    async def afk_command(self, ctx, *, reason: str = "AFK"):
+        self.afk_users[ctx.author.id] = reason
+        embed = create_embed(
+            ctx.guild,
+            title="💤 AFK Status Set",
+            description=f"**{ctx.author.mention}**, you are now marked as AFK.\n📝 **Reason:** {reason}",
+            color=discord.Color.blue()
+        )
+        await ctx.send(embed=embed)
+
     # Short & Direct Commands
     @commands.command(name="m")
     async def message_count(self, ctx):
@@ -115,7 +146,6 @@ class Utility(commands.Cog):
     @commands.command(name="v")
     async def voice_count(self, ctx):
         total_secs = self.voice_time_seconds.get(ctx.author.id, 0)
-        # Agar user abhi bhi VC me hai toh live time bhi add kar do
         if ctx.author.id in self.vc_joins:
             total_secs += int(datetime.datetime.utcnow().timestamp() - self.vc_joins[ctx.author.id])
 
@@ -160,7 +190,6 @@ class Utility(commands.Cog):
             embed = create_embed(ctx.guild, title="🎙️ Voice Leaderboard", description="No voice time recorded yet.", color=discord.Color.green())
             return await ctx.send(embed=embed)
 
-        # Calculate live times for active users
         current_data = self.voice_time_seconds.copy()
         now = datetime.datetime.utcnow().timestamp()
         for uid, join_time in self.vc_joins.items():
