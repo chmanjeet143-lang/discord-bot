@@ -86,9 +86,7 @@ class BumpSystem(commands.Cog):
                 if message.interaction and message.interaction.user:
                     user = message.interaction.user
                 
-                user_mention = user.string if user else "@User"
-                if user:
-                    user_mention = user.mention
+                user_mention = user.mention if user else "@User"
 
                 # Exact thank you message requested
                 thank_text = f"✨ Much appreciated, {user_mention} ‧₊˚. Your bump keeps Moonlight Heaven 🌙 shining bright at the top ❤️"
