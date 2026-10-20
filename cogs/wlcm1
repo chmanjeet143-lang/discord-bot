@@ -1,0 +1,67 @@
+import discord
+from discord.ext import commands
+import json
+import os
+
+class Welcome1(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.config_file = "welcome_config.json"
+        self.load_config()
+
+    def load_config(self):
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, "r") as f:
+                    self.config = json.load(f)
+            except Exception:
+                self.config = {}
+        else:
+            self.config = {}
+
+    def save_config(self):
+        try:
+            with open(self.config_file, "w") as f:
+                json.dump(self.config, f, indent=4)
+        except Exception as e:
+            print(f"Error saving welcome config: {e}")
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        guild_id = str(member.guild.id)
+        if guild_id not in self.config:
+            return
+
+        data = self.config[guild_id]
+        channel_id = data.get("channel_id")
+        message_template = data.get("message")
+
+        if not channel_id or not message_template:
+            return
+
+        channel = member.guild.get_channel(int(channel_id))
+        if not channel:
+            return
+
+        # Replace {user} with member mention
+        final_message = message_template.replace("{user}", member.mention)
+
+        try:
+            await channel.send(final_message)
+        except Exception as e:
+            print(f"Error sending welcome message: {e}")
+
+    @commands.command(name="wlcm")
+    @commands.has_permissions(administrator=True)
+    async def set_welcome_1(self, ctx, channel: discord.TextChannel, *, message: str):
+        guild_id = str(ctx.guild.id)
+        self.config[guild_id] = {
+            "channel_id": channel.id,
+            "message": message
+        }
+        self.save_config()
+
+        await ctx.send(f"✅ Welcome message set successfully in {channel.mention}!\n\n**Message:** {message}")
+
+async def setup(bot):
+    await bot.add_cog(Welcome1(bot))
