@@ -52,14 +52,23 @@ class Welcome1(commands.Cog):
 
     @commands.command(name="wlcm")
     @commands.has_permissions(administrator=True)
-    async def set_welcome_1(self, ctx, channel: discord.TextChannel, *, message: str):
+    async def set_welcome_1(self, ctx, channel_input: str, *, message: str):
+        # Extract channel ID from mention if provided (e.g. <#123456789>)
+        ch_id = ''.join(filter(str.isdigit, channel_input))
+        if not ch_id:
+            return await ctx.send("❌ Please provide a valid channel mention or ID!")
+            
+        channel = ctx.guild.get_channel(int(ch_id))
+        if not channel:
+            return await ctx.send("❌ Channel not found in this server!")
+
         guild_id = str(ctx.guild.id)
         self.config[guild_id] = {
             "channel_id": channel.id,
             "message": message
         }
         self.save_config()
-        await ctx.send(f"✅ Welcome 1 successfully set in {channel.mention}!")
+        await ctx.send(f"✅ Welcome 1 successfully set in {channel.mention}!\n📝 **Message:** {message}")
 
 async def setup(bot):
     await bot.add_cog(Welcome1(bot))
