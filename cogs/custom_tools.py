@@ -105,10 +105,10 @@ class CustomTools(commands.Cog):
                 return True
         return False
 
-    # Listener for Reaction Roles (Add)
+    # Listener for Reaction Roles (Add) - Fully Fixed
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
-        if not payload.member or payload.member.bot or not payload.guild_id:
+        if not payload.guild_id or payload.user_id == self.bot.user.id:
             return
 
         guild_id = str(payload.guild_id)
@@ -129,17 +129,28 @@ class CustomTools(commands.Cog):
 
             if matched_role_id:
                 guild = self.bot.get_guild(payload.guild_id)
-                role = guild.get_role(matched_role_id)
-                if role:
+                if not guild:
+                    return
+                
+                member = guild.get_member(payload.user_id)
+                if not member:
                     try:
-                        await payload.member.add_roles(role)
-                    except Exception as e:
-                        print(f"Error adding role: {e}")
+                        member = await guild.fetch_member(payload.user_id)
+                    except Exception:
+                        return
 
-    # Listener for Reaction Roles (Remove)
+                if member and not member.bot:
+                    role = guild.get_role(matched_role_id)
+                    if role:
+                        try:
+                            await member.add_roles(role)
+                        except Exception as e:
+                            print(f"Error adding role: {e}")
+
+    # Listener for Reaction Roles (Remove) - Fully Fixed
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
-        if not payload.guild_id:
+        if not payload.guild_id or payload.user_id == self.bot.user.id:
             return
 
         guild_id = str(payload.guild_id)
@@ -160,7 +171,16 @@ class CustomTools(commands.Cog):
 
             if matched_role_id:
                 guild = self.bot.get_guild(payload.guild_id)
+                if not guild:
+                    return
+                
                 member = guild.get_member(payload.user_id)
+                if not member:
+                    try:
+                        member = await guild.fetch_member(payload.user_id)
+                    except Exception:
+                        return
+
                 if member and not member.bot:
                     role = guild.get_role(matched_role_id)
                     if role:
@@ -169,7 +189,7 @@ class CustomTools(commands.Cog):
                         except Exception as e:
                             print(f"Error removing role: {e}")
 
-    # Listener for Tag Auto-Reaction (Role or Member mentions)
+    # Listener for Tag Auto-Reaction (Only triggers on explicit tags, not replies)
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
@@ -183,7 +203,6 @@ class CustomTools(commands.Cog):
         if not tag_reactions:
             return
 
-        # Check role mentions
         for role in message.role_mentions:
             if str(role.id) in tag_reactions:
                 emoji = tag_reactions[str(role.id)]
@@ -192,14 +211,14 @@ class CustomTools(commands.Cog):
                 except Exception as e:
                     print(f"Error adding role tag reaction: {e}")
 
-        # Check user/member mentions
         for user in message.mentions:
             if str(user.id) in tag_reactions:
-                emoji = tag_reactions[str(user.id)]
-                try:
-                    await message.add_reaction(emoji)
-                except Exception as e:
-                    print(f"Error adding member tag reaction: {e}")
+                if f"<@{user.id}>" in message.content or f"<@!{user.id}>" in message.content:
+                    emoji = tag_reactions[str(user.id)]
+                    try:
+                        await message.add_reaction(emoji)
+                    except Exception as e:
+                        print(f"Error adding member tag reaction: {e}")
 
 async def setup(bot):
     await bot.add_cog(CustomTools(bot))
