@@ -43,7 +43,6 @@ class Welcome1(commands.Cog):
         if not channel:
             return
 
-        # Replace {user} with member mention
         final_message = message_template.replace("{user}", member.mention)
 
         try:
@@ -60,8 +59,7 @@ class Welcome1(commands.Cog):
             "message": message
         }
         self.save_config()
-
-        await ctx.send(f"✅ Welcome message set successfully in {channel.mention}!\n\n**Message:** {message}")
+        await ctx.send(f"✅ Welcome 1 successfully set in {channel.mention}!")
 
 async def setup(bot):
     await bot.add_cog(Welcome1(bot))
