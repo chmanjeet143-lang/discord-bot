@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import json
 import os
+from typing import Union
 
 CONFIG_FILE = "custom_tools_config.json"
 
@@ -43,11 +44,10 @@ class CustomTools(commands.Cog):
         embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
         await ctx.send(embed=embed)
 
-    # 2. Reaction Role on Last Message (Supports multiple reactions on same message)
+    # 2. Reaction Role on Last Message (Fixed for custom & standard emojis)
     @commands.command(name="reactionrole", help="Adds a reaction role to the last message/embed in the channel.")
     @commands.has_permissions(manage_guild=True)
     async def reaction_role(self, ctx, role: discord.Role, emoji: str):
-        # Fetch last message in the channel (excluding the command message itself)
         target_msg = None
         async for m in ctx.channel.history(limit=5):
             if m.id != ctx.message.id:
@@ -60,7 +60,7 @@ class CustomTools(commands.Cog):
         try:
             await target_msg.add_reaction(emoji)
         except Exception as e:
-            return await ctx.send(f"❌ Reaction add karne me error aayi (Check karein emoji valid hai ya nahi): {e}", delete_after=5)
+            return await ctx.send(f"❌ Reaction add karne me error aayi: {e}", delete_after=5)
 
         guild_id = str(ctx.guild.id)
         if guild_id not in self.config:
@@ -72,26 +72,38 @@ class CustomTools(commands.Cog):
         if msg_id_str not in self.config[guild_id]["reaction_roles"]:
             self.config[guild_id]["reaction_roles"][msg_id_str] = {}
 
-        # Save mapping: emoji -> role_id (allows multiple roles on the same message)
         self.config[guild_id]["reaction_roles"][msg_id_str][emoji] = role.id
         self.save_config()
 
         await ctx.send(f"✅ Success! Is message par {emoji} dabane par ab **{role.name}** role mil jayega.", delete_after=5)
 
-    # 3. Tag Auto-Reaction Command (Multiple roles supported)
-    @commands.command(name="addreaction", help="Sets an auto-reaction when a specific role is tagged.")
+    # 3. Tag Auto-Reaction Command (Supports both Role and Member)
+    @commands.command(name="addreaction", help="Sets an auto-reaction when a specific role or member is tagged.")
     @commands.has_permissions(manage_guild=True)
-    async def add_tag_reaction(self, ctx, role: discord.Role, emoji: str):
+    async def add_tag_reaction(self, ctx, target: Union[discord.Role, discord.Member], emoji: str):
         guild_id = str(ctx.guild.id)
         if guild_id not in self.config:
             self.config[guild_id] = {}
         if "tag_reactions" not in self.config[guild_id]:
             self.config[guild_id]["tag_reactions"] = {}
 
-        self.config[guild_id]["tag_reactions"][str(role.id)] = emoji
+        self.config[guild_id]["tag_reactions"][str(target.id)] = emoji
         self.save_config()
 
-        await ctx.send(f"✅ Auto-reaction set! Jab bhi **{role.name}** ko tag kiya jayega, bot {emoji} reaction dega.")
+        name = target.name if hasattr(target, "name") else str(target)
+        await ctx.send(f"✅ Auto-reaction set! Jab bhi **{name}** ko tag kiya jayega, bot {emoji} reaction dega.")
+
+    # Helper method to match emojis accurately
+    def match_emoji(self, payload_emoji, saved_emoji_str):
+        if str(payload_emoji) == saved_emoji_str:
+            return True
+        if payload_emoji.is_custom():
+            if str(payload_emoji.id) in saved_emoji_str or payload_emoji.name in saved_emoji_str:
+                return True
+        else:
+            if payload_emoji.name == saved_emoji_str or str(payload_emoji) == saved_emoji_str:
+                return True
+        return False
 
     # Listener for Reaction Roles (Add)
     @commands.Cog.listener()
@@ -107,12 +119,11 @@ class CustomTools(commands.Cog):
         msg_id = str(payload.message_id)
 
         if msg_id in rr:
-            emoji_str = str(payload.emoji)
             roles_map = rr[msg_id]
-            
             matched_role_id = None
+            
             for saved_emoji, r_id in roles_map.items():
-                if emoji_str == saved_emoji or payload.emoji.name in saved_emoji:
+                if self.match_emoji(payload.emoji, saved_emoji):
                     matched_role_id = r_id
                     break
 
@@ -139,12 +150,11 @@ class CustomTools(commands.Cog):
         msg_id = str(payload.message_id)
 
         if msg_id in rr:
-            emoji_str = str(payload.emoji)
             roles_map = rr[msg_id]
-            
             matched_role_id = None
+            
             for saved_emoji, r_id in roles_map.items():
-                if emoji_str == saved_emoji or payload.emoji.name in saved_emoji:
+                if self.match_emoji(payload.emoji, saved_emoji):
                     matched_role_id = r_id
                     break
 
@@ -159,7 +169,7 @@ class CustomTools(commands.Cog):
                         except Exception as e:
                             print(f"Error removing role: {e}")
 
-    # Listener for Tag Auto-Reaction
+    # Listener for Tag Auto-Reaction (Role or Member mentions)
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
@@ -173,14 +183,23 @@ class CustomTools(commands.Cog):
         if not tag_reactions:
             return
 
+        # Check role mentions
         for role in message.role_mentions:
-            role_id_str = str(role.id)
-            if role_id_str in tag_reactions:
-                emoji = tag_reactions[role_id_str]
+            if str(role.id) in tag_reactions:
+                emoji = tag_reactions[str(role.id)]
                 try:
                     await message.add_reaction(emoji)
                 except Exception as e:
-                    print(f"Error adding tag auto-reaction: {e}")
+                    print(f"Error adding role tag reaction: {e}")
+
+        # Check user/member mentions
+        for user in message.mentions:
+            if str(user.id) in tag_reactions:
+                emoji = tag_reactions[str(user.id)]
+                try:
+                    await message.add_reaction(emoji)
+                except Exception as e:
+                    print(f"Error adding member tag reaction: {e}")
 
 async def setup(bot):
     await bot.add_cog(CustomTools(bot))
