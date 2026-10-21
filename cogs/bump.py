@@ -33,9 +33,8 @@ class BumpSystem(commands.Cog):
         except Exception as e:
             print(f"Error saving bump config: {e}")
 
-    # Setup Command: &bumpsetup <role>
+    # Setup Command: &bumpsetup <role> (Publicly accessible)
     @commands.command(name="bumpsetup", help="Sets up the bump reminder system in this channel.")
-    @commands.has_permissions(manage_guild=True)
     async def bump_setup(self, ctx, role: discord.Role):
         guild_id = str(ctx.guild.id)
         
@@ -54,6 +53,31 @@ class BumpSystem(commands.Cog):
         )
         embed.set_footer(text="Moonlight Heaven • Bump System")
         await ctx.send(embed=embed)
+
+    # Test Command: &bumpsetuptest (Instant test for reminder message)
+    @commands.command(name="bumpsetuptest", help="Tests the bump reminder message instantly.")
+    async def bump_setup_test(self, ctx):
+        guild_id = str(ctx.guild.id)
+        
+        if guild_id not in self.config:
+            await ctx.send("❌ Pehle `&bumpsetup @Role` karke system setup karo!")
+            return
+
+        cfg = self.config[guild_id]
+        guild = ctx.guild
+        role = guild.get_role(cfg["role_id"])
+
+        if not role:
+            await ctx.send("❌ Jo role setup kiya tha wo mil nahi raha, please dobara `&bumpsetup` karo.")
+            return
+
+        # Test reminder message
+        reminder_text = f"✨ Ready to Glow? 🌙\nTime to give Moonlight Heaven a quick boost! Use the `/bump` command to keep us shining at the top ✨\n{role.mention}"
+        
+        try:
+            await ctx.send(reminder_text)
+        except Exception as e:
+            await ctx.send(f"❌ Error aagya test karne me: {e}")
 
     # Listen to messages for Disboard bump success
     @commands.Cog.listener()
