@@ -71,7 +71,6 @@ class BumpSystem(commands.Cog):
             await ctx.send("❌ Jo role setup kiya tha wo mil nahi raha, please dobara `&bumpsetup` karo.")
             return
 
-        # Test reminder message
         reminder_text = f"✨ Ready to Glow? 🌙\nTime to give Moonlight Heaven a quick boost! Use the `/bump` command to keep us shining at the top ✨\n{role.mention}"
         
         try:
@@ -91,28 +90,29 @@ class BumpSystem(commands.Cog):
 
         cfg = self.config[guild_id]
 
-        # Check if message is from Disboard and indicates a successful bump
-        if message.author.id == DISBOARD_ID:
+        # Check if message is from Disboard
+        if message.author.id == DISBOARD_ID or "disboard" in message.author.name.lower():
             is_success = False
             if message.embeds:
                 for embed in message.embeds:
-                    if embed.description and "Bump done!" in embed.description:
+                    desc = embed.description or ""
+                    title = embed.title or ""
+                    if "bump done" in desc.lower() or "bump done" in title.lower() or "success" in desc.lower():
                         is_success = True
             
+            if "bump done" in message.content.lower():
+                is_success = True
+
             if is_success:
                 current_time = time.time()
                 cfg["last_bump_time"] = current_time
                 cfg["reminder_sent"] = False
                 self.save_config()
 
-                # Find who bumped using interaction
-                user = None
+                user_mention = "@User"
                 if message.interaction and message.interaction.user:
-                    user = message.interaction.user
-                
-                user_mention = user.mention if user else "@User"
+                    user_mention = message.interaction.user.mention
 
-                # Exact thank you message requested
                 thank_text = f"✨ Much appreciated, {user_mention} ‧₊˚. Your bump keeps Moonlight Heaven 🌙 shining bright at the top ❤️"
                 
                 try:
@@ -143,7 +143,6 @@ class BumpSystem(commands.Cog):
                 role = guild.get_role(cfg["role_id"])
 
                 if channel and role:
-                    # Exact reminder message requested with role ping
                     reminder_text = f"✨ Ready to Glow? 🌙\nTime to give Moonlight Heaven a quick boost! Use the `/bump` command to keep us shining at the top ✨\n{role.mention}"
                     try:
                         await channel.send(reminder_text)
