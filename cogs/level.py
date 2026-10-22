@@ -73,7 +73,7 @@ class LevelSystem(commands.Cog):
                         data[guild_id][user_id]["vc_lvl"] += 1
                         new_lvl = data[guild_id][user_id]["vc_lvl"]
 
-                        # Check and assign role if it exists
+                        # Check and assign role if it exists (5, 15, 40, 75, 100)
                         role_name = f"Level {new_lvl}"
                         role = discord.utils.get(guild.roles, name=role_name)
                         if role:
@@ -92,7 +92,7 @@ class LevelSystem(commands.Cog):
                                 formatted_msg = custom_msg.replace("{user}", member.mention).replace("{level}", str(new_lvl))
                                 try:
                                     embed = create_embed(guild, title="🎙️ VC Level Up!", description=formatted_msg, color=discord.Color.green())
-                                    await channel.send(embed=embed, delete_after=10)
+                                    await channel.send(embed=embed)
                                 except:
                                     pass
 
@@ -134,7 +134,7 @@ class LevelSystem(commands.Cog):
             data[guild_id][user_id]["msg_lvl"] += 1
             new_lvl = data[guild_id][user_id]["msg_lvl"]
 
-            # Check and assign role if it exists
+            # Check and assign role if it exists (5, 15, 40, 75, 100)
             role_name = f"Level {new_lvl}"
             role = discord.utils.get(message.guild.roles, name=role_name)
             if role:
@@ -151,7 +151,7 @@ class LevelSystem(commands.Cog):
             formatted_msg = custom_msg.replace("{user}", message.author.mention).replace("{level}", str(new_lvl))
             try:
                 embed = create_embed(message.guild, title="🎉 Message Level Up!", description=formatted_msg, color=discord.Color.gold())
-                await channel.send(embed=embed, delete_after=10)
+                await channel.send(embed=embed)
             except:
                 pass
 
