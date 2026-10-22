@@ -1,9 +1,11 @@
 import discord
 from discord.ext import commands
 import datetime
-import re
+import json
+import os
 
 DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
+PREFIX_FILE = "prefixes.json"
 
 def create_embed(guild, title="", description="", color=0x2B2D31):
     thumbnail_url = guild.icon.url if guild and guild.icon else DEFAULT_AVATAR
@@ -22,6 +24,22 @@ def format_time(seconds: int):
         minutes = (seconds % 3600) // 60
         return f"{hours}h {minutes}m"
 
+def load_prefixes():
+    if os.path.exists(PREFIX_FILE):
+        try:
+            with open(PREFIX_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_prefixes(prefixes):
+    try:
+        with open(PREFIX_FILE, "w") as f:
+            json.dump(prefixes, f, indent=4)
+    except:
+        pass
+
 class Utility(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -35,7 +53,7 @@ class Utility(commands.Cog):
         self.voice_time_seconds = {}
         self.vc_joins = {}
         
-        # AFK storage dictionary {user_id: reason}
+        # AFK storage dictionary {user_id: {"reason": reason, "time": timestamp, "mentions": []}}
         self.afk_users = {}
 
     @commands.command(name="start")
@@ -67,26 +85,49 @@ class Utility(commands.Cog):
         if message.mentions:
             for mention in message.mentions:
                 if mention.id in self.afk_users:
-                    reason = self.afk_users[mention.id]
+                    afk_data = self.afk_users[mention.id]
+                    
+                    # Store mention details
+                    afk_data["mentions"].append({
+                        "author": message.author.name,
+                        "channel": message.channel,
+                        "time": datetime.datetime.utcnow(),
+                        "content": message.content
+                    })
+                    
+                    duration = int(datetime.datetime.utcnow().timestamp() - afk_data["time"])
+                    time_ago = format_time(duration)
+                    
                     embed_afk = create_embed(
                         message.guild,
                         title="💤 User is AFK",
-                        description=f"**{mention.name}** is currently AFK: {reason}",
+                        description=f"**{mention.name}** is currently AFK: {afk_data['reason']}\n⏱️ Went AFK **{time_ago}** ago.",
                         color=discord.Color.blue()
                     )
                     await message.channel.send(embed=embed_afk, delete_after=10)
 
-        # --- AFK Removal (Ignore &afk command itself) ---
+        # --- AFK Removal & Summary Report ---
         if author_id in self.afk_users and not message.content.lower().startswith("&afk"):
-            del self.afk_users[author_id]
+            afk_data = self.afk_users.pop(author_id)
+            mentions_list = afk_data["mentions"]
+            
+            desc = f"Welcome back {message.author.mention}, I have removed your AFK status!\n\n"
+            if mentions_list:
+                desc += "📬 **You were mentioned while you were away:**\n"
+                for m in mentions_list:
+                    t_str = m["time"].strftime("%H:%M:%S")
+                    desc += f"• **{m['author']}** in {m['channel'].mention} at `{t_str}`: {m['content']}\n"
+            else:
+                desc += "✨ No one mentioned you while you were away."
+
             try:
                 embed_back = create_embed(
                     message.guild,
                     title="👋 Welcome Back!",
-                    description=f"Welcome back {message.author.mention}, I have removed your AFK status!",
+                    description=desc,
                     color=discord.Color.green()
                 )
-                await message.channel.send(embed=embed_back, delete_after=6)
+                await message.channel.send(embed=embed_back, delete_after=15)
             except:
                 pass
         # ---------------------------------------------
@@ -135,12 +176,32 @@ class Utility(commands.Cog):
     # --- AFK COMMAND ---
     @commands.command(name="afk")
     async def afk_command(self, ctx, *, reason: str = "AFK"):
-        self.afk_users[ctx.author.id] = reason
+        self.afk_users[ctx.author.id] = {
+            "reason": reason,
+            "time": datetime.datetime.utcnow().timestamp(),
+            "mentions": []
+        }
         embed = create_embed(
             ctx.guild,
             title="💤 AFK Status Set",
             description=f"**{ctx.author.mention}**, you are now marked as AFK.\n📝 **Reason:** {reason}",
             color=discord.Color.blue()
+        )
+        await ctx.send(embed=embed)
+
+    # --- SET PREFIX COMMAND ---
+    @commands.command(name="setprefix", help="Changes the bot prefix for this server.")
+    @commands.has_permissions(manage_guild=True)
+    async def set_prefix(self, ctx, new_prefix: str):
+        prefixes = load_prefixes()
+        prefixes[str(ctx.guild.id)] = new_prefix
+        save_prefixes(prefixes)
+        
+        embed = create_embed(
+            ctx.guild,
+            title="⚙️ Prefix Updated",
+            description=f"Successfully changed the server prefix to: **{new_prefix}**\nExample: `{new_prefix}help`",
+            color=discord.Color.green()
         )
         await ctx.send(embed=embed)
 
