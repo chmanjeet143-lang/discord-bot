@@ -27,12 +27,11 @@ class Bump(commands.Cog):
                     next_bump_time TEXT
                 )
             """)
-      # Agar purana table hai toh safely thanks_msg column add karne ke liye
       try:
         await db.execute(
             "ALTER TABLE bump_settings ADD COLUMN thanks_msg TEXT DEFAULT"
-            " 'Thank you for the bump legend! You''re keeping Moonlight Heaven"
-            " 🌙 active ❤️'"
+            " 'Thank you for the bump legend! You''re keeping Moonlight"
+            " Heaven 🌙 active ❤️'"
         )
       except Exception:
         pass
@@ -108,7 +107,6 @@ class Bump(commands.Cog):
 
           target_channel = guild.get_channel(channel_id) or message.channel
 
-          # Jis user ne bump kiya hai uska mention nikalne ke liye
           user_mention = ""
           if message.interaction and message.interaction.user:
             user_mention = message.interaction.user.mention
@@ -118,7 +116,6 @@ class Bump(commands.Cog):
           )
           await target_channel.send(final_thanks)
 
-          # Next bump time 2 ghante baad set karein
           next_time = (datetime.utcnow() + timedelta(hours=2)).isoformat()
           async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
