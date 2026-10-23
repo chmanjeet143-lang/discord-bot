@@ -25,7 +25,6 @@ class Leveling(commands.Cog):
         self.db.close()
 
     def create_tables(self):
-        # Users XP Table with background URL support
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER,
@@ -38,7 +37,6 @@ class Leveling(commands.Cog):
                 PRIMARY KEY (user_id, guild_id)
             )
         ''')
-        # Guild Settings Table
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS guild_settings (
                 guild_id INTEGER PRIMARY KEY,
@@ -48,7 +46,6 @@ class Leveling(commands.Cog):
                 vc_text TEXT DEFAULT 'Great job {user}, your voice activity earned you level {level}! 🎙️'
             )
         ''')
-        # Role Rewards Table
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS rewards (
                 guild_id INTEGER,
@@ -84,7 +81,6 @@ class Leveling(commands.Cog):
         guild_id = message.guild.id
         current_time = time.time()
 
-        # Cooldown check (60 seconds)
         if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60:
             return
         self.cooldowns[user_id] = current_time
@@ -110,17 +106,13 @@ class Leveling(commands.Cog):
         
         self.db.commit()
 
-        # Check Level Up & Send Embed Message
         if data and new_level > data[2]:
             msg_chan, _, msg_txt, _ = self.get_settings(guild_id)
             channel = message.guild.get_channel(msg_chan) or message.channel
-            
             formatted_text = msg_txt.replace("{user}", message.author.mention).replace("{level}", str(new_level))
-            
             embed = discord.Embed(title="🎉 Level Up! (Text)", description=formatted_text, color=discord.Color.green())
             embed.set_thumbnail(url=message.author.display_avatar.url)
             await channel.send(embed=embed)
-            
             await self.check_rewards(message.author, new_level)
 
     # --- VOICE XP BACKGROUND LOOP ---
@@ -176,12 +168,12 @@ class Leveling(commands.Cog):
                 except:
                     pass
 
-    # --- MODERN BANNER & OVERLAPPING AVATAR RANK CARD GENERATOR ---
+    # --- STYLISH RANK CARD GENERATOR (SEPARATE XP LINES & FULL BG) ---
     async def generate_rank_card(self, member, msg_xp, vc_xp, total_xp, level, rank_pos, bg_url):
-        card = Image.new("RGBA", (900, 350), (24, 25, 28, 255))
+        card = Image.new("RGBA", (900, 340), (24, 25, 28, 255))
         draw = ImageDraw.Draw(card)
 
-        # Top Banner Area (0 to 140 height)
+        # 1. Full Card Background Image Fit
         if bg_url:
             try:
                 async with aiohttp.ClientSession() as session:
@@ -189,20 +181,22 @@ class Leveling(commands.Cog):
                         if resp.status == 200:
                             bg_bytes = await resp.read()
                             bg_img = Image.open(io.BytesIO(bg_bytes)).convert("RGBA")
-                            bg_img = bg_img.resize((900, 140))
+                            bg_img = bg_img.resize((900, 340))
                             card.paste(bg_img, (0, 0))
             except:
-                draw.rectangle([0, 0, 900, 140], fill=(45, 52, 70, 255))
+                draw.rectangle([0, 0, 900, 340], fill=(24, 25, 28, 255))
         else:
-            draw.rectangle([0, 0, 900, 140], fill=(45, 52, 70, 255))
+            draw.rectangle([0, 0, 900, 340], fill=(24, 25, 28, 255))
 
-        # Lower Body Area Background
-        draw.rectangle([0, 140, 900, 350], fill=(24, 25, 28, 255))
+        # 2. Dark Overlay Panel for Readability
+        overlay = Image.new("RGBA", (900, 340), (0, 0, 0, 170))
+        card = Image.alpha_composite(card, overlay)
+        draw = ImageDraw.Draw(card)
 
         # Outer Border Outline
-        draw.rounded_rectangle([10, 10, 890, 340], radius=16, outline=(88, 101, 242, 180), width=3)
+        draw.rounded_rectangle([10, 10, 890, 330], radius=16, outline=(88, 101, 242, 200), width=3)
 
-        # Avatar overlapping banner and lower body
+        # 3. Circular Avatar with Border
         avatar_url = member.display_avatar.replace(size=128, format="png").url
         async with aiohttp.ClientSession() as session:
             async with session.get(avatar_url) as resp:
@@ -217,24 +211,31 @@ class Leveling(commands.Cog):
                     avatar_img = ImageOps.fit(avatar_img, mask.size, centering=(0.5, 0.5))
                     avatar_img.putalpha(mask)
                     
-                    card.paste(avatar_img, (45, 75), avatar_img)
-                    draw.ellipse([42, 72, 178, 208], outline=(114, 137, 218, 255), width=4)
+                    card.paste(avatar_img, (45, 95), avatar_img)
+                    draw.ellipse([42, 92, 178, 228], outline=(114, 137, 218, 255), width=4)
 
+        # Fonts Setup (Using Linux safe DejaVuSans or fallback)
         try:
-            font_name = ImageFont.truetype("arial.ttf", 36)
-            font_sub = ImageFont.truetype("arial.ttf", 20)
-            font_small = ImageFont.truetype("arial.ttf", 16)
+            font_name = ImageFont.truetype("DejaVuSans-Bold.ttf", 34)
+            font_sub = ImageFont.truetype("DejaVuSans-Bold.ttf", 20)
+            font_small = ImageFont.truetype("DejaVuSans.ttf", 17)
         except:
-            font_name = ImageFont.load_default()
-            font_sub = ImageFont.load_default()
-            font_small = ImageFont.load_default()
+            try:
+                font_name = ImageFont.truetype("arial.ttf", 34)
+                font_sub = ImageFont.truetype("arial.ttf", 20)
+                font_small = ImageFont.truetype("arial.ttf", 17)
+            except:
+                font_name = ImageFont.load_default()
+                font_sub = ImageFont.load_default()
+                font_small = ImageFont.load_default()
 
-        # User Details
-        draw.text((200, 155), member.display_name, fill=(255, 255, 255), font=font_name)
-        draw.text((200, 200), f"RANK: #{rank_pos}   •   LEVEL: {level}", fill=(114, 137, 218), font=font_sub)
+        # Text Details with Separate Lines for Msg XP & VC XP
+        draw.text((200, 45), member.display_name, fill=(255, 255, 255), font=font_name)
+        draw.text((200, 90), f"RANK: #{rank_pos}   •   LEVEL: {level}", fill=(114, 137, 218), font=font_sub)
         
-        breakdown_text = f"💬 Msg XP: {msg_xp}  |  🎙️ VC XP: {vc_xp}"
-        draw.text((200, 230), breakdown_text, fill=(180, 187, 196), font=font_small)
+        # Separate lines for Message XP and Voice XP
+        draw.text((200, 130), f"Message XP: {msg_xp}", fill=(220, 225, 235), font=font_small)
+        draw.text((200, 155), f"Voice XP: {vc_xp}", fill=(220, 225, 235), font=font_small)
 
         # Progress Bar Calculations
         current_level_xp = self.xp_for_level(level - 1) if level > 0 else 0
@@ -247,15 +248,15 @@ class Leveling(commands.Cog):
         else:
             percentage = max(0.0, min(1.0, xp_user_has / xp_needed_this_lvl))
 
-        bar_x, bar_y, bar_w, bar_h = 200, 275, 650, 26
-        draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=12, fill=(47, 49, 54))
+        bar_x, bar_y, bar_w, bar_h = 200, 210, 640, 28
+        draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=14, fill=(47, 49, 54))
         
         fill_width = int(bar_w * percentage)
         if fill_width > 0:
-            draw.rounded_rectangle([bar_x, bar_y, bar_x + fill_width, bar_y + bar_h], radius=12, fill=(88, 101, 242))
+            draw.rounded_rectangle([bar_x, bar_y, bar_x + fill_width, bar_y + bar_h], radius=14, fill=(88, 101, 242))
 
         xp_text = f"{total_xp} / {next_level_xp} XP"
-        draw.text((bar_x + 240, bar_y + 4), xp_text, fill=(255, 255, 255), font=font_small)
+        draw.text((bar_x + 240, bar_y + 5), xp_text, fill=(255, 255, 255), font=font_small)
 
         buffer = io.BytesIO()
         card.save(buffer, format="PNG")
@@ -322,7 +323,7 @@ class Leveling(commands.Cog):
         for idx, (uid, m_xp, v_xp, total_x, lvl) in enumerate(top_users, start=1):
             user = ctx.guild.get_member(uid)
             name = user.name if user else f"User ID: {uid}"
-            description += f"**{idx}.** {name} — Level: **{lvl}** (Total: {total_x} XP | 💬 {m_xp} | 🎙️ {v_xp})\n"
+            description += f"**{idx}.** {name} — Level: **{lvl}** (Total: {total_x} XP | Msg: {m_xp} | VC: {v_xp})\n"
 
         embed.description = description
         await ctx.send(embed=embed)
