@@ -18,7 +18,7 @@ class Bump(commands.Cog):
     """Ensure database and table always exist"""
     async with aiosqlite.connect(self.db_path) as db:
       await db.execute("""
-                CREATE TABLE IF NOT EXISTS bump_settings (
+                CREATE TABLE IF NOT EXISTS guild_settings (
                     guild_id INTEGER PRIMARY KEY,
                     channel_id INTEGER,
                     role_id INTEGER,
@@ -29,7 +29,7 @@ class Bump(commands.Cog):
             """)
       try:
         await db.execute(
-            "ALTER TABLE bump_settings ADD COLUMN thanks_msg TEXT DEFAULT"
+            "ALTER TABLE guild_settings ADD COLUMN thanks_msg TEXT DEFAULT"
             " 'Thank you for the bump legend! You''re keeping Moonlight"
             " Heaven 🌙 active ❤️'"
         )
@@ -133,7 +133,10 @@ class Bump(commands.Cog):
 
   @commands.command(name="setbumpchannel")
   async def setbumpchannel(self, ctx, channel: discord.TextChannel):
-    """Bump reminder aur thank you message ka channel set karein"""
+    """Set the channel for bump reminders and thank you messages.
+
+    Example: &setbumpchannel #bump-channel
+    """
     await self.ensure_db()
     try:
       async with aiosqlite.connect(self.db_path) as db:
@@ -149,11 +152,14 @@ class Bump(commands.Cog):
           f"✅ Bump channel successfully set to {channel.mention}!"
       )
     except Exception as e:
-      await ctx.send(f"❌ Error aa gaya: `{e}`")
+      await ctx.send(f"❌ Error occurred: `{e}`")
 
   @commands.command(name="setbumprole")
   async def setbumprole(self, ctx, role: discord.Role):
-    """Reminder ke waqt kaunsa role ping ho set karein"""
+    """Set the role to be pinged during bump reminders.
+
+    Example: &setbumprole @BumpPing
+    """
     await self.ensure_db()
     try:
       async with aiosqlite.connect(self.db_path) as db:
@@ -167,11 +173,14 @@ class Bump(commands.Cog):
         await db.commit()
       await ctx.send(f"✅ Bump ping role successfully set to {role.mention}!")
     except Exception as e:
-      await ctx.send(f"❌ Error aa gaya: `{e}`")
+      await ctx.send(f"❌ Error occurred: `{e}`")
 
   @commands.command(name="setbumpmsg")
   async def setbumpmsg(self, ctx, *, message: str):
-    """Reminder message ko change karne ke liye"""
+    """Customize the reminder message sent after 2 hours.
+
+    Example: &setbumpmsg Time to bump the server! 🚀
+    """
     await self.ensure_db()
     try:
       async with aiosqlite.connect(self.db_path) as db:
@@ -184,14 +193,17 @@ class Bump(commands.Cog):
         )
         await db.commit()
       await ctx.send(
-          f"✅ Reminder message successfully update ho gaya hai:\n\n> {message}"
+          f"✅ Reminder message successfully updated:\n\n> {message}"
       )
     except Exception as e:
-      await ctx.send(f"❌ Error aa gaya: `{e}`")
+      await ctx.send(f"❌ Error occurred: `{e}`")
 
   @commands.command(name="setthanksmsg")
   async def setthanksmsg(self, ctx, *, message: str):
-    """Thank you message ko change karne ke liye"""
+    """Customize the thank you message sent when someone bumps.
+
+    Example: &setthanksmsg Thanks for the bump, legend!
+    """
     await self.ensure_db()
     try:
       async with aiosqlite.connect(self.db_path) as db:
@@ -204,15 +216,18 @@ class Bump(commands.Cog):
         )
         await db.commit()
       await ctx.send(
-          f"✅ Thank you message successfully update ho gaya"
-          f" hai:\n\n> {message}\n(Sath me user mention bhi aayega)"
+          f"✅ Thank you message successfully updated:\n\n> {message}\n(User"
+          " mention will be included automatically)"
       )
     except Exception as e:
-      await ctx.send(f"❌ Error aa gaya: `{e}`")
+      await ctx.send(f"❌ Error occurred: `{e}`")
 
   @commands.command(name="bumptime")
   async def bumptime(self, ctx):
-    """Check karein ki agla bump kab kar sakte hain"""
+    """Check how much cooldown time is remaining for the next bump.
+
+    Example: &bumptime
+    """
     await self.ensure_db()
     try:
       async with aiosqlite.connect(self.db_path) as db:
@@ -224,8 +239,7 @@ class Bump(commands.Cog):
 
       if not row or not row[0]:
         await ctx.send(
-            "🚀 Abhi koi active bump timer nahi hai! Aap abhi `/bump` kar sakte"
-            " hain."
+            "🚀 There is no active bump timer! You can use `/bump` right now."
         )
         return
 
@@ -234,7 +248,7 @@ class Bump(commands.Cog):
 
       if now >= next_bump:
         await ctx.send(
-            "🚀 Bump cooldown khatam ho chuka hai! Aap `/bump` kar sakte hain."
+            "🚀 Bump cooldown has finished! You can use `/bump` now."
         )
       else:
         remaining = next_bump - now
@@ -242,10 +256,11 @@ class Bump(commands.Cog):
         hours = mins // 60
         m = mins % 60
         await ctx.send(
-            f"⏳ Agla bump **{hours} ghante {m} minute** baad kiya ja sakega."
+            f"⏳ Next bump will be available in **{hours} hours and {m}"
+            " minutes**."
         )
     except Exception as e:
-      await ctx.send(f"❌ Error aa gaya: `{e}`")
+      await ctx.send(f"❌ Error occurred: `{e}`")
 
 
 async def setup(bot):
