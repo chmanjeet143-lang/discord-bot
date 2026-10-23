@@ -14,8 +14,8 @@ class Bump(commands.Cog):
     self.db_path = "bump_data.db"
     self.bump_checker.start()
 
-  async def cog_load(self):
-    """Cog load hote hi database table aur columns create ho jayenge"""
+  async def ensure_db(self):
+    """Ensure database and table always exist"""
     async with aiosqlite.connect(self.db_path) as db:
       await db.execute("""
                 CREATE TABLE IF NOT EXISTS bump_settings (
@@ -44,35 +44,39 @@ class Bump(commands.Cog):
   @tasks.loop(seconds=30)
   async def bump_checker(self):
     await self.bot.wait_until_ready()
+    await self.ensure_db()
     now = datetime.utcnow()
 
-    async with aiosqlite.connect(self.db_path) as db:
-      async with db.execute(
-          "SELECT guild_id, channel_id, role_id, custom_msg, next_bump_time FROM"
-          " guild_settings WHERE next_bump_time IS NOT NULL"
-      ) as cursor:
-        rows = await cursor.fetchall()
+    try:
+      async with aiosqlite.connect(self.db_path) as db:
+        async with db.execute(
+            "SELECT guild_id, channel_id, role_id, custom_msg, next_bump_time"
+            " FROM guild_settings WHERE next_bump_time IS NOT NULL"
+        ) as cursor:
+          rows = await cursor.fetchall()
 
-        for guild_id, channel_id, role_id, custom_msg, next_bump_str in rows:
-          next_bump_time = datetime.fromisoformat(next_bump_str)
+          for guild_id, channel_id, role_id, custom_msg, next_bump_str in rows:
+            next_bump_time = datetime.fromisoformat(next_bump_str)
 
-          if now >= next_bump_time:
-            guild = self.bot.get_guild(guild_id)
-            if guild:
-              channel = guild.get_channel(channel_id)
-              if channel:
-                role_mention = f"<@&{role_id}>" if role_id else ""
-                final_msg = (
-                    f"{role_mention}\n{custom_msg}" if role_id else custom_msg
-                )
-                await channel.send(final_msg)
+            if now >= next_bump_time:
+              guild = self.bot.get_guild(guild_id)
+              if guild:
+                channel = guild.get_channel(channel_id)
+                if channel:
+                  role_mention = f"<@&{role_id}>" if role_id else ""
+                  final_msg = (
+                      f"{role_mention}\n{custom_msg}" if role_id else custom_msg
+                  )
+                  await channel.send(final_msg)
 
-            await db.execute(
-                "UPDATE guild_settings SET next_bump_time = NULL WHERE"
-                " guild_id = ?",
-                (guild_id,),
-            )
-            await db.commit()
+              await db.execute(
+                  "UPDATE guild_settings SET next_bump_time = NULL WHERE"
+                  " guild_id = ?",
+                  (guild_id,),
+              )
+              await db.commit()
+    except Exception as e:
+      print(f"Error in bump_checker loop: {e}")
 
   @bump_checker.before_loop
   async def before_bump_checker(self):
@@ -81,13 +85,13 @@ class Bump(commands.Cog):
   # --- EVENT: Disboard Success Detection ---
   @commands.Cog.listener()
   async def on_message(self, message):
-    # Disboard Bot ID: 302050872383242240
-    if message.author.id == 302050872383242240:
+    if message.author.id == 302050872383242240:  # Disboard Bot ID
       if message.embeds:
         embed = message.embeds[0]
         desc = embed.description or ""
         if "Bump done" in desc or "Server bumped successfully" in desc:
           guild = message.guild
+          await self.ensure_db()
 
           async with aiosqlite.connect(self.db_path) as db:
             async with db.execute(
@@ -128,102 +132,120 @@ class Bump(commands.Cog):
   # --- PREFIX COMMANDS ---
 
   @commands.command(name="setbumpchannel")
-  @commands.has_permissions(administrator=True)
   async def setbumpchannel(self, ctx, channel: discord.TextChannel):
     """Bump reminder aur thank you message ka channel set karein"""
-    async with aiosqlite.connect(self.db_path) as db:
-      await db.execute(
-          """
-                INSERT INTO guild_settings (guild_id, channel_id) VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
-            """,
-          (ctx.guild.id, channel.id),
+    await self.ensure_db()
+    try:
+      async with aiosqlite.connect(self.db_path) as db:
+        await db.execute(
+            """
+                    INSERT INTO guild_settings (guild_id, channel_id) VALUES (?, ?)
+                    ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
+                """,
+            (ctx.guild.id, channel.id),
+        )
+        await db.commit()
+      await ctx.send(
+          f"✅ Bump channel successfully set to {channel.mention}!"
       )
-      await db.commit()
-    await ctx.send(
-        f"✅ Bump channel successfully set to {channel.mention}!"
-    )
+    except Exception as e:
+      await ctx.send(f"❌ Error aa gaya: `{e}`")
 
   @commands.command(name="setbumprole")
-  @commands.has_permissions(administrator=True)
   async def setbumprole(self, ctx, role: discord.Role):
     """Reminder ke waqt kaunsa role ping ho set karein"""
-    async with aiosqlite.connect(self.db_path) as db:
-      await db.execute(
-          """
-                INSERT INTO guild_settings (guild_id, role_id) VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET role_id = excluded.role_id
-            """,
-          (ctx.guild.id, role.id),
-      )
-      await db.commit()
-    await ctx.send(f"✅ Bump ping role successfully set to {role.mention}!")
+    await self.ensure_db()
+    try:
+      async with aiosqlite.connect(self.db_path) as db:
+        await db.execute(
+            """
+                    INSERT INTO guild_settings (guild_id, role_id) VALUES (?, ?)
+                    ON CONFLICT(guild_id) DO UPDATE SET role_id = excluded.role_id
+                """,
+            (ctx.guild.id, role.id),
+        )
+        await db.commit()
+      await ctx.send(f"✅ Bump ping role successfully set to {role.mention}!")
+    except Exception as e:
+      await ctx.send(f"❌ Error aa gaya: `{e}`")
 
   @commands.command(name="setbumpmsg")
-  @commands.has_permissions(administrator=True)
   async def setbumpmsg(self, ctx, *, message: str):
     """Reminder message ko change karne ke liye"""
-    async with aiosqlite.connect(self.db_path) as db:
-      await db.execute(
-          """
-                INSERT INTO guild_settings (guild_id, custom_msg) VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET custom_msg = excluded.custom_msg
-            """,
-          (ctx.guild.id, message),
+    await self.ensure_db()
+    try:
+      async with aiosqlite.connect(self.db_path) as db:
+        await db.execute(
+            """
+                    INSERT INTO guild_settings (guild_id, custom_msg) VALUES (?, ?)
+                    ON CONFLICT(guild_id) DO UPDATE SET custom_msg = excluded.custom_msg
+                """,
+            (ctx.guild.id, message),
+        )
+        await db.commit()
+      await ctx.send(
+          f"✅ Reminder message successfully update ho gaya hai:\n\n> {message}"
       )
-      await db.commit()
-    await ctx.send(
-        f"✅ Reminder message successfully update ho gaya hai:\n\n> {message}"
-    )
+    except Exception as e:
+      await ctx.send(f"❌ Error aa gaya: `{e}`")
 
   @commands.command(name="setthanksmsg")
-  @commands.has_permissions(administrator=True)
   async def setthanksmsg(self, ctx, *, message: str):
     """Thank you message ko change karne ke liye"""
-    async with aiosqlite.connect(self.db_path) as db:
-      await db.execute(
-          """
-                INSERT INTO guild_settings (guild_id, thanks_msg) VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET thanks_msg = excluded.thanks_msg
-            """,
-          (ctx.guild.id, message),
+    await self.ensure_db()
+    try:
+      async with aiosqlite.connect(self.db_path) as db:
+        await db.execute(
+            """
+                    INSERT INTO guild_settings (guild_id, thanks_msg) VALUES (?, ?)
+                    ON CONFLICT(guild_id) DO UPDATE SET thanks_msg = excluded.thanks_msg
+                """,
+            (ctx.guild.id, message),
+        )
+        await db.commit()
+      await ctx.send(
+          f"✅ Thank you message successfully update ho gaya"
+          f" hai:\n\n> {message}\n(Sath me user mention bhi aayega)"
       )
-      await db.commit()
-    await ctx.send(
-        f"✅ Thank you message successfully update ho gaya"
-        f" hai:\n\n> {message}\n(Sath me user mention bhi aayega)"
-    )
+    except Exception as e:
+      await ctx.send(f"❌ Error aa gaya: `{e}`")
 
   @commands.command(name="bumptime")
   async def bumptime(self, ctx):
     """Check karein ki agla bump kab kar sakte hain"""
-    async with aiosqlite.connect(self.db_path) as db:
-      async with db.execute(
-          "SELECT next_bump_time FROM guild_settings WHERE guild_id = ?",
-          (ctx.guild.id,),
-      ) as cursor:
-        row = await cursor.fetchone()
+    await self.ensure_db()
+    try:
+      async with aiosqlite.connect(self.db_path) as db:
+        async with db.execute(
+            "SELECT next_bump_time FROM guild_settings WHERE guild_id = ?",
+            (ctx.guild.id,),
+        ) as cursor:
+          row = await cursor.fetchone()
 
-    if not row or not row[0]:
-      await ctx.send(
-          "🚀 Abhi koi active bump timer nahi hai! Aap abhi `/bump` kar sakte"
-          " hain."
-      )
-      return
+      if not row or not row[0]:
+        await ctx.send(
+            "🚀 Abhi koi active bump timer nahi hai! Aap abhi `/bump` kar sakte"
+            " hain."
+        )
+        return
 
-    next_bump = datetime.fromisoformat(row[0])
-    now = datetime.utcnow()
+      next_bump = datetime.fromisoformat(row[0])
+      now = datetime.utcnow()
 
-    if now >= next_bump:
-      await ctx.send("🚀 Bump cooldown khatam ho chuka hai! Aap `/bump` kar sakte hain.")
-    else:
-      remaining = next_bump - now
-      mins = int(remaining.total_seconds() // 60)
-      hours = mins // 60
-      m = mins % 60
-      await ctx.send(
-          f"⏳ Agla bump **{hours} ghante {m} minute** baad kiya ja sakega."
-      )
+      if now >= next_bump:
+        await ctx.send(
+            "🚀 Bump cooldown khatam ho chuka hai! Aap `/bump` kar sakte hain."
+        )
+      else:
+        remaining = next_bump - now
+        mins = int(remaining.total_seconds() // 60)
+        hours = mins // 60
+        m = mins % 60
+        await ctx.send(
+            f"⏳ Agla bump **{hours} ghante {m} minute** baad kiya ja sakega."
+        )
+    except Exception as e:
+      await ctx.send(f"❌ Error aa gaya: `{e}`")
 
 
 async def setup(bot):
