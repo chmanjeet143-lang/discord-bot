@@ -1,219 +1,187 @@
 import discord
 from discord.ext import commands
-import datetime
-import json
-import os
-import collections
-
-DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
-
-def create_embed(guild, title="", description="", color=0x2B2D31):
-    thumbnail_url = guild.icon.url if guild and guild.icon else DEFAULT_AVATAR
-    embed = discord.Embed(title=title, description=description, color=color)
-    embed.set_thumbnail(url=thumbnail_url)
-    embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
-    return embed
+import sqlite3
+import time
+from collections import defaultdict
 
 class AutoMod(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.warnings_file = "warnings.json"
         
-        # Features on/off toggles
-        self.toggles = {
-            "youtube": True,
-            "discord": True,
-            "spam": True,
-            "abuse": True
-        }
+        # Database Setup for AutoMod Settings & Bad Words
+        self.db = sqlite3.connect("automod.db")
+        self.cursor = self.db.cursor()
+        self.create_tables()
         
-        # Abuse words list (manageable via commands)
-        self.abuse_words = ["badword1", "badword2", "gaali1"]
-        
-        # Spam tracking: {user_id: [timestamps]}
-        self.message_tracker = collections.defaultdict(list)
-        self.spam_time_limit = 5  # seconds window
-        self.spam_message_limit = 4  # max messages allowed in window
+        # Anti-Spam Tracking Dictionary: { (guild_id, user_id): [timestamps] }
+        self.message_tracker = defaultdict(list)
 
-    def add_warning_to_file(self, guild_id, user_id, reason):
-        warnings_store = {}
-        if os.path.exists(self.warnings_file):
-            try:
-                with open(self.warnings_file, "r") as f:
-                    warnings_store = json.load(f)
-            except Exception:
-                warnings_store = {}
+    def cog_unload(self):
+        self.db.close()
 
-        g_id = str(guild_id)
-        u_id = str(user_id)
+    def create_tables(self):
+        # Guild Settings for AutoMod features (1 = ON, 0 = OFF)
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS automod_settings (
+                guild_id INTEGER PRIMARY KEY,
+                antilink INTEGER DEFAULT 1,
+                antiyoutube INTEGER DEFAULT 0,
+                antispam INTEGER DEFAULT 1,
+                badwords INTEGER DEFAULT 1
+            )
+        ''')
+        # Custom Bad Words List per guild
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bad_words (
+                guild_id INTEGER,
+                word TEXT,
+                PRIMARY KEY (guild_id, word)
+            )
+        ''')
+        self.db.commit()
 
-        if g_id not in warnings_store:
-            warnings_store[g_id] = {}
-        if u_id not in warnings_store[g_id]:
-            warnings_store[g_id][u_id] = []
+    def get_settings(self, guild_id):
+        self.cursor.execute("SELECT antilink, antiyoutube, antispam, badwords FROM automod_settings WHERE guild_id = ?", (guild_id,))
+        res = self.cursor.fetchone()
+        if not res:
+            self.cursor.execute("INSERT INTO automod_settings (guild_id) VALUES (?)", (guild_id,))
+            self.db.commit()
+            return (1, 0, 1, 1) # Defaults: antilink ON, antiyoutube OFF, antispam ON, badwords ON
+        return res
 
-        warnings_store[g_id][u_id].append(reason)
-
-        try:
-            with open(self.warnings_file, "w") as f:
-                json.dump(warnings_store, f, indent=4)
-        except Exception as e:
-            print(f"Error saving automod warning: {e}")
-
-        return len(warnings_store[g_id][u_id])
-
+    # --- AUTOMOD LISTENER (MAIN CHECKER) ---
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot or not message.guild:
+        # Bots, DMs, aur Administrators par AutoMod apply nahi hoga
+        if message.author.bot or not message.guild or message.author.guild_permissions.administrator:
             return
 
-        # Admins/Mods par automod apply nahi hoga
-        if message.author.guild_permissions.manage_messages:
-            return
-
+        guild_id = message.guild.id
+        antilink, antiyoutube, antispam, badwords_enabled = self.get_settings(guild_id)
         content_lower = message.content.lower()
-        guild = message.guild
-        author = message.author
-        now = datetime.datetime.utcnow().timestamp()
 
-        violation_reason = None
-        give_timeout = False
-
-        # 1. YouTube Link Check
-        if self.toggles["youtube"] and ("youtube.com" in content_lower or "youtu.be" in content_lower):
-            violation_reason = "Posted YouTube Link"
-
-        # 2. Discord Server Invite Check
-        elif self.toggles["discord"] and ("discord.gg" in content_lower or "discord.com/invite" in content_lower):
-            violation_reason = "Posted Discord Server Invite Link"
-
-        # 3. Abuse / Bad Words Check
-        elif self.toggles["abuse"]:
-            for word in self.abuse_words:
-                if word in content_lower:
-                    violation_reason = "Used Abusive Language"
-                    give_timeout = True
-                    break
-
-        # 4. Spam Check
-        if not violation_reason and self.toggles["spam"]:
-            self.message_tracker[author.id].append(now)
-            # Purane timestamps hatao
-            self.message_tracker[author.id] = [t for t in self.message_tracker[author.id] if now - t < self.spam_time_limit]
-            if len(self.message_tracker[author.id]) > self.spam_message_limit:
-                violation_reason = "Spamming in Chat"
-                give_timeout = True
-                self.message_tracker[author.id] = []
-
-        # Agar koi bhi rule break hua hai
-        if violation_reason:
-            try:
+        try:
+            # 1. Anti-YouTube Filter
+            if antiyoutube and ("youtube.com" in content_lower or "youtu.be" in content_lower):
                 await message.delete()
-            except Exception:
-                pass
+                return await message.channel.send(f"⚠️ {message.author.mention}, is server me YouTube links bhejna allowed nahi hai!", delete_after=5)
 
-            # Warning save karo aur total count lo
-            total_warns = self.add_warning_to_file(guild.id, author.id, violation_reason)
+            # 2. Anti-Link / Anti-Invite Filter
+            if antilink and ("discord.gg/" in content_lower or "http://" in content_lower or "https://" in content_lower or "www." in content_lower):
+                # Agar antiyoutube on hai aur youtube link hai toh wo upar handle ho chuka hai, warna baaki links block hongi
+                if not (antiyoutube and ("youtube.com" in content_lower or "youtu.be" in content_lower)):
+                    await message.delete()
+                    return await message.channel.send(f"⚠️ {message.author.mention}, is server me links bhejna strict mana hai!", delete_after=5)
 
-            # Agar spam يا abuse hai toh 5 min ka timeout do
-            if give_timeout:
-                try:
-                    await author.timeout(datetime.timedelta(minutes=5), reason=violation_reason)
-                except Exception:
-                    pass
+            # 3. Bad Words (Profanity) Filter
+            if badwords_enabled:
+                self.cursor.execute("SELECT word FROM bad_words WHERE guild_id = ?", (guild_id,))
+                banned_words = [row[0] for row in self.cursor.fetchall()]
+                
+                if any(word in content_lower for word in banned_words):
+                    await message.delete()
+                    return await message.channel.send(f"⚠️ {message.author.mention}, aapka message inappropriate hone ki wajah se delete kar diya gaya hai.", delete_after=5)
 
-            # Warning embed bhejo
-            embed = create_embed(
-                guild,
-                title="⚠️ Auto-Mod Action Taken",
-                description=f"**{author.mention}**, your message was deleted.\n\n"
-                            f"📝 **Reason:** `{violation_reason}`\n"
-                            f"📊 **Total Warnings:** {total_warns}"
-                            f"{'\n⏱️ **Penalty:** 5-minute timeout applied.' if give_timeout else ''}",
-                color=discord.Color.red()
-            )
-            
-            warning_msg = await message.channel.send(embed=embed)
-            await discord.utils.sleep_until(datetime.datetime.utcnow() + datetime.timedelta(seconds=5))
-            try:
-                await warning_msg.delete()
-            except Exception:
-                pass
+            # 4. Anti-Spam Filter (5 seconds me 5 messages threshold)
+            if antispam:
+                current_time = time.time()
+                key = (guild_id, message.author.id)
+                
+                # Purane timestamps hatao (older than 5 seconds)
+                self.message_tracker[key] = [t for t in self.message_tracker[key] if current_time - t < 5]
+                self.message_tracker[key].append(current_time)
 
-    # --- AUTOMOD SETTINGS & MANAGEMENT COMMANDS ---
+                if len(self.message_tracker[key]) >= 5:
+                    await message.delete()
+                    # User ko 5 minute ke liye timeout (mute) dena
+                    try:
+                        from datetime import timedelta
+                        await message.author.timeout(timedelta(minutes=5), reason="AutoMod: Spamming detected")
+                        await message.channel.send(f"🚨 {message.author.mention} ko spam karne ke liye **5 minutes ka Timeout** de diya gaya hai!", delete_after=7)
+                    except:
+                        await message.channel.send(f"⚠️ {message.author.mention}, kripya spam karna band karein!", delete_after=5)
+                    
+                    # Tracker clear karo taaki baar-baar spam na trigger ho
+                    self.message_tracker[key] = []
+                    return
 
-    @commands.group(name="automod", invoke_without_command=True)
+        except discord.Forbidden:
+            pass
+        except Exception as e:
+            print(f"AutoMod Error: {e}")
+
+    # --- AUTOMOD TOGGLE COMMANDS (ADMIN ONLY) ---
+
+    @commands.command(name="antilink", help="Toggle anti-link protection on or off. Usage: &antilink on/off")
     @commands.has_permissions(administrator=True)
-    async def automod(self, ctx):
-        embed = create_embed(
-            ctx.guild,
-            title="🛡️ Auto-Mod Control Panel",
-            description=f"**Current Status:**\n"
-                        f"• YouTube Link Filter: `{'ON' if self.toggles['youtube'] else 'OFF'}`\n"
-                        f"• Discord Link Filter: `{'ON' if self.toggles['discord'] else 'OFF'}`\n"
-                        f"• Spam Filter: `{'ON' if self.toggles['spam'] else 'OFF'}`\n"
-                        f"• Abuse Filter: `{'ON' if self.toggles['abuse'] else 'OFF'}`\n\n"
-                        f"**How to Use:**\n"
-                        f"`&automod toggle [youtube/discord/spam/abuse] [on/off]`\n"
-                        f"`&abuse add [word]` | `&abuse remove [word]` | `&abuse list`",
-            color=discord.Color.blue()
-        )
-        await ctx.send(embed=embed)
-
-    @automod.command(name="toggle")
-    @commands.has_permissions(administrator=True)
-    async def automod_toggle(self, ctx, feature: str, status: str):
-        feature = feature.lower()
+    async def antilink(self, ctx, status: str):
         status = status.lower()
-        if feature not in self.toggles:
-            return await ctx.send("❌ Invalid feature! Choose from: `youtube`, `discord`, `spam`, `abuse`.")
+        val = 1 if status == "on" else 0 if status == "off" else None
+        if val is None:
+            return await ctx.send("❌ Kripya sahi status dein: `&antilink on` ya `&antilink off`")
         
-        if status == "on":
-            self.toggles[feature] = True
-        elif status == "off":
-            self.toggles[feature] = False
-        else:
-            return await ctx.send("❌ Please specify status as `on` or `off`.")
+        self.cursor.execute("UPDATE automod_settings SET antilink = ? WHERE guild_id = ?", (val, ctx.guild.id))
+        self.db.commit()
+        state = "enabled (ON)" if val == 1 else "disabled (OFF)"
+        await ctx.send(f"✅ Anti-Link protection successfully **{state}** kar di gayi hai.")
 
-        await ctx.send(f"✅ Auto-Mod **{feature}** filter is now **{status.upper()}**.")
-
-    @commands.group(name="abuse", invoke_without_command=True)
+    @commands.command(name="antiyoutube", help="Toggle anti-youtube link filter on or off. Usage: &antiyoutube on/off")
     @commands.has_permissions(administrator=True)
-    async def abuse(self, ctx):
-        embed = create_embed(
-            ctx.guild,
-            title="🛑 Abuse Filter Usage",
-            description="Please specify a valid action:\n\n"
-                        "• `&abuse add [word]` — Add a word to the filter\n"
-                        "• `&abuse remove [word]` — Remove a word from the filter\n"
-                        "• `&abuse list` — View all filtered abusive words",
-            color=discord.Color.orange()
-        )
-        await ctx.send(embed=embed)
+    async def antiyoutube(self, ctx, status: str):
+        status = status.lower()
+        val = 1 if status == "on" else 0 if status == "off" else None
+        if val is None:
+            return await ctx.send("❌ Kripya sahi status dein: `&antiyoutube on` ya `&antiyoutube off`")
+        
+        self.cursor.execute("UPDATE automod_settings SET antiyoutube = ? WHERE guild_id = ?", (val, ctx.guild.id))
+        self.db.commit()
+        state = "enabled (ON)" if val == 1 else "disabled (OFF)"
+        await ctx.send(f"✅ Anti-YouTube filter successfully **{state}** kar diya gaya hai.")
 
-    @abuse.command(name="add")
+    @commands.command(name="antispam", help="Toggle anti-spam protection on or off. Usage: &antispam on/off")
     @commands.has_permissions(administrator=True)
-    async def abuse_add(self, ctx, word: str):
+    async def antispam(self, ctx, status: str):
+        status = status.lower()
+        val = 1 if status == "on" else 0 if status == "off" else None
+        if val is None:
+            return await ctx.send("❌ Kripya sahi status dein: `&antispam on` ya `&antispam off`")
+        
+        self.cursor.execute("UPDATE automod_settings SET antispam = ? WHERE guild_id = ?", (val, ctx.guild.id))
+        self.db.commit()
+        state = "enabled (ON)" if val == 1 else "disabled (OFF)"
+        await ctx.send(f"✅ Anti-Spam protection successfully **{state}** kar di gayi hai.")
+
+    # --- BAD WORDS MANAGEMENT COMMANDS ---
+
+    @commands.command(name="addbadword", help="Add a word to the server bad words blacklist. Usage: &addbadword <word>")
+    @commands.has_permissions(administrator=True)
+    async def addbadword(self, ctx, word: str):
         word = word.lower()
-        if word in self.abuse_words:
-            return await ctx.send(f"⚠️ `{word}` is already in the abuse list.")
-        self.abuse_words.append(word)
-        await ctx.send(f"✅ Successfully added `{word}` to the abuse filter list.")
+        try:
+            self.cursor.execute("INSERT INTO bad_words (guild_id, word) VALUES (?, ?)", (ctx.guild.id, word))
+            self.db.commit()
+            await ctx.send(f"✅ Banned words list me **'{word}'** successfully jodh diya gaya hai.")
+        except sqlite3.IntegrityError:
+            await ctx.send(f"⚠️ Yeh word pehle se hi blacklist me added hai!")
 
-    @abuse.command(name="remove")
+    @commands.command(name="removebadword", help="Remove a word from the server bad words blacklist. Usage: &removebadword <word>")
     @commands.has_permissions(administrator=True)
-    async def abuse_remove(self, ctx, word: str):
+    async def removebadword(self, ctx, word: str):
         word = word.lower()
-        if word not in self.abuse_words:
-            return await ctx.send(f"⚠️ `{word}` was not found in the abuse list.")
-        self.abuse_words.remove(word)
-        await ctx.send(f"✅ Successfully removed `{word}` from the abuse filter list.")
+        self.cursor.execute("DELETE FROM bad_words WHERE guild_id = ? AND word = ?", (ctx.guild.id, word))
+        self.db.commit()
+        await ctx.send(f"✅ Blacklist se **'{word}'** hata diya gaya hai.")
 
-    @abuse.command(name="list")
+    @commands.command(name="badwords", help="View all banned bad words in the server.")
     @commands.has_permissions(administrator=True)
-    async def abuse_list(self, ctx):
-        words = ", ".join([f"`{w}`" for w in self.abuse_words]) if self.abuse_words else "No words added yet."
-        embed = create_embed(ctx.guild, title="🛑 Abusive Words List", description=words, color=discord.Color.orange())
+    async def badwords(self, ctx):
+        self.cursor.execute("SELECT word FROM bad_words WHERE guild_id = ?", (ctx.guild.id,))
+        rows = self.cursor.fetchall()
+        if not rows:
+            return await ctx.send("❌ Is server ki bad words blacklist mein koi bhi word nahi hai!")
+        
+        word_list = ", ".join([f"`{row[0]}`" for row in rows])
+        embed = discord.Embed(title=f"🛡️ Banned Words - {ctx.guild.name}", description=word_list, color=discord.Color.red())
         await ctx.send(embed=embed)
 
 async def setup(bot):
