@@ -1,160 +1,233 @@
+import asyncio
+from datetime import datetime, timedelta
+import aiosqlite
 import discord
 from discord.ext import commands, tasks
-import json
-import os
-import time
 
-CONFIG_FILE = "bump_config.json"
-DISBOARD_ID = 302094752740937728  # Disboard bot ID
+DB_NAME = "bump_data.db"
 
-class BumpSystem(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.load_config()
-        self.bump_checker.start()
 
-    def cog_unload(self):
-        self.bump_checker.cancel()
+class Bump(commands.Cog):
 
-    def load_config(self):
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r") as f:
-                    self.config = json.load(f)
-            except Exception:
-                self.config = {}
-        else:
-            self.config = {}
+  def __init__(self, bot):
+    self.bot = bot
+    self.db_path = "bump_data.db"
+    self.bump_checker.start()
 
-    def save_config(self):
-        try:
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(self.config, f, indent=4)
-        except Exception as e:
-            print(f"Error saving bump config: {e}")
-
-    # Setup Command: &bumpsetup <role> (Publicly accessible)
-    @commands.command(name="bumpsetup", help="Sets up the bump reminder system in this channel.")
-    async def bump_setup(self, ctx, role: discord.Role):
-        guild_id = str(ctx.guild.id)
-        
-        self.config[guild_id] = {
-            "channel_id": ctx.channel.id,
-            "role_id": role.id,
-            "last_bump_time": 0,
-            "reminder_sent": True
-        }
-        self.save_config()
-
-        embed = discord.Embed(
-            title="✅ Bump System Setup Successful!",
-            description=f"**Channel:** {ctx.channel.mention}\n**Role to Ping:** {role.mention}\n\nTimer shuru ho chuka hai! Ab se har successful bump ke 2 ghante baad reminder bheja jayega.",
-            color=discord.Color.green()
+  async def cog_load(self):
+    """Cog load hote hi database table aur columns create ho jayenge"""
+    async with aiosqlite.connect(self.db_path) as db:
+      await db.execute("""
+                CREATE TABLE IF NOT EXISTS bump_settings (
+                    guild_id INTEGER PRIMARY KEY,
+                    channel_id INTEGER,
+                    role_id INTEGER,
+                    custom_msg TEXT DEFAULT 'It''s time to bump! 🔔\nDrop that \`/bump\` right now to push Moonlight Heaven 🌙 to the top!',
+                    thanks_msg TEXT DEFAULT 'Thank you for the bump legend! You''re keeping Moonlight Heaven 🌙 active ❤️',
+                    next_bump_time TEXT
+                )
+            """)
+      # Agar purana table hai toh safely thanks_msg column add karne ke liye
+      try:
+        await db.execute(
+            "ALTER TABLE bump_settings ADD COLUMN thanks_msg TEXT DEFAULT"
+            " 'Thank you for the bump legend! You''re keeping Moonlight Heaven"
+            " 🌙 active ❤️'"
         )
-        embed.set_footer(text="Moonlight Heaven • Bump System")
-        await ctx.send(embed=embed)
+      except Exception:
+        pass
+      await db.commit()
 
-    # Test Command: &bumpsetuptest (Instant test for reminder message)
-    @commands.command(name="bumpsetuptest", help="Tests the bump reminder message instantly.")
-    async def bump_setup_test(self, ctx):
-        guild_id = str(ctx.guild.id)
-        
-        if guild_id not in self.config:
-            await ctx.send("❌ Pehle `&bumpsetup @Role` karke system setup karo!")
-            return
+  def cog_unload(self):
+    self.bump_checker.cancel()
 
-        cfg = self.config[guild_id]
-        guild = ctx.guild
-        role = guild.get_role(cfg["role_id"])
+  # --- BACKGROUND LOOP: Timer check karne ke liye ---
+  @tasks.loop(seconds=30)
+  async def bump_checker(self):
+    await self.bot.wait_until_ready()
+    now = datetime.utcnow()
 
-        if not role:
-            await ctx.send("❌ Jo role setup kiya tha wo mil nahi raha, please dobara `&bumpsetup` karo.")
-            return
+    async with aiosqlite.connect(self.db_path) as db:
+      async with db.execute(
+          "SELECT guild_id, channel_id, role_id, custom_msg, next_bump_time FROM"
+          " guild_settings WHERE next_bump_time IS NOT NULL"
+      ) as cursor:
+        rows = await cursor.fetchall()
 
-        reminder_text = f"✨ Ready to Glow? 🌙\nTime to give Moonlight Heaven a quick boost! Use the `/bump` command to keep us shining at the top ✨\n{role.mention}"
-        
-        try:
-            await ctx.send(reminder_text)
-        except Exception as e:
-            await ctx.send(f"❌ Error aagya test karne me: {e}")
+        for guild_id, channel_id, role_id, custom_msg, next_bump_str in rows:
+          next_bump_time = datetime.fromisoformat(next_bump_str)
 
-    # Listen to messages for Disboard bump success
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if not message.guild:
-            return
+          if now >= next_bump_time:
+            guild = self.bot.get_guild(guild_id)
+            if guild:
+              channel = guild.get_channel(channel_id)
+              if channel:
+                role_mention = f"<@&{role_id}>" if role_id else ""
+                final_msg = (
+                    f"{role_mention}\n{custom_msg}" if role_id else custom_msg
+                )
+                await channel.send(final_msg)
 
-        guild_id = str(message.guild.id)
-        if guild_id not in self.config:
-            return
+            await db.execute(
+                "UPDATE guild_settings SET next_bump_time = NULL WHERE"
+                " guild_id = ?",
+                (guild_id,),
+            )
+            await db.commit()
 
-        cfg = self.config[guild_id]
+  @bump_checker.before_loop
+  async def before_bump_checker(self):
+    await self.bot.wait_until_ready()
 
-        # Check if message is from Disboard
-        if message.author.id == DISBOARD_ID or "disboard" in message.author.name.lower():
-            is_success = False
-            if message.embeds:
-                for embed in message.embeds:
-                    desc = embed.description or ""
-                    title = embed.title or ""
-                    if "bump done" in desc.lower() or "bump done" in title.lower() or "success" in desc.lower():
-                        is_success = True
-            
-            if "bump done" in message.content.lower():
-                is_success = True
+  # --- EVENT: Disboard Success Detection ---
+  @commands.Cog.listener()
+  async def on_message(self, message):
+    # Disboard Bot ID: 302050872383242240
+    if message.author.id == 302050872383242240:
+      if message.embeds:
+        embed = message.embeds[0]
+        desc = embed.description or ""
+        if "Bump done" in desc or "Server bumped successfully" in desc:
+          guild = message.guild
 
-            if is_success:
-                current_time = time.time()
-                cfg["last_bump_time"] = current_time
-                cfg["reminder_sent"] = False
-                self.save_config()
+          async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                "SELECT channel_id, thanks_msg FROM guild_settings WHERE"
+                " guild_id = ?",
+                (guild.id,),
+            ) as cursor:
+              row = await cursor.fetchone()
 
-                user_mention = "@User"
-                if message.interaction and message.interaction.user:
-                    user_mention = message.interaction.user.mention
+          channel_id = row[0] if row else None
+          thanks_msg = (
+              row[1]
+              if row and row[1]
+              else "Thank you for the bump legend! You're keeping Moonlight"
+              " Heaven 🌙 active ❤️"
+          )
 
-                thank_text = f"✨ Much appreciated, {user_mention} ‧₊˚. Your bump keeps Moonlight Heaven 🌙 shining bright at the top ❤️"
-                
-                try:
-                    channel = message.guild.get_channel(cfg["channel_id"])
-                    if channel:
-                        await channel.send(thank_text)
-                    else:
-                        await message.channel.send(thank_text)
-                except Exception as e:
-                    print(f"Error sending bump thank you: {e}")
+          target_channel = guild.get_channel(channel_id) or message.channel
 
-    # Background task loop checking every 60 seconds if 2 hours have passed
-    @tasks.loop(seconds=60)
-    async def bump_checker(self):
-        current_time = time.time()
-        for guild_id, cfg in self.config.items():
-            if cfg.get("last_bump_time", 0) == 0 or cfg.get("reminder_sent", True):
-                continue
+          # Jis user ne bump kiya hai uska mention nikalne ke liye
+          user_mention = ""
+          if message.interaction and message.interaction.user:
+            user_mention = message.interaction.user.mention
 
-            # 2 hours = 7200 seconds
-            elapsed_time = current_time - cfg["last_bump_time"]
-            if elapsed_time >= 7200:
-                guild = self.bot.get_guild(int(guild_id))
-                if not guild:
-                    continue
+          final_thanks = (
+              f"{thanks_msg}\n{user_mention}" if user_mention else thanks_msg
+          )
+          await target_channel.send(final_thanks)
 
-                channel = guild.get_channel(cfg["channel_id"])
-                role = guild.get_role(cfg["role_id"])
+          # Next bump time 2 ghante baad set karein
+          next_time = (datetime.utcnow() + timedelta(hours=2)).isoformat()
+          async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE guild_settings SET next_bump_time = ? WHERE"
+                " guild_id = ?",
+                (next_time, guild.id),
+            )
+            await db.commit()
 
-                if channel and role:
-                    reminder_text = f"✨ Ready to Glow? 🌙\nTime to give Moonlight Heaven a quick boost! Use the `/bump` command to keep us shining at the top ✨\n{role.mention}"
-                    try:
-                        await channel.send(reminder_text)
-                    except Exception as e:
-                        print(f"Error sending bump reminder: {e}")
+  # --- PREFIX COMMANDS ---
 
-                cfg["reminder_sent"] = True
-                self.save_config()
+  @commands.command(name="setbumpchannel")
+  @commands.has_permissions(administrator=True)
+  async def setbumpchannel(self, ctx, channel: discord.TextChannel):
+    """Bump reminder aur thank you message ka channel set karein"""
+    async with aiosqlite.connect(self.db_path) as db:
+      await db.execute(
+          """
+                INSERT INTO guild_settings (guild_id, channel_id) VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
+            """,
+          (ctx.guild.id, channel.id),
+      )
+      await db.commit()
+    await ctx.send(
+        f"✅ Bump channel successfully set to {channel.mention}!"
+    )
 
-    @bump_checker.before_loop
-    async def before_bump_checker(self):
-        await self.bot.wait_until_ready()
+  @commands.command(name="setbumprole")
+  @commands.has_permissions(administrator=True)
+  async def setbumprole(self, ctx, role: discord.Role):
+    """Reminder ke waqt kaunsa role ping ho set karein"""
+    async with aiosqlite.connect(self.db_path) as db:
+      await db.execute(
+          """
+                INSERT INTO guild_settings (guild_id, role_id) VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET role_id = excluded.role_id
+            """,
+          (ctx.guild.id, role.id),
+      )
+      await db.commit()
+    await ctx.send(f"✅ Bump ping role successfully set to {role.mention}!")
+
+  @commands.command(name="setbumpmsg")
+  @commands.has_permissions(administrator=True)
+  async def setbumpmsg(self, ctx, *, message: str):
+    """Reminder message ko change karne ke liye"""
+    async with aiosqlite.connect(self.db_path) as db:
+      await db.execute(
+          """
+                INSERT INTO guild_settings (guild_id, custom_msg) VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET custom_msg = excluded.custom_msg
+            """,
+          (ctx.guild.id, message),
+      )
+      await db.commit()
+    await ctx.send(
+        f"✅ Reminder message successfully update ho gaya hai:\n\n> {message}"
+    )
+
+  @commands.command(name="setthanksmsg")
+  @commands.has_permissions(administrator=True)
+  async def setthanksmsg(self, ctx, *, message: str):
+    """Thank you message ko change karne ke liye"""
+    async with aiosqlite.connect(self.db_path) as db:
+      await db.execute(
+          """
+                INSERT INTO guild_settings (guild_id, thanks_msg) VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET thanks_msg = excluded.thanks_msg
+            """,
+          (ctx.guild.id, message),
+      )
+      await db.commit()
+    await ctx.send(
+        f"✅ Thank you message successfully update ho gaya"
+        f" hai:\n\n> {message}\n(Sath me user mention bhi aayega)"
+    )
+
+  @commands.command(name="bumptime")
+  async def bumptime(self, ctx):
+    """Check karein ki agla bump kab kar sakte hain"""
+    async with aiosqlite.connect(self.db_path) as db:
+      async with db.execute(
+          "SELECT next_bump_time FROM guild_settings WHERE guild_id = ?",
+          (ctx.guild.id,),
+      ) as cursor:
+        row = await cursor.fetchone()
+
+    if not row or not row[0]:
+      await ctx.send(
+          "🚀 Abhi koi active bump timer nahi hai! Aap abhi `/bump` kar sakte"
+          " hain."
+      )
+      return
+
+    next_bump = datetime.fromisoformat(row[0])
+    now = datetime.utcnow()
+
+    if now >= next_bump:
+      await ctx.send("🚀 Bump cooldown khatam ho chuka hai! Aap `/bump` kar sakte hain.")
+    else:
+      remaining = next_bump - now
+      mins = int(remaining.total_seconds() // 60)
+      hours = mins // 60
+      m = mins % 60
+      await ctx.send(
+          f"⏳ Agla bump **{hours} ghante {m} minute** baad kiya ja sakega."
+      )
+
 
 async def setup(bot):
-    await bot.add_cog(BumpSystem(bot))
+  await bot.add_cog(Bump(bot))
