@@ -16,7 +16,7 @@ def save_config(data):
         json.dump(data, f, indent=4)
 
 class TagTracker(commands.Cog, name="TagTracker"):
-    """Track clan tags automatically based on douknowluci's exact tag and notify members."""
+    """Track official native clan tags and profile tags automatically based on douknowluci's profile."""
     def __init__(self, bot):
         self.bot = bot
 
@@ -41,7 +41,7 @@ class TagTracker(commands.Cog, name="TagTracker"):
         save_config(config)
 
     def get_owner_tag(self, guild):
-        """douknowluci ki profile se emoji ke baad wala exact clan tag nikalne ka sahi logic"""
+        """douknowluci ki profile se official native clan tag ya display name ka tag uthane ka logic"""
         owner_member = discord.utils.find(
             lambda m: m.name.lower() == "douknowluci" or (m.global_name and m.global_name.lower() == "douknowluci"), 
             guild.members
@@ -50,15 +50,14 @@ class TagTracker(commands.Cog, name="TagTracker"):
         if not owner_member:
             return None
 
-        # 1. Native Discord clan tag check
+        # 1. Check official native Discord clan tag object first
         if hasattr(owner_member, 'clan') and owner_member.clan:
             clan_tag = getattr(owner_member.clan, 'tag', str(owner_member.clan))
             if clan_tag:
                 return clan_tag.strip()
 
-        # 2. Display name se emoji ke baad ka exact tag uthana (jaise 🌸 Moon)
+        # 2. Fallback to display name emoji/symbol splitting if native tag isn't set
         name = owner_member.display_name or owner_member.name
-        
         for emoji in ["🌸", "🌙", "✨", "⭐", "💫", "💎", "🌿"]:
             if emoji in name:
                 parts = name.split(emoji)
@@ -67,7 +66,11 @@ class TagTracker(commands.Cog, name="TagTracker"):
                     if tag_text:
                         return f"{emoji} {tag_text}"
 
-        return None
+        parts = name.split()
+        if len(parts) > 1:
+            return parts[-1].strip()
+
+        return name.strip()
 
     def check_user_tag(self, member, target_tag):
         if not target_tag:
@@ -75,13 +78,13 @@ class TagTracker(commands.Cog, name="TagTracker"):
             
         target_tag_lower = target_tag.lower()
         
-        # Native clan tag check
+        # 1. Check official native Discord clan attribute
         if hasattr(member, 'clan') and member.clan:
             clan_tag = getattr(member.clan, 'tag', str(member.clan))
             if clan_tag and target_tag_lower in clan_tag.lower():
                 return True
 
-        # Display name, username, global name, nick check
+        # 2. Check display name, username, global name, nick
         names_to_check = [
             getattr(member, 'display_name', ''),
             getattr(member, 'name', ''),
