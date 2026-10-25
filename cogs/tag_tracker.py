@@ -16,7 +16,7 @@ def save_config(data):
         json.dump(data, f, indent=4)
 
 class TagTracker(commands.Cog, name="TagTracker"):
-    """Track clan tags automatically based on douknowluci's profile and notify members."""
+    """Track clan tags automatically based on douknowluci's profile tag without hardcoding names."""
     def __init__(self, bot):
         self.bot = bot
 
@@ -24,8 +24,8 @@ class TagTracker(commands.Cog, name="TagTracker"):
         config = load_config()
         return config.get(str(guild_id), {
             "channel_id": None,
-            "msg_use": "{user} added the clan tag! Welcome to the family 🌙",
-            "msg_unuse": "{user} removed the clan tag. 🌑"
+            "msg_use": "{user} ne clan tag add kar liya hai! Family me swagat hai ✨",
+            "msg_unuse": "{user} ne clan tag hata diya hai. 🌑"
         })
 
     def update_guild_config(self, guild_id, key, value):
@@ -34,45 +34,56 @@ class TagTracker(commands.Cog, name="TagTracker"):
         if guild_str not in config:
             config[guild_str] = {
                 "channel_id": None,
-                "msg_use": "{user} added the clan tag! Welcome to the family 🌙",
-                "msg_unuse": "{user} removed the clan tag. 🌑"
+                "msg_use": "{user} ne clan tag add kar liya hai! Family me swagat hai ✨",
+                "msg_unuse": "{user} ne clan tag hata diya hai. 🌑"
             }
         config[guild_str][key] = value
         save_config(config)
 
     def get_owner_tag(self, guild):
-        """Internal method to fetch the exact clan tag from douknowluci's profile"""
+        """douknowluci ki profile se exact tag dynamically uthane ka logic bina kisi hardcoded word ke"""
         owner_member = discord.utils.find(
             lambda m: m.name.lower() == "douknowluci" or (m.global_name and m.global_name.lower() == "douknowluci"), 
             guild.members
         )
         
         if not owner_member:
-            return "Moon"
+            return None
 
-        # 1. Check native Discord clan object
+        # 1. Native Discord clan tag check
         if hasattr(owner_member, 'clan') and owner_member.clan:
             clan_tag = getattr(owner_member.clan, 'tag', str(owner_member.clan))
             if clan_tag:
                 return clan_tag.strip()
 
-        # 2. Extract tag smartly from display name (jaise agar 'Moon' ya '🌸 Moon' hai)
+        # 2. Display name ya nickname se tag nikalna bina kisi hardcoded word ke
         name = owner_member.display_name or owner_member.name
-        if "moon" in name.lower():
-            return "Moon"
+        if "[" in name and "]" in name:
+            start = name.find("[") + 1
+            end = name.find("]")
+            if end > start:
+                return name[start:end].strip()
 
-        return "Moon"
+        # Agar koi symbol/emoji ke baad tag hai toh last part utha lo
+        parts = name.split()
+        if len(parts) > 1:
+            return parts[-1].strip()
+
+        return name.strip()
 
     def check_user_tag(self, member, target_tag):
+        if not target_tag:
+            return False
+            
         target_tag_lower = target_tag.lower()
         
-        # 1. Check native Discord clan attribute
+        # Native clan tag check
         if hasattr(member, 'clan') and member.clan:
             clan_tag = getattr(member.clan, 'tag', str(member.clan))
             if clan_tag and target_tag_lower in clan_tag.lower():
                 return True
 
-        # 2. Check names and display fields
+        # Display name, username, global name, nick check
         names_to_check = [
             getattr(member, 'display_name', ''),
             getattr(member, 'name', ''),
@@ -86,7 +97,6 @@ class TagTracker(commands.Cog, name="TagTracker"):
                 
         return False
 
-    # Real-time Clan Tag tracking event
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if before.bot:
@@ -94,6 +104,8 @@ class TagTracker(commands.Cog, name="TagTracker"):
 
         config = self.get_guild_config(after.guild.id)
         target_tag = self.get_owner_tag(after.guild)
+        if not target_tag:
+            return
 
         has_tag_before = self.check_user_tag(before, target_tag)
         has_tag_after = self.check_user_tag(after, target_tag)
@@ -111,93 +123,99 @@ class TagTracker(commands.Cog, name="TagTracker"):
 
         if not has_tag_before and has_tag_after:
             text = config["msg_use"].replace("{user}", after.mention).replace("{username}", after.name)
-            embed = discord.Embed(title="🌙 Clan Tag Added", description=text, color=0x57F287)
+            embed = discord.Embed(title="✨ Clan Tag Added", description=text, color=0x57F287)
             embed.set_thumbnail(url=after.display_avatar.url)
-            embed.set_footer(text="Moonlight Heaven • Tag Tracker")
+            embed.set_footer(text="Tag Tracker System")
             await channel.send(embed=embed)
 
         elif has_tag_before and not has_tag_after:
             text = config["msg_unuse"].replace("{user}", after.mention).replace("{username}", after.name)
             embed = discord.Embed(title="🌑 Clan Tag Removed", description=text, color=0xED4245)
             embed.set_thumbnail(url=after.display_avatar.url)
-            embed.set_footer(text="Moonlight Heaven • Tag Tracker")
+            embed.set_footer(text="Tag Tracker System")
             await channel.send(embed=embed)
-
-    # Individual Commands with Descriptions & Examples
 
     @commands.command(name="tagchannel")
     @commands.has_permissions(administrator=True)
     async def tag_channel(self, ctx, channel: discord.TextChannel):
         """
-        Set the specific log channel where clan tag notifications will be sent.
+        Log channel set karne ke liye.
         
         **Example:**
-        `&tagchannel #tag-logs`
+        `&tagchannel #logs`
         """
         self.update_guild_config(ctx.guild.id, "channel_id", channel.id)
-        await ctx.send(f"✅ Tag tracker log channel successfully set to {channel.mention}!")
+        await ctx.send(f"✅ Tag tracker log channel successfully set ho gaya hai {channel.mention} par!")
 
     @commands.command(name="tagcount")
     async def tag_count(self, ctx):
         """
-        Check the total number of members wearing douknowluci's clan tag.
+        Total members check karne ke liye jinke paas tag laga hai.
         
         **Example:**
         `&tagcount`
         """
         target_tag = self.get_owner_tag(ctx.guild)
+        if not target_tag:
+            await ctx.send("❌ `douknowluci` ki profile se tag detect nahi ho paya!")
+            return
+            
         count = sum(1 for m in ctx.guild.members if self.check_user_tag(m, target_tag) and not m.bot)
         
-        embed = discord.Embed(title="📊 Clan Tag Count", description=f"Total members currently wearing **{target_tag}** (detected from `douknowluci`): **{count}**", color=0x5865F2)
-        embed.set_footer(text="Moonlight Heaven • Tag Tracker")
+        embed = discord.Embed(title="📊 Clan Tag Count", description=f"Total members jo **{target_tag}** tag use kar rahe hain: **{count}**", color=0x5865F2)
+        embed.set_footer(text="Tag Tracker System")
         await ctx.send(embed=embed)
 
     @commands.command(name="taglist")
     async def tag_list(self, ctx):
         """
-        View the complete list of members wearing douknowluci's clan tag.
+        List dekhne ke liye ki kis-kis ke paas tag hai.
         
         **Example:**
         `&taglist`
         """
         target_tag = self.get_owner_tag(ctx.guild)
+        if not target_tag:
+            await ctx.send("❌ `douknowluci` ki profile se tag detect nahi ho paya!")
+            return
+            
         members = [m.mention for m in ctx.guild.members if self.check_user_tag(m, target_tag) and not m.bot]
         
         if not members:
-            await ctx.send(f"❌ No members found wearing the clan tag detected from `douknowluci` (`{target_tag}`) currently.")
+            await ctx.send(f"❌ Koi bhi member `{target_tag}` tag ke sath nahi mila.")
             return
         
         members_str = ", ".join(members)
         if len(members_str) > 2000:
-            members_str = members_str[:1950] + "... (and more)"
+            members_str = members_str[:1950] + "... (aur bhi hain)"
 
         embed = discord.Embed(title="📜 Clan Tag Members List", description=members_str, color=0x5865F2)
-        embed.set_footer(text=f"Tag: {target_tag} | Total: {len(members)} members | Moonlight Heaven")
+        embed.set_footer(text=f"Tag: {target_tag} | Total: {len(members)} members")
         await ctx.send(embed=embed)
 
     @commands.command(name="tagmsguse")
     @commands.has_permissions(administrator=True)
     async def tag_msg_use(self, ctx, *, message: str):
         """
-        Customize the notification message when a user adds the clan tag.
+        Tag add hone par notification message customize karne ke liye.
         
         **Example:**
-        `&tagmsguse {user} added the clan tag! Welcome!`
+        `&tagmsguse {user} ne tag add kar liya hai!`
         """
         self.update_guild_config(ctx.guild.id, "msg_use", message)
-        await ctx.send(f"✅ Tag use message updated successfully!\n\n**Preview:** {message.replace('{user}', ctx.author.mention)}")
+        await ctx.send(f"✅ Tag use message update ho gaya hai!\n\n**Preview:** {message.replace('{user}', ctx.author.mention)}")
 
     @commands.command(name="tagmsgunuse")
     @commands.has_permissions(administrator=True)
     async def tag_msg_unuse(self, ctx, *, message: str):
         """
-        Customize the notification message when a user removes the clan tag.
+        Tag remove hone par notification message customize karne ke liye.
         
         **Example:**
-        `&tagmsgunuse {user} removed the clan tag.`
+        `&tagmsgunuse {user} ne tag hata diya hai.`
         """
         self.update_guild_config(ctx.guild.id, "msg_unuse", message)
-        await ctx.send(f"✅ Tag unuse message updated successfully!\n\n**Preview:** {message.replace('{user}', ctx.author.mention)}")
+        await ctx.send(f"✅ Tag unuse message update ho gaya hai!\n\n**Preview:** {message.replace('{user}', ctx.author.mention)}")
 
 async def setup(bot):
     await bot.add_cog(TagTracker(bot))
