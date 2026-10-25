@@ -16,7 +16,7 @@ def save_config(data):
         json.dump(data, f, indent=4)
 
 class TagTracker(commands.Cog, name="TagTracker"):
-    """Explore all commands related to TagTracker."""
+    """Track Level 3 Boost clan tags and notify when members add or remove them."""
     def __init__(self, bot):
         self.bot = bot
 
@@ -44,7 +44,6 @@ class TagTracker(commands.Cog, name="TagTracker"):
 
     def check_user_tag(self, member, target_tag):
         target_tag_lower = target_tag.lower()
-        # Strictly check official Discord Level 3 Boost clan tag only, ignoring display name completely
         if hasattr(member, 'clan') and member.clan:
             clan_tag = getattr(member.clan, 'tag', str(member.clan))
             if clan_tag and target_tag_lower in clan_tag.lower():
@@ -90,25 +89,40 @@ class TagTracker(commands.Cog, name="TagTracker"):
             embed.set_footer(text="Moonlight Heaven • Tag Tracker")
             await channel.send(embed=embed)
 
-    # Main Command Group
-    @commands.group(name="tag", invoke_without_command=False, help="Explore all commands related to TagTracker.")
-    async def tag(self, ctx):
-        pass
+    # Individual Commands with Descriptions & Examples (Directly visible in help menu)
 
-    @tag.command(name="settag", help="Set your exact official clan tag to track. Usage: &tag settag Moon")
+    @commands.command(name="tagsettag")
     @commands.has_permissions(administrator=True)
     async def tag_settag(self, ctx, *, new_tag: str):
+        """
+        Set your exact official clan tag to track.
+        
+        **Example:**
+        `&tagsettag Moon`
+        """
         self.update_guild_config(ctx.guild.id, "tag", new_tag)
         await ctx.send(f"✅ Official clan tag successfully updated to: `{new_tag}`")
 
-    @tag.command(name="channel", help="Set the specific log channel where clan tag notifications will be sent. Usage: &tag channel #channel")
+    @commands.command(name="tagchannel")
     @commands.has_permissions(administrator=True)
     async def tag_channel(self, ctx, channel: discord.TextChannel):
+        """
+        Set the specific log channel where clan tag notifications will be sent.
+        
+        **Example:**
+        `&tagchannel #tag-logs`
+        """
         self.update_guild_config(ctx.guild.id, "channel_id", channel.id)
         await ctx.send(f"✅ Tag tracker log channel successfully set to {channel.mention}!")
 
-    @tag.command(name="count", help="Check the total number of members wearing the official clan tag. Usage: &tag count")
+    @commands.command(name="tagcount")
     async def tag_count(self, ctx):
+        """
+        Check the total number of members currently wearing the official clan tag.
+        
+        **Example:**
+        `&tagcount`
+        """
         config = self.get_guild_config(ctx.guild.id)
         target_tag = config.get("tag", "Moon")
         
@@ -117,8 +131,14 @@ class TagTracker(commands.Cog, name="TagTracker"):
         embed.set_footer(text="Moonlight Heaven • Tag Tracker")
         await ctx.send(embed=embed)
 
-    @tag.command(name="list", help="View the complete list of members wearing the official clan tag. Usage: &tag list")
+    @commands.command(name="taglist")
     async def tag_list(self, ctx):
+        """
+        View the complete list of members currently wearing the official clan tag.
+        
+        **Example:**
+        `&taglist`
+        """
         config = self.get_guild_config(ctx.guild.id)
         target_tag = config.get("tag", "Moon")
 
@@ -135,15 +155,27 @@ class TagTracker(commands.Cog, name="TagTracker"):
         embed.set_footer(text=f"Total: {len(members)} members | Moonlight Heaven")
         await ctx.send(embed=embed)
 
-    @tag.command(name="msguse", help="Customize the notification message when a user adds the clan tag. Usage: &tag msguse {user} added the clan tag!")
+    @commands.command(name="tagmsguse")
     @commands.has_permissions(administrator=True)
     async def tag_msg_use(self, ctx, *, message: str):
+        """
+        Customize the notification message when a user adds the clan tag.
+        
+        **Example:**
+        `&tagmsguse {user} added the clan tag! Welcome!`
+        """
         self.update_guild_config(ctx.guild.id, "msg_use", message)
         await ctx.send(f"✅ Tag use message updated successfully!\n\n**Preview:** {message.replace('{user}', ctx.author.mention)}")
 
-    @tag.command(name="msgunuse", help="Customize the notification message when a user removes the clan tag. Usage: &tag msgunuse {user} removed the clan tag!")
+    @commands.command(name="tagmsgunuse")
     @commands.has_permissions(administrator=True)
     async def tag_msg_unuse(self, ctx, *, message: str):
+        """
+        Customize the notification message when a user removes the clan tag.
+        
+        **Example:**
+        `&tagmsgunuse {user} removed the clan tag.`
+        """
         self.update_guild_config(ctx.guild.id, "msg_unuse", message)
         await ctx.send(f"✅ Tag unuse message updated successfully!\n\n**Preview:** {message.replace('{user}', ctx.author.mention)}")
 
