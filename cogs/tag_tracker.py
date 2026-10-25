@@ -21,22 +21,22 @@ class TagTracker(commands.Cog):
 
     def get_channel_id(self, guild_id):
         config = load_config()
-        return config.get(str(guild_id), None)
+        return config.get(str(guild_id), {}).get("channel_id", None)
 
     def set_channel_id(self, guild_id, channel_id):
         config = load_config()
-        config[str(guild_id)] = channel_id
+        if str(guild_id) not in config:
+            config[str(guild_id)] = {}
+        config[str(guild_id)]["channel_id"] = channel_id
         save_config(config)
 
     def check_user_tag(self, member, guild):
-        # Check official Discord Level 3 native clan feature
         if hasattr(member, 'clan') and member.clan:
-            # Agar server ka official clan set hai, toh check karo ki user ne wahi clan tag lagaya hai ya nahi
+            # Check karo ki member ka clan is guild se match karta hai ya nahi
             if hasattr(guild, 'clan') and guild.clan:
                 if member.clan == guild.clan:
                     return True
-            else:
-                # Agar guild.clan direct match na ho, toh member ke pas active clan tag hone par bhi true maan lo
+            if getattr(member.clan, 'id', None) == guild.id:
                 return True
         return False
 
@@ -77,7 +77,21 @@ class TagTracker(commands.Cog):
     async def tag_channel(self, ctx, channel: discord.TextChannel):
         """Log channel set karne ke liye."""
         self.set_channel_id(ctx.guild.id, channel.id)
-        await ctx.send(f"✅ Log channel set ho gaya hai {channel.mention} par! Ab bot official Level 3 clan tag automatically detect karega.")
+        await ctx.send(f"✅ Log channel set ho gaya hai {channel.mention} par!")
+
+    @commands.command(name="internalid")
+    @commands.has_permissions(administrator=True)
+    async def internal_id(self, ctx):
+        """Server ke clan ki internal ID aur details check karne ke liye."""
+        guild = ctx.guild
+        msg = f"🔍 **Server Info:**\n- Guild Name: `{guild.name}`\n- Guild ID: `{guild.id}`\n"
+        
+        if hasattr(guild, 'clan') and guild.clan:
+            msg += f"- Guild Clan Object: `{guild.clan}`\n"
+        else:
+            msg += f"- Guild Clan: `Direct attribute available nahi hai (Normal behavior)`\n"
+            
+        await ctx.send(msg)
 
 async def setup(bot):
     await bot.add_cog(TagTracker(bot))
