@@ -18,14 +18,14 @@ def save_config(data):
 class TagTracker(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.tag = "moon"  # Aapka server tag
 
     def get_guild_config(self, guild_id):
         config = load_config()
         return config.get(str(guild_id), {
             "channel_id": None,
-            "msg_use": "{user} added the **moon** tag to their name! Welcome to the family 🌙",
-            "msg_unuse": "{user} removed the **moon** tag from their name. 🌑"
+            "tag": "🌸Moon",  # Default exact server tag
+            "msg_use": "{user} added the tag to their name! Welcome to the family 🌙",
+            "msg_unuse": "{user} removed the tag from their name. 🌑"
         })
 
     def update_guild_config(self, guild_id, key, value):
@@ -34,8 +34,9 @@ class TagTracker(commands.Cog):
         if guild_str not in config:
             config[guild_str] = {
                 "channel_id": None,
-                "msg_use": "{user} added the **moon** tag to their name! Welcome to the family 🌙",
-                "msg_unuse": "{user} removed the **moon** tag from their name. 🌑"
+                "tag": "🌸Moon",
+                "msg_use": "{user} added the tag to their name! Welcome to the family 🌙",
+                "msg_unuse": "{user} removed the tag from their name. 🌑"
             }
         config[guild_str][key] = value
         save_config(config)
@@ -46,16 +47,18 @@ class TagTracker(commands.Cog):
         if before.bot:
             return
 
+        config = self.get_guild_config(after.guild.id)
+        target_tag = config.get("tag", "🌸Moon").lower()
+
         before_name = before.display_name.lower()
         after_name = after.display_name.lower()
 
-        has_tag_before = self.tag in before_name
-        has_tag_after = self.tag in after_name
+        has_tag_before = target_tag in before_name
+        has_tag_after = target_tag in after_name
 
         if has_tag_before == has_tag_after:
-            return  # Tag status mein koi change nahi hua
+            return  # No change in tag status
 
-        config = self.get_guild_config(after.guild.id)
         channel_id = config.get("channel_id")
         if not channel_id:
             return
@@ -64,39 +67,50 @@ class TagTracker(commands.Cog):
         if not channel:
             return
 
-        # Jab user tag lagaye
+        # When user adds the tag
         if not has_tag_before and has_tag_after:
             text = config["msg_use"].replace("{user}", after.mention).replace("{username}", after.name)
-            embed = discord.Embed(title="🌙 Moon Tag Added", description=text, color=0x57F287)
+            embed = discord.Embed(title="🌙 Tag Added", description=text, color=0x57F287)
             embed.set_thumbnail(url=after.display_avatar.url)
             embed.set_footer(text="Moonlight Heaven • Tag Tracker")
             await channel.send(embed=embed)
 
-        # Jab user tag hataye
+        # When user removes the tag
         elif has_tag_before and not has_tag_after:
             text = config["msg_unuse"].replace("{user}", after.mention).replace("{username}", after.name)
-            embed = discord.Embed(title="🌑 Moon Tag Removed", description=text, color=0xED4245)
+            embed = discord.Embed(title="🌑 Tag Removed", description=text, color=0xED4245)
             embed.set_thumbnail(url=after.display_avatar.url)
             embed.set_footer(text="Moonlight Heaven • Tag Tracker")
             await channel.send(embed=embed)
 
-    # Main Command Group with Detailed Help Menu (jaise screenshot mein tha)
+    # Main Command Group with Detailed Help Menu
     @commands.group(name="tag", invoke_without_command=True)
     async def tag(self, ctx):
+        config = self.get_guild_config(ctx.guild.id)
+        current_tag = config.get("tag", "🌸Moon")
+        
         embed = discord.Embed(
             title="🏷️ Tag Tracker",
             description=(
-                "Here are all the available commands under **Tag Tracker**:\n\n"
-                "• `&tag channel #channel` - Set the specific log channel where tag add/remove notifications will be sent.\n"
-                "• `&tag count` - Check the total number of members currently wearing the moon tag in the server.\n"
-                "• `&tag list` - View the complete list of members who are wearing the moon tag.\n"
-                "• `&tag msguse <message>` - Customize the notification message when a user adds the tag (Use `{user}`).\n"
-                "• `&tag msgunuse <message>` - Customize the notification message when a user removes the tag (Use `{user}`)."
+                f"Here are all the available commands under **Tag Tracker**:\n"
+                f"Current Server Tag: `{current_tag}`\n\n"
+                "• `&tag settag <tag>` - Set your exact server tag (Admin Only).\n"
+                "• `&tag channel #channel` - Set the specific log channel for notifications (Admin Only).\n"
+                "• `&tag count` - Check the total number of members wearing the tag.\n"
+                "• `&tag list` - View the complete list of members wearing the tag.\n"
+                "• `&tag msguse <message>` - Customize message when a user adds the tag (Admin Only).\n"
+                "• `&tag msgunuse <message>` - Customize message when a user removes the tag (Admin Only)."
             ),
             color=0x2B2D31
         )
         embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
         await ctx.send(embed=embed)
+
+    @tag.command(name="settag")
+    @commands.has_permissions(administrator=True)
+    async def tag_settag(self, ctx, *, new_tag: str):
+        self.update_guild_config(ctx.guild.id, "tag", new_tag)
+        await ctx.send(f"✅ Server tag successfully updated to: `{new_tag}`")
 
     @tag.command(name="channel")
     @commands.has_permissions(administrator=True)
@@ -106,10 +120,13 @@ class TagTracker(commands.Cog):
 
     @tag.command(name="count")
     async def tag_count(self, ctx):
-        count = sum(1 for m in ctx.guild.members if self.tag in m.display_name.lower() and not m.bot)
+        config = self.get_guild_config(ctx.guild.id)
+        target_tag = config.get("tag", "🌸Moon").lower()
+        
+        count = sum(1 for m in ctx.guild.members if target_tag in m.display_name.lower() and not m.bot)
         embed = discord.Embed(
-            title="📊 Moon Tag Count",
-            description=f"Total members currently wearing the **{self.tag}** tag: **{count}**",
+            title="📊 Tag Count",
+            description=f"Total members currently wearing the **{config.get('tag')}** tag: **{count}**",
             color=0x5865F2
         )
         embed.set_footer(text="Moonlight Heaven • Tag Tracker")
@@ -117,9 +134,12 @@ class TagTracker(commands.Cog):
 
     @tag.command(name="list")
     async def tag_list(self, ctx):
-        members = [m.mention for m in ctx.guild.members if self.tag in m.display_name.lower() and not m.bot]
+        config = self.get_guild_config(ctx.guild.id)
+        target_tag = config.get("tag", "🌸Moon").lower()
+
+        members = [m.mention for m in ctx.guild.members if target_tag in m.display_name.lower() and not m.bot]
         if not members:
-            await ctx.send("❌ No members found wearing the `moon` tag currently.")
+            await ctx.send(f"❌ No members found wearing the `{config.get('tag')}` tag currently.")
             return
         
         members_str = ", ".join(members)
@@ -127,7 +147,7 @@ class TagTracker(commands.Cog):
             members_str = members_str[:1950] + "... (and more)"
 
         embed = discord.Embed(
-            title="📜 Moon Tag Members List",
+            title="📜 Tag Members List",
             description=members_str,
             color=0x5865F2
         )
