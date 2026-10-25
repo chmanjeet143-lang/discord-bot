@@ -41,36 +41,38 @@ class TagTracker(commands.Cog, name="TagTracker"):
         save_config(config)
 
     def get_owner_tag(self, guild):
-        """Internal method to fetch the clan tag dynamically from douknowluci's profile"""
+        """Internal method to fetch the exact clan tag from douknowluci's profile"""
         owner_member = discord.utils.find(
             lambda m: m.name.lower() == "douknowluci" or (m.global_name and m.global_name.lower() == "douknowluci"), 
             guild.members
         )
         
         if not owner_member:
-            return "Moon"  # Default fallback if douknowluci is not found in cache
+            return "Moon"
 
-        # 1. Check native Discord clan tag
+        # 1. Check native Discord clan object
         if hasattr(owner_member, 'clan') and owner_member.clan:
             clan_tag = getattr(owner_member.clan, 'tag', str(owner_member.clan))
             if clan_tag:
                 return clan_tag.strip()
 
-        # 2. Check bracket format in display name or nickname (e.g., [Moon])
+        # 2. Extract tag smartly from display name (jaise agar 'Moon' ya '🌸 Moon' hai)
         name = owner_member.display_name or owner_member.name
-        if "[" in name and "]" in name:
-            start = name.find("[") + 1
-            end = name.find("]")
-            if end > start:
-                return name[start:end].strip()
+        if "moon" in name.lower():
+            return "Moon"
 
-        # 3. Fallback to display name text or default
-        return name
+        return "Moon"
 
     def check_user_tag(self, member, target_tag):
         target_tag_lower = target_tag.lower()
         
-        # Check all possible name fields and native clan attribute
+        # 1. Check native Discord clan attribute
+        if hasattr(member, 'clan') and member.clan:
+            clan_tag = getattr(member.clan, 'tag', str(member.clan))
+            if clan_tag and target_tag_lower in clan_tag.lower():
+                return True
+
+        # 2. Check names and display fields
         names_to_check = [
             getattr(member, 'display_name', ''),
             getattr(member, 'name', ''),
@@ -80,11 +82,6 @@ class TagTracker(commands.Cog, name="TagTracker"):
         
         for name in names_to_check:
             if name and target_tag_lower in name.lower():
-                return True
-
-        if hasattr(member, 'clan') and member.clan:
-            clan_tag = getattr(member.clan, 'tag', str(member.clan))
-            if clan_tag and target_tag_lower in clan_tag.lower():
                 return True
                 
         return False
@@ -102,7 +99,7 @@ class TagTracker(commands.Cog, name="TagTracker"):
         has_tag_after = self.check_user_tag(after, target_tag)
 
         if has_tag_before == has_tag_after:
-            return  # No change in tag status
+            return
 
         channel_id = config.get("channel_id")
         if not channel_id:
@@ -112,7 +109,6 @@ class TagTracker(commands.Cog, name="TagTracker"):
         if not channel:
             return
 
-        # When user adds the clan tag
         if not has_tag_before and has_tag_after:
             text = config["msg_use"].replace("{user}", after.mention).replace("{username}", after.name)
             embed = discord.Embed(title="🌙 Clan Tag Added", description=text, color=0x57F287)
@@ -120,7 +116,6 @@ class TagTracker(commands.Cog, name="TagTracker"):
             embed.set_footer(text="Moonlight Heaven • Tag Tracker")
             await channel.send(embed=embed)
 
-        # When user removes the clan tag
         elif has_tag_before and not has_tag_after:
             text = config["msg_unuse"].replace("{user}", after.mention).replace("{username}", after.name)
             embed = discord.Embed(title="🌑 Clan Tag Removed", description=text, color=0xED4245)
@@ -128,7 +123,7 @@ class TagTracker(commands.Cog, name="TagTracker"):
             embed.set_footer(text="Moonlight Heaven • Tag Tracker")
             await channel.send(embed=embed)
 
-    # Individual Commands with Descriptions & Examples (Directly visible in help menu)
+    # Individual Commands with Descriptions & Examples
 
     @commands.command(name="tagchannel")
     @commands.has_permissions(administrator=True)
