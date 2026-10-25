@@ -6,7 +6,7 @@ from discord.ext import commands, tasks
 from flask import Flask
 from threading import Thread
 
-# 1. Flask server to keep bot alive on hosting (Replit etc.)
+# 1. Flask server to keep bot alive on hosting
 app = Flask('')
 
 @app.route('/')
@@ -38,7 +38,7 @@ def load_config():
     return {}
 
 def save_config(data):
-    with open(CONFIG_FILE, "w") as f:
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
 def get_guild_config(guild_id):
@@ -82,7 +82,7 @@ def check_user_tag(member, guild_id):
         if name and target_tag in name.lower():
             return True
             
-        return False
+    return False
 
 @bot.event
 async def on_ready():
@@ -158,5 +158,5 @@ async def tag_list(ctx):
 
 if __name__ == "__main__":
     keep_alive()
-    # Apna bot token yahan daalein ya environment variable use karein
-    bot.run(os.environ.get("DISCORD_TOKEN"))
+    # Railway ke 'TOKEN' variable ke sath match kar raha hai
+    bot.run(os.environ.get("TOKEN"))
