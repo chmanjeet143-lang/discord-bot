@@ -1,84 +1,72 @@
 import discord
 from discord.ext import commands
-import json
-import os
 
-CONFIG_FILE = "tag_config.json"
-
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-def save_config(data):
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+# Configuration
+SERVER_TAG = "Moon"  # Apna server tag yahan daalein (Case-insensitive check hoga)
+REWARD_ROLE_IDS = [
+    123456789012345678,  # Extra Emojis perm role ID
+    987654321098765432   # Extra Sticker perm role ID
+]
+LOG_CHANNEL_ID = 123456789012345678  # Jahan reward message bhejna hai (channel ID)
 
 class TagTracker(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def get_channel_id(self, guild_id):
-        config = load_config()
-        return config.get(str(guild_id), None)
-
-    def set_channel_id(self, guild_id, channel_id):
-        config = load_config()
-        config[str(guild_id)] = channel_id
-        save_config(config)
-
-    def check_user_tag(self, member, guild):
-        # Strictly official clan badge check aur Guild ID verification
-        if hasattr(member, 'clan') and member.clan:
-            clan = member.clan
-            
-            # Discord ke clan object me guild ID ya clan ID match karne ke liye check karte hain
-            clan_guild_id = getattr(clan, 'guild_id', None)
-            clan_id = getattr(clan, 'id', None)
-            
-            if clan_guild_id == guild.id or clan_id == guild.id:
-                return True
-        return False
+    def has_tag(self, member: discord.Member) -> bool:
+        """User ke username, global name ya nickname mein tag check karta hai."""
+        name_to_check = [
+            member.name,
+            member.global_name or "",
+            member.nick or ""
+        ]
+        return any(SERVER_TAG.lower() in text.lower() for text in name_to_check)
 
     @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
-        if before.bot:
+    async def on_member_update(before: discord.Member, after: discord.Member):
+        # Bot updates ko ignore karein
+        if after.bot:
             return
 
-        guild = after.guild
-        guild_id = guild.id
-        
-        has_tag_before = self.check_user_tag(before, guild)
-        has_tag_after = self.check_user_tag(after, guild)
+        before_has = self.has_tag(before)
+        after_has = self.has_tag(after)
 
-        if has_tag_before == has_tag_after:
-            return
+        # Agar pehle tag nahi tha, ab lagaa liya hai
+        if not before_has and after_has:
+            channel = after.guild.get_channel(LOG_CHANNEL_ID)
+            added_roles = []
 
-        channel_id = self.get_channel_id(guild_id)
-        if not channel_id:
-            return
+            for role_id in REWARD_ROLE_IDS:
+                role = after.guild.get_role(role_id)
+                if role and role not in after.roles:
+                    try:
+                        await after.add_roles(role, reason="Added server tag reward")
+                        added_roles.append(role)
+                    except discord.Forbidden:
+                        print(f"Failed to add role {role.name} due to missing permissions.")
 
-        channel = guild.get_channel(channel_id)
-        if not channel:
-            return
+            # Embed message bhejne ke liye
+            if channel:
+                embed = discord.Embed(
+                    title="Guild Tag Added",
+                    description=f"{after.mention} Thanks for wearing our server tag!",
+                    color=discord.Color.blue()
+                )
+                embed.add_field(name="Tag", value=f"`{SERVER_TAG}`", inline=True)
+                embed.set_thumbnail(url=after.display_avatar.url)
+                
+                # Agar kuch roles mile hain toh unka zikr kar sakte hain
+                await channel.send(embed=embed)
 
-        if not has_tag_before and has_tag_after:
-            text = f"Thanks for using our server tag bsss! {after.mention} ✨"
-            embed = discord.Embed(title="✨ Server Clan Tag Added", description=text, color=0x57F287)
-            await channel.send(embed=embed)
-
-        elif has_tag_before and not has_tag_after:
-            text = f"{after.mention} ne hamara server clan tag hata diya. 🌑"
-            embed = discord.Embed(title="🌑 Server Clan Tag Removed", description=text, color=0xED4245)
-            await channel.send(embed=embed)
-
-    @commands.command(name="tagchannel")
-    @commands.has_permissions(administrator=True)
-    async def tag_channel(self, ctx, channel: discord.TextChannel):
-        """Log channel set karne ke liye."""
-        self.set_channel_id(ctx.guild.id, channel.id)
-        await ctx.send(f"✅ Log channel set ho gaya hai {channel.mention} par! Ab bot sirf official clan badge aur server guild ID match karke kaam karega.")
+        # Agar pehle tag tha, ab hata diya hai
+        elif before_has and not after_has:
+            for role_id in REWARD_ROLE_IDS:
+                role = after.guild.get_role(role_id)
+                if role and role in after.roles:
+                    try:
+                        await after.remove_roles(role, reason="Removed server tag")
+                    except discord.Forbidden:
+                        print(f"Failed to remove role {role.name} due to missing permissions.")
 
 async def setup(bot):
     await bot.add_cog(TagTracker(bot))
