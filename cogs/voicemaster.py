@@ -222,10 +222,6 @@ class VoiceMaster(commands.Cog, description="Explore all commands related to Voi
 
     @vm.command(name="img", help="Set or update the Voice Master panel banner image.")
     async def vm_img(self, ctx, url: str):
-        """
-        Set or update the custom banner image for Voice Master panels.
-        Usage: !vm img <image_link>
-        """
         if not ctx.author.guild_permissions.administrator:
             return await ctx.send("❌ You need Administrator permission.")
         
@@ -326,7 +322,7 @@ class VoiceMaster(commands.Cog, description="Explore all commands related to Voi
             self.bot.add_view(VoiceControlView(new_vc.id))
 
             embed = self.get_panel_embed(guild.id)
-            embed.description = f"Welcome {member.mention} ❤️\n\nUse this interface to manage your voice channel.\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel."
+            embed.description = f"Welcome {member.mention} ❤️\n\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel."
             
             view = VoiceControlView(new_vc.id)
             try:
