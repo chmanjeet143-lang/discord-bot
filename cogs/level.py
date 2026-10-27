@@ -1,427 +1,287 @@
 import discord
 from discord.ext import commands, tasks
-import sqlite3
-import math
-import time
+import json
+import os
+import random
+from PIL import Image, ImageDraw, ImageFont
 import io
-from PIL import Image, ImageDraw, ImageFont, ImageOps
 import aiohttp
 
-class Leveling(commands.Cog):
+CONFIG_FILE = "levels_config.json"
+
+def load_data():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_data(data):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+class AdvancedLeveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.cooldowns = {}
-        
-        # Database Connection Setup
-        self.db = sqlite3.connect("levels.db")
-        self.cursor = self.db.cursor()
-        self.create_tables()
-        
-        # Start Voice XP Loop
-        self.voice_xp_loop.start()
+        self.vc_xp_loop.start()
 
     def cog_unload(self):
-        self.voice_xp_loop.cancel()
-        self.db.close()
+        self.vc_xp_loop.cancel()
 
-    def create_tables(self):
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER,
-                guild_id INTEGER,
-                msg_xp INTEGER DEFAULT 0,
-                vc_xp INTEGER DEFAULT 0,
-                xp INTEGER DEFAULT 0,
-                level INTEGER DEFAULT 0,
-                bg_url TEXT DEFAULT NULL,
-                PRIMARY KEY (user_id, guild_id)
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS guild_settings (
-                guild_id INTEGER PRIMARY KEY,
-                msg_channel INTEGER DEFAULT 0,
-                vc_channel INTEGER DEFAULT 0,
-                msg_text TEXT DEFAULT 'Congratulations {user}, you just advanced to level {level} through texting! 🎉',
-                vc_text TEXT DEFAULT 'Great job {user}, your voice activity earned you level {level}! 🎙️'
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS rewards (
-                guild_id INTEGER,
-                level INTEGER,
-                role_id INTEGER,
-                PRIMARY KEY (guild_id, level)
-            )
-        ''')
-        self.db.commit()
+    @commands.command(name="setmsgchannel", help="Set the channel for Message XP.")
+    @commands.has_permissions(administrator=True)
+    async def set_msg_channel(self, ctx, channel: discord.TextChannel):
+        """Set message XP channel.
+        Usage: &setmsgchannel #channel-name"""
+        data = load_data()
+        guild_id = str(ctx.guild.id)
+        if guild_id not in data:
+            data[guild_id] = {"settings": {}, "users": {}}
+        data[guild_id]["settings"]["msg_channel"] = channel.id
+        save_data(data)
+        await ctx.send(f"✅ Message XP channel successfully set to {channel.mention}!")
 
-    def get_settings(self, guild_id):
-        self.cursor.execute("SELECT msg_channel, vc_channel, msg_text, vc_text FROM guild_settings WHERE guild_id = ?", (guild_id,))
-        res = self.cursor.fetchone()
-        if not res:
-            self.cursor.execute("INSERT INTO guild_settings (guild_id) VALUES (?)", (guild_id,))
-            self.db.commit()
-            return (0, 0, 'Congratulations {user}, you just advanced to level {level} through texting! 🎉', 'Great job {user}, your voice activity earned you level {level}! 🎙️')
-        return res
+    @commands.command(name="setvcchannel", help="Set the channel for VC XP.")
+    @commands.has_permissions(administrator=True)
+    async def set_vc_channel(self, ctx, channel: discord.TextChannel):
+        """Set VC XP channel.
+        Usage: &setvcchannel #channel-name"""
+        data = load_data()
+        guild_id = str(ctx.guild.id)
+        if guild_id not in data:
+            data[guild_id] = {"settings": {}, "users": {}}
+        data[guild_id]["settings"]["vc_channel"] = channel.id
+        save_data(data)
+        await ctx.send(f"✅ VC XP channel successfully set to {channel.mention}!")
 
-    def calculate_level(self, xp):
-        return int(math.sqrt(xp / 100))
+    @commands.command(name="setlevelmsg", help="Set a custom level-up message.")
+    @commands.has_permissions(administrator=True)
+    async def set_level_msg(self, ctx, *, message: str):
+        """Set custom level up message.
+        Usage: &setlevelmsg Congrats {user} for reaching level {level}!"""
+        data = load_data()
+        guild_id = str(ctx.guild.id)
+        if guild_id not in data:
+            data[guild_id] = {"settings": {}, "users": {}}
+        data[guild_id]["settings"]["custom_msg"] = message
+        save_data(data)
+        await ctx.send("✅ Custom level-up message updated successfully!")
 
-    def xp_for_level(self, level):
-        return (level + 1) ** 2 * 100
+    @commands.command(name="setrankbg", help="Set a custom background image URL for your VIP rank card.")
+    async def set_rank_bg(self, ctx, url: str):
+        """Set custom rank card background.
+        Usage: &setrankbg https://image-url.com/bg.png"""
+        data = load_data()
+        guild_id = str(ctx.guild.id)
+        user_id = str(ctx.author.id)
+        if guild_id not in data:
+            data[guild_id] = {"settings": {}, "users": {}}
+        if "users" not in data[guild_id]:
+            data[guild_id]["users"] = {}
+        if user_id not in data[guild_id]["users"]:
+            data[guild_id]["users"][user_id] = {"msg_xp": 0, "msg_level": 1, "vc_xp": 0, "vc_level": 1}
+        
+        data[guild_id]["users"][user_id]["custom_bg"] = url
+        save_data(data)
+        await ctx.send("✅ Aapka VIP rank card background successfully set ho gaya hai!")
 
-    # --- MESSAGE XP LISTENER ---
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
             return
 
-        user_id = message.author.id
-        guild_id = message.guild.id
-        current_time = time.time()
+        data = load_data()
+        guild_id = str(message.guild.id)
+        user_id = str(message.author.id)
 
-        if user_id in self.cooldowns and current_time - self.cooldowns[user_id] < 60:
-            return
-        self.cooldowns[user_id] = current_time
+        if guild_id not in data:
+            data[guild_id] = {"settings": {}, "users": {}}
+        if "users" not in data[guild_id]:
+            data[guild_id]["users"] = {}
+        if user_id not in data[guild_id]["users"]:
+            data[guild_id]["users"][user_id] = {"msg_xp": 0, "msg_level": 1, "vc_xp": 0, "vc_level": 1}
 
-        self.cursor.execute("SELECT msg_xp, vc_xp, level FROM users WHERE user_id = ? AND guild_id = ?", (user_id, guild_id))
-        data = self.cursor.fetchone()
-        
-        earned_msg_xp = 20
-        if not data:
-            new_msg_xp = earned_msg_xp
-            new_vc_xp = 0
-            total_xp = new_msg_xp
-            new_level = self.calculate_level(total_xp)
-            self.cursor.execute("INSERT INTO users (user_id, guild_id, msg_xp, vc_xp, xp, level) VALUES (?, ?, ?, ?, ?, ?)", 
-                                (user_id, guild_id, new_msg_xp, new_vc_xp, total_xp, new_level))
-        else:
-            old_msg_xp, vc_xp, old_level = data
-            new_msg_xp = old_msg_xp + earned_msg_xp
-            total_xp = new_msg_xp + vc_xp
-            new_level = self.calculate_level(total_xp)
-            self.cursor.execute("UPDATE users SET msg_xp = ?, xp = ?, level = ? WHERE user_id = ? AND guild_id = ?", 
-                                (new_msg_xp, total_xp, new_level, user_id, guild_id))
-        
-        self.db.commit()
+        xp_earned = random.randint(2, 4)
+        user_data = data[guild_id]["users"][user_id]
+        user_data["msg_xp"] += xp_earned
 
-        if data and new_level > data[2]:
-            msg_chan, _, msg_txt, _ = self.get_settings(guild_id)
-            channel = message.guild.get_channel(msg_chan) or message.channel
-            formatted_text = msg_txt.replace("{user}", message.author.mention).replace("{level}", str(new_level))
-            embed = discord.Embed(title="🎉 Level Up! (Text)", description=formatted_text, color=discord.Color.green())
-            embed.set_thumbnail(url=message.author.display_avatar.url)
-            await channel.send(embed=embed)
-            await self.check_rewards(message.author, new_level)
+        next_level_xp = user_data["msg_level"] * 100
+        if user_data["msg_xp"] >= next_level_xp:
+            user_data["msg_level"] += 1
+            user_data["msg_xp"] = 0
 
-    # --- VOICE XP BACKGROUND LOOP ---
-    @tasks.loop(minutes=5.0)
-    async def voice_xp_loop(self):
-        for guild in self.bot.guilds:
-            msg_chan, vc_chan, _, vc_txt = self.get_settings(guild.id)
+            settings = data[guild_id].get("settings", {})
+            target_channel_id = settings.get("msg_channel", message.channel.id)
+            target_channel = message.guild.get_channel(target_channel_id) or message.channel
+
+            custom_msg = settings.get("custom_msg", "🎉 Badhai ho {user}, aapka message level badhkar **Level {level}** ho gaya hai!")
+            formatted_msg = custom_msg.format(
+                user=message.author.mention,
+                level=user_data["msg_level"],
+                server=message.guild.name
+            )
+            await target_channel.send(formatted_msg)
+
+        save_data(data)
+
+    @tasks.loop(minutes=1)
+    async def vc_xp_loop(self):
+        data = load_data()
+        for guild_id, guild_info in data.items():
+            guild = self.bot.get_guild(int(guild_id))
+            if not guild:
+                continue
+
+            settings = guild_info.get("settings", {})
+            users_data = guild_info.get("users", {})
+
             for vc in guild.voice_channels:
-                active_members = [m for m in vc.members if not m.bot and not m.voice.self_mute]
-                if len(active_members) >= 2:
-                    for member in active_members:
-                        self.cursor.execute("SELECT msg_xp, vc_xp, level FROM users WHERE user_id = ? AND guild_id = ?", (member.id, guild.id))
-                        data = self.cursor.fetchone()
-                        
-                        earned_vc_xp = 15
-                        if not data:
-                            msg_xp = 0
-                            new_vc_xp = earned_vc_xp
-                            total_xp = new_vc_xp
-                            new_level = self.calculate_level(total_xp)
-                            self.cursor.execute("INSERT INTO users (user_id, guild_id, msg_xp, vc_xp, xp, level) VALUES (?, ?, ?, ?, ?, ?)", 
-                                                (member.id, guild.id, msg_xp, new_vc_xp, total_xp, new_level))
-                        else:
-                            msg_xp, old_vc_xp, old_level = data
-                            new_vc_xp = old_vc_xp + earned_vc_xp
-                            total_xp = msg_xp + new_vc_xp
-                            new_level = self.calculate_level(total_xp)
-                            self.cursor.execute("UPDATE users SET vc_xp = ?, xp = ?, level = ? WHERE user_id = ? AND guild_id = ?", 
-                                                (new_vc_xp, total_xp, new_level, member.id, guild.id))
-                        self.db.commit()
+                active_members = [m for m in vc.members if not m.bot and not m.voice.self_deaf]
+                if len(active_members) < 2:
+                    continue
 
-                        if data and new_level > data[2]:
-                            channel = guild.get_channel(vc_chan) or guild.system_channel
-                            if channel:
-                                formatted_text = vc_txt.replace("{user}", member.mention).replace("{level}", str(new_level))
-                                embed = discord.Embed(title="🎙️ Level Up! (Voice)", description=formatted_text, color=discord.Color.blue())
-                                embed.set_thumbnail(url=member.display_avatar.url)
-                                await channel.send(embed=embed)
-                            await self.check_rewards(member, new_level)
+                for member in active_members:
+                    user_id = str(member.id)
+                    if user_id not in users_data:
+                        users_data[user_id] = {"msg_xp": 0, "msg_level": 1, "vc_xp": 0, "vc_level": 1}
 
-    @voice_xp_loop.before_loop
-    async def before_voice_loop(self):
+                    vc_earned = random.randint(1, 2)
+                    u_info = users_data[user_id]
+                    u_info["vc_xp"] += vc_earned
+
+                    next_vc_xp = u_info["vc_level"] * 100
+                    if u_info["vc_xp"] >= next_vc_xp:
+                        u_info["vc_level"] += 1
+                        u_info["vc_xp"] = 0
+
+                        target_channel_id = settings.get("vc_channel")
+                        target_channel = guild.get_channel(target_channel_id) if target_channel_id else None
+
+                        if target_channel:
+                            custom_msg = settings.get("custom_msg", "🎙️ Shandaar {user}! Aapka VC level badhkar **Level {level}** ho gaya hai!")
+                            formatted_msg = custom_msg.format(
+                                user=member.mention,
+                                level=u_info["vc_level"],
+                                server=guild.name
+                            )
+                            await target_channel.send(formatted_msg)
+
+        save_data(data)
+
+    @vc_xp_loop.before_loop
+    async def before_vc_xp(self):
         await self.bot.wait_until_ready()
 
-    async def check_rewards(self, member, level):
-        self.cursor.execute("SELECT role_id FROM rewards WHERE guild_id = ? AND level = ?", (member.guild.id, level))
-        res = self.cursor.fetchone()
-        if res:
-            role = member.guild.get_role(res[0])
-            if role:
-                try:
-                    await member.add_roles(role)
-                except:
-                    pass
-
-    # --- STYLISH RANK CARD GENERATOR (SEPARATE XP LINES & FULL BG) ---
-    async def generate_rank_card(self, member, msg_xp, vc_xp, total_xp, level, rank_pos, bg_url):
-        card = Image.new("RGBA", (900, 340), (24, 25, 28, 255))
-        draw = ImageDraw.Draw(card)
-
-        # 1. Full Card Background Image Fit
-        if bg_url:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(bg_url) as resp:
-                        if resp.status == 200:
-                            bg_bytes = await resp.read()
-                            bg_img = Image.open(io.BytesIO(bg_bytes)).convert("RGBA")
-                            bg_img = bg_img.resize((900, 340))
-                            card.paste(bg_img, (0, 0))
-            except:
-                draw.rectangle([0, 0, 900, 340], fill=(24, 25, 28, 255))
-        else:
-            draw.rectangle([0, 0, 900, 340], fill=(24, 25, 28, 255))
-
-        # 2. Dark Overlay Panel for Readability
-        overlay = Image.new("RGBA", (900, 340), (0, 0, 0, 170))
-        card = Image.alpha_composite(card, overlay)
-        draw = ImageDraw.Draw(card)
-
-        # Outer Border Outline
-        draw.rounded_rectangle([10, 10, 890, 330], radius=16, outline=(88, 101, 242, 200), width=3)
-
-        # 3. Circular Avatar with Border
-        avatar_url = member.display_avatar.replace(size=128, format="png").url
-        async with aiohttp.ClientSession() as session:
-            async with session.get(avatar_url) as resp:
-                if resp.status == 200:
-                    avatar_bytes = await resp.read()
-                    avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-                    avatar_img = avatar_img.resize((130, 130))
-                    
-                    mask = Image.new("L", (130, 130), 0)
-                    draw_mask = ImageDraw.Draw(mask)
-                    draw_mask.ellipse((0, 0, 130, 130), fill=255)
-                    avatar_img = ImageOps.fit(avatar_img, mask.size, centering=(0.5, 0.5))
-                    avatar_img.putalpha(mask)
-                    
-                    card.paste(avatar_img, (45, 95), avatar_img)
-                    draw.ellipse([42, 92, 178, 228], outline=(114, 137, 218, 255), width=4)
-
-        # Fonts Setup (Using Linux safe DejaVuSans or fallback)
-        try:
-            font_name = ImageFont.truetype("DejaVuSans-Bold.ttf", 34)
-            font_sub = ImageFont.truetype("DejaVuSans-Bold.ttf", 20)
-            font_small = ImageFont.truetype("DejaVuSans.ttf", 17)
-        except:
-            try:
-                font_name = ImageFont.truetype("arial.ttf", 34)
-                font_sub = ImageFont.truetype("arial.ttf", 20)
-                font_small = ImageFont.truetype("arial.ttf", 17)
-            except:
-                font_name = ImageFont.load_default()
-                font_sub = ImageFont.load_default()
-                font_small = ImageFont.load_default()
-
-        # Text Details with Separate Lines for Msg XP & VC XP
-        draw.text((200, 45), member.display_name, fill=(255, 255, 255), font=font_name)
-        draw.text((200, 90), f"RANK: #{rank_pos}   •   LEVEL: {level}", fill=(114, 137, 218), font=font_sub)
-        
-        # Separate lines for Message XP and Voice XP
-        draw.text((200, 130), f"Message XP: {msg_xp}", fill=(220, 225, 235), font=font_small)
-        draw.text((200, 155), f"Voice XP: {vc_xp}", fill=(220, 225, 235), font=font_small)
-
-        # Progress Bar Calculations
-        current_level_xp = self.xp_for_level(level - 1) if level > 0 else 0
-        next_level_xp = self.xp_for_level(level)
-        xp_needed_this_lvl = next_level_xp - current_level_xp
-        xp_user_has = total_xp - current_level_xp
-        
-        if xp_needed_this_lvl <= 0:
-            percentage = 1.0
-        else:
-            percentage = max(0.0, min(1.0, xp_user_has / xp_needed_this_lvl))
-
-        bar_x, bar_y, bar_w, bar_h = 200, 210, 640, 28
-        draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=14, fill=(47, 49, 54))
-        
-        fill_width = int(bar_w * percentage)
-        if fill_width > 0:
-            draw.rounded_rectangle([bar_x, bar_y, bar_x + fill_width, bar_y + bar_h], radius=14, fill=(88, 101, 242))
-
-        xp_text = f"{total_xp} / {next_level_xp} XP"
-        draw.text((bar_x + 240, bar_y + 5), xp_text, fill=(255, 255, 255), font=font_small)
-
-        buffer = io.BytesIO()
-        card.save(buffer, format="PNG")
-        buffer.seek(0)
-        return buffer
-
-    # --- CUSTOM BACKGROUND COMMAND ---
-    @commands.command(name="setbg", help="Set a custom background image for your rank card using image URL or attachment.")
-    async def setbg(self, ctx, url: str = None):
-        if not url and ctx.message.attachments:
-            url = ctx.message.attachments[0].url
-        
-        if not url:
-            return await ctx.send("❌ Kripya image ka URL dein ya image attach karein!")
-        
-        self.cursor.execute("SELECT user_id FROM users WHERE user_id = ? AND guild_id = ?", (ctx.author.id, ctx.guild.id))
-        data = self.cursor.fetchone()
-        if not data:
-            self.cursor.execute("INSERT INTO users (user_id, guild_id, bg_url) VALUES (?, ?, ?)", (ctx.author.id, ctx.guild.id, url))
-        else:
-            self.cursor.execute("UPDATE users SET bg_url = ? WHERE user_id = ? AND guild_id = ?", (url, ctx.author.id, ctx.guild.id))
-        self.db.commit()
-        await ctx.send("✅ Aapka custom rank card background successfully set ho gaya hai!")
-
-    # --- USER COMMANDS ---
-    @commands.command(name="rank", help="Check your current level, XP breakdown, and stylish rank card.")
+    @commands.command(name="rank", help="Check your VIP rank card with custom background.")
     async def rank(self, ctx, member: discord.Member = None):
+        """Check your VIP rank card.
+        Usage: &rank @username"""
         member = member or ctx.author
-        guild_id = ctx.guild.id
+        data = load_data()
+        guild_id = str(ctx.guild.id)
+        user_id = str(member.id)
 
-        self.cursor.execute("SELECT msg_xp, vc_xp, xp, level, bg_url FROM users WHERE user_id = ? AND guild_id = ?", (member.id, guild_id))
-        data = self.cursor.fetchone()
-        
-        msg_xp = data[0] if data else 0
-        vc_xp = data[1] if data else 0
-        total_xp = data[2] if data else 0
-        level = data[3] if data else 0
-        bg_url = data[4] if data and len(data) > 4 else None
+        if guild_id not in data or user_id not in data[guild_id].get("users", {}):
+            await ctx.send("❌ Is user ka koi level data nahi mila!")
+            return
 
-        self.cursor.execute("SELECT user_id FROM users WHERE guild_id = ? ORDER BY xp DESC", (guild_id,))
-        all_users = self.cursor.fetchall()
-        rank_pos = 1
-        for idx, row in enumerate(all_users):
-            if row[0] == member.id:
-                rank_pos = idx + 1
-                break
+        u_info = data[guild_id]["users"][user_id]
+        bg_url = u_info.get("custom_bg", None)
 
         async with ctx.typing():
-            buffer = await self.generate_rank_card(member, msg_xp, vc_xp, total_xp, level, rank_pos, bg_url)
+            card_width, card_height = 930, 282
+            card = Image.new("RGBA", (card_width, card_height), (20, 20, 25, 255))
+            
+            # Custom Background Image Load Karna
+            if bg_url:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(bg_url) as resp:
+                            if resp.status == 200:
+                                bg_bytes = await resp.read()
+                                bg_image = Image.open(io.BytesIO(bg_bytes)).convert("RGBA")
+                                bg_image = bg_image.resize((card_width, card_height))
+                                card.paste(bg_image, (0, 0))
+                except Exception:
+                    pass
+
+            # Dark Overlay for Readability
+            overlay = Image.new("RGBA", (card_width, card_height), (0, 0, 0, 160))
+            card = Image.alpha_composite(card, overlay)
+            draw = ImageDraw.Draw(card)
+
+            # User Avatar Circular Shape me Paste Karna
+            avatar_url = member.display_avatar.url
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(avatar_url) as resp:
+                        if resp.status == 200:
+                            avatar_bytes = await resp.read()
+                            avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
+                            avatar = avatar.resize((180, 180))
+                            
+                            mask = Image.new("L", (180, 180), 0)
+                            mask_draw = ImageDraw.Draw(mask)
+                            mask_draw.ellipse((0, 0, 180, 180), fill=255)
+                            
+                            card.paste(avatar, (51, 51), mask)
+            except Exception:
+                pass
+
+            try:
+                font_large = ImageFont.truetype("arial.ttf", 36)
+                font_medium = ImageFont.truetype("arial.ttf", 26)
+            except IOError:
+                font_large = ImageFont.load_default()
+                font_medium = ImageFont.load_default()
+
+            # Username & Big Stats Display
+            draw.text((260, 45), f"{member.name}", fill=(255, 255, 255, 255), font=font_large)
+            
+            msg_level = u_info['msg_level']
+            msg_xp = u_info['msg_xp']
+            next_xp = msg_level * 100
+            
+            draw.text((260, 105), f"LEVEL: {msg_level}", fill=(153, 45, 255, 255), font=font_large)
+            draw.text((600, 110), f"XP: {msg_xp} / {next_xp}", fill=(220, 220, 220, 255), font=font_medium)
+
+            # Progress Bar
+            bar_x, bar_y, bar_w, bar_h = 260, 175, 600, 30
+            draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=15, fill=(50, 50, 60, 255))
+            
+            progress = min(msg_xp / next_xp, 1.0)
+            fill_w = int(bar_w * progress)
+            if fill_w > 0:
+                draw.rounded_rectangle([bar_x, bar_y, bar_x + fill_w, bar_y + bar_h], radius=15, fill=(153, 45, 255, 255))
+
+            buffer = io.BytesIO()
+            card.save(buffer, format="PNG")
+            buffer.seek(0)
+            
             file = discord.File(buffer, filename="rank.png")
             await ctx.send(file=file)
 
-    @commands.command(name="leaderboard", aliases=["lb"], help="Check the top active users in the server.")
+    @commands.command(name="leaderboard", help="Show the top members leaderboard.")
     async def leaderboard(self, ctx):
-        guild_id = ctx.guild.id
-        self.cursor.execute("SELECT user_id, msg_xp, vc_xp, xp, level FROM users WHERE guild_id = ? ORDER BY xp DESC LIMIT 10", (guild_id,))
-        top_users = self.cursor.fetchall()
+        """Show leaderboard.
+        Usage: &leaderboard"""
+        data = load_data()
+        guild_id = str(ctx.guild.id)
 
-        if not top_users:
-            return await ctx.send("❌ Is server me abhi tak koi leveling data nahi mila!")
+        if guild_id not in data or not data[guild_id].get("users"):
+            await ctx.send("❌ Is server par abhi koi level data available nahi hai!")
+            return
 
-        embed = discord.Embed(title=f"🏆 Leaderboard - {ctx.guild.name}", color=discord.Color.gold())
-        description = ""
-        for idx, (uid, m_xp, v_xp, total_x, lvl) in enumerate(top_users, start=1):
-            user = ctx.guild.get_member(uid)
-            name = user.name if user else f"User ID: {uid}"
-            description += f"**{idx}.** {name} — Level: **{lvl}** (Total: {total_x} XP | Msg: {m_xp} | VC: {v_xp})\n"
+        users_dict = data[guild_id]["users"]
+        sorted_users = sorted(
+            users_dict.items(),
+            key=lambda x: (x[1]["msg_level"], x[1]["msg_xp"]),
+            reverse=True
+        )[:10]
 
-        embed.description = description
-        await ctx.send(embed=embed)
+        embed = discord.Embed(
+            title="🏆 Server Message Leaderboard",
+            color=discord.Color.gold()
+        )
 
-    # --- ADMIN CONFIGURATION COMMANDS ---
-    @commands.command(name="setmsgchannel", help="Set the channel for text message level-up notifications.")
-    @commands.has_permissions(administrator=True)
-    async def setmsgchannel(self, ctx, channel: discord.TextChannel):
-        self.cursor.execute("UPDATE guild_settings SET msg_channel = ? WHERE guild_id = ?", (channel.id, ctx.guild.id))
-        self.db.commit()
-        await ctx.send(f"✅ Text level-up channel successfully set to {channel.mention}!")
-
-    @commands.command(name="setvcchannel", help="Set the channel for voice XP level-up notifications.")
-    @commands.has_permissions(administrator=True)
-    async def setvcchannel(self, ctx, channel: discord.TextChannel):
-        self.cursor.execute("UPDATE guild_settings SET vc_channel = ? WHERE guild_id = ?", (channel.id, ctx.guild.id))
-        self.db.commit()
-        await ctx.send(f"✅ Voice level-up channel successfully set to {channel.mention}!")
-
-    @commands.command(name="setmsgtext", help="Customize the text level-up message.")
-    @commands.has_permissions(administrator=True)
-    async def setmsgtext(self, ctx, *, message: str):
-        self.cursor.execute("UPDATE guild_settings SET msg_text = ? WHERE guild_id = ?", (message, ctx.guild.id))
-        self.db.commit()
-        await ctx.send(f"✅ Text level-up message successfully update ho gaya hai!")
-
-    @commands.command(name="setvctext", help="Customize the voice level-up message.")
-    @commands.has_permissions(administrator=True)
-    async def setvctext(self, ctx, *, message: str):
-        self.cursor.execute("UPDATE guild_settings SET vc_text = ? WHERE guild_id = ?", (message, ctx.guild.id))
-        self.db.commit()
-        await ctx.send(f"✅ Voice level-up message successfully update ho gaya hai!")
-
-    @commands.command(name="addreward", help="Set a role reward for a specific level.")
-    @commands.has_permissions(administrator=True)
-    async def addreward(self, ctx, level: int, role: discord.Role):
-        self.cursor.execute("INSERT OR REPLACE INTO rewards (guild_id, level, role_id) VALUES (?, ?, ?)", (ctx.guild.id, level, role.id))
-        self.db.commit()
-        await ctx.send(f"✅ Successfully added reward: Level **{level}** par {role.mention} role milega!")
-
-    @commands.command(name="removereward", help="Remove the role reward from a specific level.")
-    @commands.has_permissions(administrator=True)
-    async def removereward(self, ctx, level: int):
-        self.cursor.execute("DELETE FROM rewards WHERE guild_id = ? AND level = ?", (ctx.guild.id, level))
-        self.db.commit()
-        await ctx.send(f"✅ Level **{level}** ka role reward hata diya gaya hai.")
-
-    @commands.command(name="rewards", help="View the list of all level role rewards.")
-    async def rewards(self, ctx):
-        self.cursor.execute("SELECT level, role_id FROM rewards WHERE guild_id = ? ORDER BY level ASC", (ctx.guild.id,))
-        rows = self.cursor.fetchall()
-        if not rows:
-            return await ctx.send("❌ Is server me koi level rewards configured nahi hain!")
-        
-        embed = discord.Embed(title=f"🎁 Level Rewards - {ctx.guild.name}", color=discord.Color.purple())
         desc = ""
-        for lvl, rid in rows:
-            role = ctx.guild.get_role(rid)
-            role_name = role.mention if role else f"Deleted Role (ID: {rid})"
-            desc += f"Level **{lvl}** ➔ {role_name}\n"
-        embed.description = desc
-        await ctx.send(embed=embed)
-
-    @commands.command(name="givexp", help="Add custom XP to a user.")
-    @commands.has_permissions(administrator=True)
-    async def givexp(self, ctx, member: discord.Member, amount: int):
-        self.cursor.execute("SELECT msg_xp, vc_xp, xp, level FROM users WHERE user_id = ? AND guild_id = ?", (member.id, ctx.guild.id))
-        data = self.cursor.fetchone()
-        if not data:
-            new_msg_xp = amount
-            vc_xp = 0
-            total_xp = new_msg_xp
-            new_level = self.calculate_level(total_xp)
-            self.cursor.execute("INSERT INTO users (user_id, guild_id, msg_xp, vc_xp, xp, level) VALUES (?, ?, ?, ?, ?, ?)", (member.id, ctx.guild.id, new_msg_xp, vc_xp, total_xp, new_level))
-        else:
-            msg_xp, vc_xp, old_total, old_lvl = data
-            new_msg_xp = msg_xp + amount
-            total_xp = new_msg_xp + vc_xp
-            new_level = self.calculate_level(total_xp)
-            self.cursor.execute("UPDATE users SET msg_xp = ?, xp = ?, level = ? WHERE user_id = ? AND guild_id = ?", (new_msg_xp, total_xp, new_level, member.id, ctx.guild.id))
-        self.db.commit()
-        await ctx.send(f"✅ {member.mention} ko **{amount} XP** add kar diye gaye hain!")
-
-    @commands.command(name="removexp", help="Remove XP from a user.")
-    @commands.has_permissions(administrator=True)
-    async def removexp(self, ctx, member: discord.Member, amount: int):
-        self.cursor.execute("SELECT msg_xp, vc_xp, xp, level FROM users WHERE user_id = ? AND guild_id = ?", (member.id, ctx.guild.id))
-        data = self.cursor.fetchone()
-        if not data:
-            return await ctx.send(f"❌ {member.mention} ke paas koi XP data nahi hai.")
-        
-        msg_xp, vc_xp, old_total, old_lvl = data
-        new_msg_xp = max(0, msg_xp - amount)
-        total_xp = new_msg_xp + vc_xp
-        new_level = self.calculate_level(total_xp)
-        self.cursor.execute("UPDATE users SET msg_xp = ?, xp = ?, level = ? WHERE user_id = ? AND guild_id = ?", (new_msg_xp, total_xp, new_level, member.id, ctx.guild.id))
-        self.db.commit()
-        await ctx.send(f"✅ {member.mention} se **{amount} XP** kam kar diye gaye hain!")
-
-async def setup(bot):
-    await bot.add_cog(Leveling(bot))
+        for i, (user_id, info) in enumerate(sorted_users, start=1):
