@@ -11,8 +11,11 @@ CONFIG_FILE = "levels_config.json"
 
 def load_data():
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
     return {}
 
 def save_data(data):
@@ -29,49 +32,108 @@ class Level(commands.Cog):
     def cog_unload(self):
         self.vc_xp_loop.cancel()
 
-    @commands.command(name="setmsgchannel", help="Set the channel for Message XP.")
+    @commands.command(name="setmsgchannel", help="Set the channel for Message XP.\nUsage: &setmsgchannel #channel-name")
     @commands.has_permissions(administrator=True)
-    async def set_msg_channel(self, ctx, channel: discord.TextChannel):
-        """Set message XP channel.
-        Usage: &setmsgchannel #channel-name"""
+    async def set_msg_channel(self, ctx, channel: discord.TextChannel = None):
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+
+        if not channel:
+            embed = discord.Embed(
+                title="⚙️ Message XP Channel",
+                description="Set the channel where message level-up notifications will be sent.\n\n**Usage:**\n`&setmsgchannel #channel`",
+                color=discord.Color.blue()
+            )
+            return await ctx.send(embed=embed, delete_after=5)
+
         data = load_data()
         guild_id = str(ctx.guild.id)
         if guild_id not in data:
             data[guild_id] = {"settings": {}, "users": {}}
         data[guild_id]["settings"]["msg_channel"] = channel.id
         save_data(data)
-        await ctx.send(f"✅ Message XP channel successfully set to {channel.mention}!")
 
-    @commands.command(name="setvcchannel", help="Set the channel for VC XP.")
+        embed = discord.Embed(
+            description=f"✅ Message XP channel successfully set to {channel.mention}!",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed, delete_after=3)
+
+    @commands.command(name="setvcchannel", help="Set the channel for VC XP notifications.\nUsage: &setvcchannel #channel-name")
     @commands.has_permissions(administrator=True)
-    async def set_vc_channel(self, ctx, channel: discord.TextChannel):
-        """Set VC XP channel.
-        Usage: &setvcchannel #channel-name"""
+    async def set_vc_channel(self, ctx, channel: discord.TextChannel = None):
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+
+        if not channel:
+            embed = discord.Embed(
+                title="🎙️ VC XP Channel",
+                description="Set the channel where Voice Chat level-up notifications will be sent.\n\n**Usage:**\n`&setvcchannel #channel`",
+                color=discord.Color.blue()
+            )
+            return await ctx.send(embed=embed, delete_after=5)
+
         data = load_data()
         guild_id = str(ctx.guild.id)
         if guild_id not in data:
             data[guild_id] = {"settings": {}, "users": {}}
         data[guild_id]["settings"]["vc_channel"] = channel.id
         save_data(data)
-        await ctx.send(f"✅ VC XP channel successfully set to {channel.mention}!")
 
-    @commands.command(name="setlevelmsg", help="Set a custom level-up message.")
+        embed = discord.Embed(
+            description=f"✅ VC XP channel successfully set to {channel.mention}!",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed, delete_after=3)
+
+    @commands.command(name="setlevelmsg", help="Set a custom level-up message.\nUsage: &setlevelmsg Congrats {user} for reaching level {level}!")
     @commands.has_permissions(administrator=True)
-    async def set_level_msg(self, ctx, *, message: str):
-        """Set custom level up message.
-        Usage: &setlevelmsg Congrats {user} for reaching level {level}!"""
+    async def set_level_msg(self, ctx, *, message: str = None):
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+
+        if not message:
+            embed = discord.Embed(
+                title="⚙️ Custom Level Message",
+                description="Set a custom message when a user levels up.\n\n**Variables:** `{user}`, `{level}`, `{server}`\n**Usage:**\n`&setlevelmsg Congrats {user} for reaching Level {level}!`",
+                color=discord.Color.blue()
+            )
+            return await ctx.send(embed=embed, delete_after=5)
+
         data = load_data()
         guild_id = str(ctx.guild.id)
         if guild_id not in data:
             data[guild_id] = {"settings": {}, "users": {}}
         data[guild_id]["settings"]["custom_msg"] = message
         save_data(data)
-        await ctx.send("✅ Custom level-up message updated successfully!")
 
-    @commands.command(name="setrankbg", help="Set a custom background image URL for your VIP rank card.")
-    async def set_rank_bg(self, ctx, url: str):
-        """Set custom rank card background.
-        Usage: &setrankbg https://image-url.com/bg.png"""
+        embed = discord.Embed(
+            description="✅ Custom level-up message updated successfully!",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed, delete_after=3)
+
+    @commands.command(name="setrankbg", help="Set a custom background image URL for your VIP rank card.\nUsage: &setrankbg https://image-url.com/bg.png")
+    async def set_rank_bg(self, ctx, url: str = None):
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+
+        if not url:
+            embed = discord.Embed(
+                title="🖼️ VIP Rank Card Background",
+                description="Set a custom background image link for your rank card.\n\n**Usage:**\n`&setrankbg <image_url>`",
+                color=discord.Color.blue()
+            )
+            return await ctx.send(embed=embed, delete_after=5)
+
         data = load_data()
         guild_id = str(ctx.guild.id)
         user_id = str(ctx.author.id)
@@ -84,7 +146,12 @@ class Level(commands.Cog):
         
         data[guild_id]["users"][user_id]["custom_bg"] = url
         save_data(data)
-        await ctx.send("✅ Aapka VIP rank card background successfully set ho gaya hai!")
+
+        embed = discord.Embed(
+            description=f"✅ {ctx.author.mention}, your VIP rank card background has been set successfully!",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed, delete_after=3)
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -121,7 +188,11 @@ class Level(commands.Cog):
                 level=user_data["msg_level"],
                 server=message.guild.name
             )
-            await target_channel.send(formatted_msg)
+            embed = discord.Embed(description=formatted_msg, color=discord.Color.gold())
+            try:
+                await target_channel.send(embed=embed)
+            except:
+                pass
 
         save_data(data)
 
@@ -165,7 +236,11 @@ class Level(commands.Cog):
                                 level=u_info["vc_level"],
                                 server=guild.name
                             )
-                            await target_channel.send(formatted_msg)
+                            embed = discord.Embed(description=formatted_msg, color=discord.Color.purple())
+                            try:
+                                await target_channel.send(embed=embed)
+                            except:
+                                pass
 
         save_data(data)
 
@@ -173,26 +248,25 @@ class Level(commands.Cog):
     async def before_vc_xp(self):
         await self.bot.wait_until_ready()
 
-    @commands.command(name="rank", help="Check your VIP rank card with custom background.")
+    @commands.command(name="rank", help="Check your VIP rank card with custom background.\nUsage: &rank @username")
     async def rank(self, ctx, member: discord.Member = None):
-        """Check your VIP rank card.
-        Usage: &rank @username"""
         member = member or ctx.author
         data = load_data()
         guild_id = str(ctx.guild.id)
         user_id = str(member.id)
 
         if guild_id not in data or user_id not in data[guild_id].get("users", {}):
-            await ctx.send("❌ Is user ka koi level data nahi mila!")
-            return
+            embed = discord.Embed(description="❌ Is user ka koi level data nahi mila!", color=discord.Color.red())
+            return await ctx.send(embed=embed, delete_after=3)
 
         u_info = data[guild_id]["users"][user_id]
         bg_url = u_info.get("custom_bg", None)
 
         async with ctx.typing():
             card_width, card_height = 930, 282
-            card = Image.new("RGBA", (card_width, card_height), (20, 20, 25, 255))
+            card = Image.new("RGBA", (card_width, card_height), (15, 15, 20, 255))
             
+            # Background Image Loading
             if bg_url:
                 try:
                     async with aiohttp.ClientSession() as session:
@@ -205,50 +279,67 @@ class Level(commands.Cog):
                 except Exception:
                     pass
 
-            overlay = Image.new("RGBA", (card_width, card_height), (0, 0, 0, 160))
+            # Stunning Dark Gradient Overlay for High Contrast & Beauty
+            overlay = Image.new("RGBA", (card_width, card_height), (10, 10, 15, 185))
             card = Image.alpha_composite(card, overlay)
             draw = ImageDraw.Draw(card)
 
-            avatar_url = member.display_avatar.url
+            # Avatar Loading with Glowing Neon Ring Border
+            avatar_size = 180
+            avatar_x, avatar_y = 51, 51
+            
+            # Draw Outer Neon Glow/Ring
+            ring_margin = 4
+            draw.ellipse(
+                [avatar_x - ring_margin, avatar_y - ring_margin, avatar_x + avatar_size + ring_margin, avatar_y + avatar_size + ring_margin],
+                fill=(153, 45, 255, 255)
+            )
+
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(avatar_url) as resp:
+                    async with session.get(member.display_avatar.url) as resp:
                         if resp.status == 200:
                             avatar_bytes = await resp.read()
                             avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-                            avatar = avatar.resize((180, 180))
+                            avatar = avatar.resize((avatar_size, avatar_size))
                             
-                            mask = Image.new("L", (180, 180), 0)
+                            mask = Image.new("L", (avatar_size, avatar_size), 0)
                             mask_draw = ImageDraw.Draw(mask)
-                            mask_draw.ellipse((0, 0, 180, 180), fill=255)
+                            mask_draw.ellipse((0, 0, avatar_size, avatar_size), fill=255)
                             
-                            card.paste(avatar, (51, 51), mask)
+                            card.paste(avatar, (avatar_x, avatar_y), mask)
             except Exception:
                 pass
 
+            # Fonts Loading (Larger, Bold & Gorgeous Layout)
             try:
-                font_large = ImageFont.truetype("arial.ttf", 36)
-                font_medium = ImageFont.truetype("arial.ttf", 26)
+                font_name = ImageFont.truetype("arial.ttf", 46)
+                font_level = ImageFont.truetype("arial.ttf", 36)
+                font_xp = ImageFont.truetype("arial.ttf", 26)
             except IOError:
-                font_large = ImageFont.load_default()
-                font_medium = ImageFont.load_default()
+                font_name = ImageFont.load_default()
+                font_level = ImageFont.load_default()
+                font_xp = ImageFont.load_default()
 
-            draw.text((260, 45), f"{member.name}", fill=(255, 255, 255, 255), font=font_large)
+            # Username Text (Bold & Large)
+            draw.text((260, 42), f"{member.name}", fill=(255, 255, 255, 255), font=font_name)
             
             msg_level = u_info['msg_level']
             msg_xp = u_info['msg_xp']
             next_xp = msg_level * 100
             
-            draw.text((260, 105), f"LEVEL: {msg_level}", fill=(153, 45, 255, 255), font=font_large)
-            draw.text((600, 110), f"XP: {msg_xp} / {next_xp}", fill=(220, 220, 220, 255), font=font_medium)
+            # Level & XP Stats Display
+            draw.text((260, 102), f"LEVEL: {msg_level}", fill=(170, 80, 255, 255), font=font_level)
+            draw.text((620, 108), f"XP: {msg_xp} / {next_xp}", fill=(210, 210, 220, 255), font=font_xp)
 
-            bar_x, bar_y, bar_w, bar_h = 260, 175, 600, 30
-            draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=15, fill=(50, 50, 60, 255))
+            # Sleek Progress Bar
+            bar_x, bar_y, bar_w, bar_h = 260, 172, 610, 32
+            draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=16, fill=(35, 35, 45, 255))
             
             progress = min(msg_xp / next_xp, 1.0)
             fill_w = int(bar_w * progress)
             if fill_w > 0:
-                draw.rounded_rectangle([bar_x, bar_y, bar_x + fill_w, bar_y + bar_h], radius=15, fill=(153, 45, 255, 255))
+                draw.rounded_rectangle([bar_x, bar_y, bar_x + fill_w, bar_y + bar_h], radius=16, fill=(153, 45, 255, 255))
 
             buffer = io.BytesIO()
             card.save(buffer, format="PNG")
@@ -257,16 +348,14 @@ class Level(commands.Cog):
             file = discord.File(buffer, filename="rank.png")
             await ctx.send(file=file)
 
-    @commands.command(name="leaderboard", help="Show the top members leaderboard.")
+    @commands.command(name="leaderboard", help="Show the top members leaderboard.\nUsage: &leaderboard")
     async def leaderboard(self, ctx):
-        """Show leaderboard.
-        Usage: &leaderboard"""
         data = load_data()
         guild_id = str(ctx.guild.id)
 
         if guild_id not in data or not data[guild_id].get("users"):
-            await ctx.send("❌ Is server par abhi koi level data available nahi hai!")
-            return
+            embed = discord.Embed(description="❌ Is server par abhi koi level data available nahi hai!", color=discord.Color.red())
+            return await ctx.send(embed=embed, delete_after=3)
 
         users_dict = data[guild_id]["users"]
         sorted_users = sorted(
@@ -276,7 +365,7 @@ class Level(commands.Cog):
         )[:10]
 
         embed = discord.Embed(
-            title="🏆 Server Message Leaderboard",
+            title=f"🏆 Server Leaderboard - {ctx.guild.name}",
             color=discord.Color.gold()
         )
 
