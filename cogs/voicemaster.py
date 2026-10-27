@@ -8,105 +8,105 @@ class VoiceControlView(discord.ui.View):
         self.channel_id = channel_id
 
     # Row 0
-    @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, emoji="🎛️", custom_id="vm_status", row=0)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🎛️", custom_id="vm_status", row=0)
     async def status_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("ℹ️ Channel status: Active and managed.", ephemeral=True)
 
-    @discord.ui.button(label="Limit", style=discord.ButtonStyle.secondary, emoji="👥", custom_id="vm_limit_btn", row=0)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="👥", custom_id="vm_limit_btn", row=0)
     async def limit_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("👥 Use `!limit <number>` to change user limit.", ephemeral=True)
 
-    @discord.ui.button(label="Logs", style=discord.ButtonStyle.secondary, emoji="📄", custom_id="vm_logs", row=0)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="📄", custom_id="vm_logs", row=0)
     async def logs_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("📄 Voice channel logs are active.", ephemeral=True)
 
-    @discord.ui.button(label="Ban", style=discord.ButtonStyle.secondary, emoji="🚫", custom_id="vm_ban", row=0)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🚫", custom_id="vm_ban", row=0)
     async def ban_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("🚫 User ban feature is ready.", ephemeral=True)
 
-    @discord.ui.button(label="Unban", style=discord.ButtonStyle.secondary, emoji="✅", custom_id="vm_unban", row=0)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="✅", custom_id="vm_unban", row=0)
     async def unban_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("✅ User unban feature is ready.", ephemeral=True)
 
     # Row 1
-    @discord.ui.button(label="Hide", style=discord.ButtonStyle.secondary, emoji="🙈", custom_id="vm_hide", row=1)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🙈", custom_id="vm_hide", row=1)
     async def hide_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=False)
         await interaction.response.send_message("🙈 Voice channel has been hidden.", ephemeral=True)
 
-    @discord.ui.button(label="Unhide", style=discord.ButtonStyle.secondary, emoji="👁️", custom_id="vm_unhide", row=1)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="👁️", custom_id="vm_unhide", row=1)
     async def unhide_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
         await interaction.response.send_message("👁️ Voice channel is now visible.", ephemeral=True)
 
-    @discord.ui.button(label="Region", style=discord.ButtonStyle.secondary, emoji="🌍", custom_id="vm_region", row=1)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🌍", custom_id="vm_region", row=1)
     async def region_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("🌍 Region settings updated.", ephemeral=True)
 
-    @discord.ui.button(label="Unlock", style=discord.ButtonStyle.secondary, emoji="🔓", custom_id="vm_unlock", row=1)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🔓", custom_id="vm_unlock", row=1)
     async def unlock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.channel.set_permissions(interaction.guild.default_role, connect=True)
         await interaction.response.send_message("🔓 Voice channel has been unlocked.", ephemeral=True)
 
-    @discord.ui.button(label="Lock", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="vm_lock", row=1)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="vm_lock", row=1)
     async def lock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.channel.set_permissions(interaction.guild.default_role, connect=False)
         await interaction.response.send_message("🔒 Voice channel has been locked.", ephemeral=True)
 
     # Row 2
-    @discord.ui.button(label="Trust", style=discord.ButtonStyle.secondary, emoji="👤", custom_id="vm_trust", row=2)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="👤", custom_id="vm_trust", row=2)
     async def trust_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("👤 User trusted successfully.", ephemeral=True)
 
-    @discord.ui.button(label="Untrust", style=discord.ButtonStyle.secondary, emoji="📉", custom_id="vm_untrust", row=2)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="📉", custom_id="vm_untrust", row=2)
     async def untrust_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("📉 User untrusted.", ephemeral=True)
 
-    @discord.ui.button(label="Bitrate", style=discord.ButtonStyle.secondary, emoji="📊", custom_id="vm_bitrate", row=2)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="📊", custom_id="vm_bitrate", row=2)
     async def bitrate_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.channel.edit(bitrate=96000)
         await interaction.response.send_message("📊 Bitrate adjusted.", ephemeral=True)
 
-    @discord.ui.button(label="Invite", style=discord.ButtonStyle.secondary, emoji="📞", custom_id="vm_invite", row=2)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="📞", custom_id="vm_invite", row=2)
     async def invite_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("📞 Invite sent.", ephemeral=True)
 
-    @discord.ui.button(label="Kick", style=discord.ButtonStyle.secondary, emoji="👢", custom_id="vm_kick", row=2)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="👢", custom_id="vm_kick", row=2)
     async def kick_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("👢 Use `!kick @user` to kick a member.", ephemeral=True)
 
     # Row 3
-    @discord.ui.button(label="Suppress", style=discord.ButtonStyle.secondary, emoji="🎤", custom_id="vm_suppress", row=3)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🎤", custom_id="vm_suppress", row=3)
     async def suppress_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("🎤 User suppressed.", ephemeral=True)
 
-    @discord.ui.button(label="Unsuppress", style=discord.ButtonStyle.secondary, emoji="🎙️", custom_id="vm_unsuppress", row=3)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🎙️", custom_id="vm_unsuppress", row=3)
     async def unsuppress_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("🎙️ User unsuppressed.", ephemeral=True)
 
-    @discord.ui.button(label="Chat", style=discord.ButtonStyle.secondary, emoji="💬", custom_id="vm_chat", row=3)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="💬", custom_id="vm_chat", row=3)
     async def chat_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("💬 Chat interface active.", ephemeral=True)
 
-    @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary, emoji="👑", custom_id="vm_claim", row=3)
+    @discord.ui.button(style=discord.ButtonStyle.primary, emoji="👑", custom_id="vm_claim", row=3)
     async def claim_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         conn = sqlite3.connect("voicemaster.db")
         cursor = conn.cursor()
@@ -127,13 +127,13 @@ class VoiceControlView(discord.ui.View):
         conn.close()
         await interaction.response.send_message(f"👑 {interaction.user.mention} has claimed ownership of this voice channel!", ephemeral=False)
 
-    @discord.ui.button(label="Transfer", style=discord.ButtonStyle.primary, emoji="↗️", custom_id="vm_transfer", row=3)
+    @discord.ui.button(style=discord.ButtonStyle.primary, emoji="↗️", custom_id="vm_transfer", row=3)
     async def transfer_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("↗️ Use `!transfer @user` to transfer ownership.", ephemeral=True)
 
     # Row 4 (Delete Channel - Red Button)
-    @discord.ui.button(label="Delete Channel", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="vm_delete", row=4)
+    @discord.ui.button(style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="vm_delete", row=4)
     async def delete_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_owner(interaction): return
         await interaction.response.send_message("🗑️ Deleting channel...", ephemeral=True)
