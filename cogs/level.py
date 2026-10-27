@@ -1,4 +1,4 @@
-import discord
+Import discord
 from discord.ext import commands, tasks
 import json
 import os
@@ -90,9 +90,9 @@ class Level(commands.Cog):
         )
         await ctx.send(embed=embed, delete_after=3)
 
-    @commands.command(name="setlevelmsg", help="Set a custom level-up message.\nUsage: &setlevelmsg Congrats {user} for reaching level {level}!")
+    @commands.command(name="setmsglevelmsg", help="Set custom level-up message for text messages.\nUsage: &setmsglevelmsg Congrats {user}, reached Level {level}! XP: {xp}")
     @commands.has_permissions(administrator=True)
-    async def set_level_msg(self, ctx, *, message: str = None):
+    async def set_msg_level_msg(self, ctx, *, message: str = None):
         try:
             await ctx.message.delete()
         except:
@@ -100,8 +100,8 @@ class Level(commands.Cog):
 
         if not message:
             embed = discord.Embed(
-                title="⚙️ Custom Level Message",
-                description="Set a custom message when a user levels up.\n\n**Variables:** `{user}`, `{level}`, `{server}`\n**Usage:**\n`&setlevelmsg Congrats {user} for reaching Level {level}!`",
+                title="⚙️ Custom Message Level-Up Text",
+                description="Set custom message for **Text Message** level-ups.\n\n**Variables:** `{user}`, `{level}`, `{xp}`, `{server}`\n**Usage:**\n`&setmsglevelmsg Congrats {user} for Level {level}! Current XP: {xp}`",
                 color=discord.Color.blue()
             )
             return await ctx.send(embed=embed, delete_after=5)
@@ -110,11 +110,40 @@ class Level(commands.Cog):
         guild_id = str(ctx.guild.id)
         if guild_id not in data:
             data[guild_id] = {"settings": {}, "users": {}}
-        data[guild_id]["settings"]["custom_msg"] = message
+        data[guild_id]["settings"]["msg_custom_msg"] = message
         save_data(data)
 
         embed = discord.Embed(
-            description="✅ Custom level-up message updated successfully!",
+            description="✅ Text message level-up announcement updated successfully!",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed, delete_after=3)
+
+    @commands.command(name="setvclevelmsg", help="Set custom level-up message for voice chat.\nUsage: &setvclevelmsg Voice Level Up {user} to Level {level}! XP: {xp}")
+    @commands.has_permissions(administrator=True)
+    async def set_vc_level_msg(self, ctx, *, message: str = None):
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+
+        if not message:
+            embed = discord.Embed(
+                title="⚙️ Custom Voice Level-Up Text",
+                description="Set custom message for **Voice Chat (VC)** level-ups.\n\n**Variables:** `{user}`, `{level}`, `{xp}`, `{server}`\n**Usage:**\n`&setvclevelmsg VC Level Up {user} to Level {level}! Current XP: {xp}`",
+                color=discord.Color.blue()
+            )
+            return await ctx.send(embed=embed, delete_after=5)
+
+        data = load_data()
+        guild_id = str(ctx.guild.id)
+        if guild_id not in data:
+            data[guild_id] = {"settings": {}, "users": {}}
+        data[guild_id]["settings"]["vc_custom_msg"] = message
+        save_data(data)
+
+        embed = discord.Embed(
+            description="✅ Voice chat level-up announcement updated successfully!",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed, delete_after=3)
@@ -182,10 +211,11 @@ class Level(commands.Cog):
             target_channel_id = settings.get("msg_channel", message.channel.id)
             target_channel = message.guild.get_channel(target_channel_id) or message.channel
 
-            custom_msg = settings.get("custom_msg", "🎉 Badhai ho {user}, aapka message level badhkar **Level {level}** ho gaya hai!")
+            custom_msg = settings.get("msg_custom_msg", "🎉 Badhai ho {user}, aapka message level badhkar **Level {level}** ho gaya hai! (XP: {xp})")
             formatted_msg = custom_msg.format(
                 user=message.author.mention,
                 level=user_data["msg_level"],
+                xp=user_data["msg_xp"],
                 server=message.guild.name
             )
             embed = discord.Embed(description=formatted_msg, color=discord.Color.gold())
@@ -230,10 +260,11 @@ class Level(commands.Cog):
                         target_channel = guild.get_channel(target_channel_id) if target_channel_id else None
 
                         if target_channel:
-                            custom_msg = settings.get("custom_msg", "🎙️ Shandaar {user}! Aapka VC level badhkar **Level {level}** ho gaya hai!")
+                            custom_msg = settings.get("vc_custom_msg", "🎙️ Shandaar {user}! Aapka VC level badhkar **Level {level}** ho gaya hai! (XP: {xp})")
                             formatted_msg = custom_msg.format(
                                 user=member.mention,
                                 level=u_info["vc_level"],
+                                xp=u_info["vc_xp"],
                                 server=guild.name
                             )
                             embed = discord.Embed(description=formatted_msg, color=discord.Color.purple())
@@ -266,7 +297,6 @@ class Level(commands.Cog):
             card_width, card_height = 930, 282
             card = Image.new("RGBA", (card_width, card_height), (15, 15, 20, 255))
             
-            # Background Image Loading
             if bg_url:
                 try:
                     async with aiohttp.ClientSession() as session:
@@ -279,16 +309,12 @@ class Level(commands.Cog):
                 except Exception:
                     pass
 
-            # Stunning Dark Gradient Overlay for High Contrast & Beauty
             overlay = Image.new("RGBA", (card_width, card_height), (10, 10, 15, 185))
             card = Image.alpha_composite(card, overlay)
             draw = ImageDraw.Draw(card)
 
-            # Avatar Loading with Glowing Neon Ring Border
             avatar_size = 180
             avatar_x, avatar_y = 51, 51
-            
-            # Draw Outer Neon Glow/Ring
             ring_margin = 4
             draw.ellipse(
                 [avatar_x - ring_margin, avatar_y - ring_margin, avatar_x + avatar_size + ring_margin, avatar_y + avatar_size + ring_margin],
@@ -311,7 +337,6 @@ class Level(commands.Cog):
             except Exception:
                 pass
 
-            # Fonts Loading (Larger, Bold & Gorgeous Layout)
             try:
                 font_name = ImageFont.truetype("arial.ttf", 46)
                 font_level = ImageFont.truetype("arial.ttf", 36)
@@ -321,18 +346,15 @@ class Level(commands.Cog):
                 font_level = ImageFont.load_default()
                 font_xp = ImageFont.load_default()
 
-            # Username Text (Bold & Large)
             draw.text((260, 42), f"{member.name}", fill=(255, 255, 255, 255), font=font_name)
             
             msg_level = u_info['msg_level']
             msg_xp = u_info['msg_xp']
             next_xp = msg_level * 100
             
-            # Level & XP Stats Display
             draw.text((260, 102), f"LEVEL: {msg_level}", fill=(170, 80, 255, 255), font=font_level)
             draw.text((620, 108), f"XP: {msg_xp} / {next_xp}", fill=(210, 210, 220, 255), font=font_xp)
 
-            # Sleek Progress Bar
             bar_x, bar_y, bar_w, bar_h = 260, 172, 610, 32
             draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=16, fill=(35, 35, 45, 255))
             
