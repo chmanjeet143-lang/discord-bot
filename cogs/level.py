@@ -1,4 +1,4 @@
-Import discord
+import discord
 from discord.ext import commands, tasks
 import json
 import os
@@ -22,7 +22,7 @@ def save_data(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-class Level(commands.Cog):
+class Level(commands.Cog, description="Explore all commands related to Leveling and XP system."):
     """Explore all commands related to Leveling system."""
     
     def __init__(self, bot):
@@ -32,9 +32,11 @@ class Level(commands.Cog):
     def cog_unload(self):
         self.vc_xp_loop.cancel()
 
-    @commands.command(name="setmsgchannel", help="Set the channel for Message XP.\nUsage: &setmsgchannel #channel-name")
+    @commands.command(name="setmsgchannel", help="Set the channel for Message XP level-up notifications.")
     @commands.has_permissions(administrator=True)
     async def set_msg_channel(self, ctx, channel: discord.TextChannel = None):
+        """Set message XP channel.
+        Usage: &setmsgchannel #channel-name"""
         try:
             await ctx.message.delete()
         except:
@@ -61,9 +63,11 @@ class Level(commands.Cog):
         )
         await ctx.send(embed=embed, delete_after=3)
 
-    @commands.command(name="setvcchannel", help="Set the channel for VC XP notifications.\nUsage: &setvcchannel #channel-name")
+    @commands.command(name="setvcchannel", help="Set the channel for Voice Chat (VC) XP notifications.")
     @commands.has_permissions(administrator=True)
     async def set_vc_channel(self, ctx, channel: discord.TextChannel = None):
+        """Set VC XP channel.
+        Usage: &setvcchannel #channel-name"""
         try:
             await ctx.message.delete()
         except:
@@ -90,9 +94,11 @@ class Level(commands.Cog):
         )
         await ctx.send(embed=embed, delete_after=3)
 
-    @commands.command(name="setmsglevelmsg", help="Set custom level-up message for text messages.\nUsage: &setmsglevelmsg Congrats {user}, reached Level {level}! XP: {xp}")
+    @commands.command(name="setmsglevelmsg", help="Set custom level-up announcement message for text messages.")
     @commands.has_permissions(administrator=True)
     async def set_msg_level_msg(self, ctx, *, message: str = None):
+        """Set custom text level up message.
+        Usage: &setmsglevelmsg Congrats {user} for Level {level}!"""
         try:
             await ctx.message.delete()
         except:
@@ -119,9 +125,11 @@ class Level(commands.Cog):
         )
         await ctx.send(embed=embed, delete_after=3)
 
-    @commands.command(name="setvclevelmsg", help="Set custom level-up message for voice chat.\nUsage: &setvclevelmsg Voice Level Up {user} to Level {level}! XP: {xp}")
+    @commands.command(name="setvclevelmsg", help="Set custom level-up announcement message for voice chat.")
     @commands.has_permissions(administrator=True)
     async def set_vc_level_msg(self, ctx, *, message: str = None):
+        """Set custom VC level up message.
+        Usage: &setvclevelmsg VC Level Up {user} to Level {level}!"""
         try:
             await ctx.message.delete()
         except:
@@ -148,8 +156,10 @@ class Level(commands.Cog):
         )
         await ctx.send(embed=embed, delete_after=3)
 
-    @commands.command(name="setrankbg", help="Set a custom background image URL for your VIP rank card.\nUsage: &setrankbg https://image-url.com/bg.png")
+    @commands.command(name="setrankbg", help="Set a custom background image URL for your VIP rank card.")
     async def set_rank_bg(self, ctx, url: str = None):
+        """Set custom rank card background.
+        Usage: &setrankbg https://image-url.com/bg.png"""
         try:
             await ctx.message.delete()
         except:
@@ -279,8 +289,10 @@ class Level(commands.Cog):
     async def before_vc_xp(self):
         await self.bot.wait_until_ready()
 
-    @commands.command(name="rank", help="Check your VIP rank card with custom background.\nUsage: &rank @username")
+    @commands.command(name="rank", help="Check your VIP rank card with custom background.")
     async def rank(self, ctx, member: discord.Member = None):
+        """Check your VIP rank card.
+        Usage: &rank @username"""
         member = member or ctx.author
         data = load_data()
         guild_id = str(ctx.guild.id)
@@ -370,8 +382,10 @@ class Level(commands.Cog):
             file = discord.File(buffer, filename="rank.png")
             await ctx.send(file=file)
 
-    @commands.command(name="leaderboard", help="Show the top members leaderboard.\nUsage: &leaderboard")
+    @commands.command(name="leaderboard", help="Show the top members leaderboard.")
     async def leaderboard(self, ctx):
+        """Show leaderboard.
+        Usage: &leaderboard"""
         data = load_data()
         guild_id = str(ctx.guild.id)
 
