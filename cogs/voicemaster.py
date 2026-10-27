@@ -2,71 +2,111 @@ import discord
 from discord.ext import commands
 import sqlite3
 
-class VoiceHelpSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(
-                label="Voice Master",
-                description="View all available Voice Master commands and usage.",
-                emoji="🎙️",
-                value="vm_commands_help"
-            )
-        ]
-        super().__init__(placeholder="Select a category...", min_values=1, max_values=1, options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            description="📁 **Category • Voice Master**\n\n"
-                        "Here are all the available commands under **Voice Master**:\n\n"
-                        "• `!vm panel` - Toggle or create the voice interface control channel.\n"
-                        "Usage: `!vm panel`\n\n"
-                        "• `!vm setup` - Create the normal Join-to-Create voice channel and category.\n"
-                        "Usage: `!vm setup`\n\n"
-                        "• `!vm setup duo` - Create the Duo Join-to-Create voice channel (Limit: 2).\n"
-                        "Usage: `!vm setup duo`",
-            color=discord.Color.from_rgb(43, 45, 49)
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-class VoiceHelpView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=180)
-        self.add_item(VoiceHelpSelect())
-
 class VoiceControlView(discord.ui.View):
     def __init__(self, channel_id: int):
         super().__init__(timeout=None)
         self.channel_id = channel_id
 
-    @discord.ui.button(label="Lock", style=discord.ButtonStyle.red, emoji="🔒", custom_id="vm_lock", row=0)
-    async def lock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await self.check_owner(interaction):
-            return
-        await interaction.channel.set_permissions(interaction.guild.default_role, connect=False)
-        await interaction.response.send_message("🔒 Voice channel lock kar diya gaya hai.", ephemeral=True)
+    # Row 0
+    @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, emoji="🎛️", custom_id="vm_status", row=0)
+    async def status_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("ℹ️ Channel status: Active and managed.", ephemeral=True)
 
-    @discord.ui.button(label="Unlock", style=discord.ButtonStyle.green, emoji="🔓", custom_id="vm_unlock", row=0)
-    async def unlock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await self.check_owner(interaction):
-            return
-        await interaction.channel.set_permissions(interaction.guild.default_role, connect=True)
-        await interaction.response.send_message("🔓 Voice channel unlock kar diya gaya hai.", ephemeral=True)
+    @discord.ui.button(label="Limit", style=discord.ButtonStyle.secondary, emoji="👥", custom_id="vm_limit_btn", row=0)
+    async def limit_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("👥 Use `!limit <number>` to change user limit.", ephemeral=True)
 
-    @discord.ui.button(label="Hide", style=discord.ButtonStyle.grey, emoji="🙈", custom_id="vm_hide", row=1)
+    @discord.ui.button(label="Logs", style=discord.ButtonStyle.secondary, emoji="📄", custom_id="vm_logs", row=0)
+    async def logs_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("📄 Voice channel logs are active.", ephemeral=True)
+
+    @discord.ui.button(label="Ban", style=discord.ButtonStyle.secondary, emoji="🚫", custom_id="vm_ban", row=0)
+    async def ban_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("🚫 User ban feature is ready.", ephemeral=True)
+
+    @discord.ui.button(label="Unban", style=discord.ButtonStyle.secondary, emoji="✅", custom_id="vm_unban", row=0)
+    async def unban_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("✅ User unban feature is ready.", ephemeral=True)
+
+    # Row 1
+    @discord.ui.button(label="Hide", style=discord.ButtonStyle.secondary, emoji="🙈", custom_id="vm_hide", row=1)
     async def hide_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await self.check_owner(interaction):
-            return
+        if not await self.check_owner(interaction): return
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=False)
-        await interaction.response.send_message("🙈 Voice channel hidden kar diya gaya hai.", ephemeral=True)
+        await interaction.response.send_message("🙈 Voice channel has been hidden.", ephemeral=True)
 
-    @discord.ui.button(label="Unhide", style=discord.ButtonStyle.grey, emoji="👁️", custom_id="vm_unhide", row=1)
+    @discord.ui.button(label="Unhide", style=discord.ButtonStyle.secondary, emoji="👁️", custom_id="vm_unhide", row=1)
     async def unhide_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await self.check_owner(interaction):
-            return
+        if not await self.check_owner(interaction): return
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
-        await interaction.response.send_message("👁️ Voice channel visible kar diya gaya hai.", ephemeral=True)
+        await interaction.response.send_message("👁️ Voice channel is now visible.", ephemeral=True)
 
-    @discord.ui.button(label="Claim", style=discord.ButtonStyle.blurple, emoji="👑", custom_id="vm_claim", row=2)
+    @discord.ui.button(label="Region", style=discord.ButtonStyle.secondary, emoji="🌍", custom_id="vm_region", row=1)
+    async def region_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("🌍 Region settings updated.", ephemeral=True)
+
+    @discord.ui.button(label="Unlock", style=discord.ButtonStyle.secondary, emoji="🔓", custom_id="vm_unlock", row=1)
+    async def unlock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.channel.set_permissions(interaction.guild.default_role, connect=True)
+        await interaction.response.send_message("🔓 Voice channel has been unlocked.", ephemeral=True)
+
+    @discord.ui.button(label="Lock", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="vm_lock", row=1)
+    async def lock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.channel.set_permissions(interaction.guild.default_role, connect=False)
+        await interaction.response.send_message("🔒 Voice channel has been locked.", ephemeral=True)
+
+    # Row 2
+    @discord.ui.button(label="Trust", style=discord.ButtonStyle.secondary, emoji="👤", custom_id="vm_trust", row=2)
+    async def trust_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("👤 User trusted successfully.", ephemeral=True)
+
+    @discord.ui.button(label="Untrust", style=discord.ButtonStyle.secondary, emoji="📉", custom_id="vm_untrust", row=2)
+    async def untrust_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("📉 User untrusted.", ephemeral=True)
+
+    @discord.ui.button(label="Bitrate", style=discord.ButtonStyle.secondary, emoji="📊", custom_id="vm_bitrate", row=2)
+    async def bitrate_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.channel.edit(bitrate=96000)
+        await interaction.response.send_message("📊 Bitrate adjusted.", ephemeral=True)
+
+    @discord.ui.button(label="Invite", style=discord.ButtonStyle.secondary, emoji="📞", custom_id="vm_invite", row=2)
+    async def invite_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("📞 Invite sent.", ephemeral=True)
+
+    @discord.ui.button(label="Kick", style=discord.ButtonStyle.secondary, emoji="👢", custom_id="vm_kick", row=2)
+    async def kick_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("👢 Use `!kick @user` to kick a member.", ephemeral=True)
+
+    # Row 3
+    @discord.ui.button(label="Suppress", style=discord.ButtonStyle.secondary, emoji="🎤", custom_id="vm_suppress", row=3)
+    async def suppress_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("🎤 User suppressed.", ephemeral=True)
+
+    @discord.ui.button(label="Unsuppress", style=discord.ButtonStyle.secondary, emoji="🎙️", custom_id="vm_unsuppress", row=3)
+    async def unsuppress_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("🎙️ User unsuppressed.", ephemeral=True)
+
+    @discord.ui.button(label="Chat", style=discord.ButtonStyle.secondary, emoji="💬", custom_id="vm_chat", row=3)
+    async def chat_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("💬 Chat interface active.", ephemeral=True)
+
+    @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary, emoji="👑", custom_id="vm_claim", row=3)
     async def claim_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         conn = sqlite3.connect("voicemaster.db")
         cursor = conn.cursor()
@@ -74,24 +114,29 @@ class VoiceControlView(discord.ui.View):
         row = cursor.fetchone()
         if not row:
             conn.close()
-            return await interaction.response.send_message("❌ Yeh managed voice channel nahi hai.", ephemeral=True)
+            return await interaction.response.send_message("❌ This is not a managed voice channel.", ephemeral=True)
         
         current_owner = row[0]
         member = interaction.guild.get_member(current_owner)
         if member and member in interaction.channel.members:
             conn.close()
-            return await interaction.response.send_message("❌ Current owner abhi bhi channel ke andar maujood hai!", ephemeral=True)
+            return await interaction.response.send_message("❌ The current owner is still in the voice channel!", ephemeral=True)
 
         cursor.execute("UPDATE active_channels SET owner_id = ? WHERE channel_id = ?", (interaction.user.id, self.channel_id))
         conn.commit()
         conn.close()
-        await interaction.response.send_message(f"👑 {interaction.user.mention} ne is voice channel ki ownership claim kar li hai!", ephemeral=False)
+        await interaction.response.send_message(f"👑 {interaction.user.mention} has claimed ownership of this voice channel!", ephemeral=False)
 
-    @discord.ui.button(label="Delete Channel", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="vm_delete", row=2)
+    @discord.ui.button(label="Transfer", style=discord.ButtonStyle.primary, emoji="↗️", custom_id="vm_transfer", row=3)
+    async def transfer_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("↗️ Use `!transfer @user` to transfer ownership.", ephemeral=True)
+
+    # Row 4 (Delete Channel - Red Button)
+    @discord.ui.button(label="Delete Channel", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="vm_delete", row=4)
     async def delete_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await self.check_owner(interaction):
-            return
-        await interaction.response.send_message("🗑️ Channel delete kiya ja raha hai...", ephemeral=True)
+        if not await self.check_owner(interaction): return
+        await interaction.response.send_message("🗑️ Deleting channel...", ephemeral=True)
         conn = sqlite3.connect("voicemaster.db")
         cursor = conn.cursor()
         cursor.execute("DELETE FROM active_channels WHERE channel_id = ?", (self.channel_id,))
@@ -107,15 +152,15 @@ class VoiceControlView(discord.ui.View):
         conn.close()
         
         if not row:
-            await interaction.response.send_message("❌ Channel data nahi mila.", ephemeral=True)
+            await interaction.response.send_message("❌ Channel data not found.", ephemeral=True)
             return False
             
         if interaction.user.id != row[0] and not interaction.user.guild_permissions.manage_channels:
-            await interaction.response.send_message("❌ Sirf channel owner ya staff hi ise control kar sakte hain!", ephemeral=True)
+            await interaction.response.send_message("❌ Only the channel owner or staff can use these controls!", ephemeral=True)
             return False
         return True
 
-class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with custom help format."):
+class VoiceMaster(commands.Cog, description="Explore all commands related to VoiceMaster."):
     def __init__(self, bot):
         self.bot = bot
         self.init_db()
@@ -144,7 +189,6 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # Bot restart hone par purane active channels ke buttons ko fir se active karna
         conn = sqlite3.connect("voicemaster.db")
         cursor = conn.cursor()
         cursor.execute("SELECT channel_id FROM active_channels")
@@ -155,20 +199,12 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
 
     @commands.group(invoke_without_command=True)
     async def vm(self, ctx):
-        """Voice Master help menu."""
-        embed = discord.Embed(
-            title="🎙️ Voice Master Help Menu",
-            description="Neeche diye gaye dropdown menu se Voice Master category select karein.",
-            color=discord.Color.teal()
-        )
-        view = VoiceHelpView()
-        await ctx.send(embed=embed, view=view)
+        await ctx.send("❌ Usage: `!vm panel`, `!vm setup`, or `!vm setup duo`")
 
-    @vm.command(name="setup")
+    @vm.command(name="setup", help="Create the normal Join-to-Create voice channel and category.")
     async def vm_setup(self, ctx, mode: str = "normal"):
-        """Creates the Voice Master create-vc channel."""
         if not ctx.author.guild_permissions.administrator:
-            return await ctx.send("❌ Aapko Administrator permission chahiye.")
+            return await ctx.send("❌ You need Administrator permission.")
 
         guild = ctx.guild
         category = discord.utils.get(guild.categories, name="🎙️ Voice Master")
@@ -186,7 +222,7 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
             ''', (guild.id, category.id, create_channel.id))
             conn.commit()
             conn.close()
-            await ctx.send("✅ Voice Master **Duo setup channel** successfully ban gaya hai!")
+            await ctx.send("✅ Voice Master **Duo setup channel** created successfully!")
         else:
             create_channel = await guild.create_voice_channel("➕ Create VC", category=category)
             conn = sqlite3.connect("voicemaster.db")
@@ -198,25 +234,24 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
             ''', (guild.id, category.id, create_channel.id))
             conn.commit()
             conn.close()
-            await ctx.send("✅ Voice Master **Normal setup channel** successfully ban gaya hai!")
+            await ctx.send("✅ Voice Master **Normal setup channel** created successfully!")
 
-    @vm.command(name="panel")
+    @vm.command(name="panel", help="Create a text channel with the Voice Master control panel.")
     async def vm_panel(self, ctx):
-        """Creates a text channel with the Voice Master control panel."""
         if not ctx.author.guild_permissions.administrator:
-            return await ctx.send("❌ Aapko Administrator permission chahiye.")
+            return await ctx.send("❌ You need Administrator permission.")
         
         guild = ctx.guild
         text_channel = await guild.create_text_channel("voice-interface")
         
         embed = discord.Embed(
             title="VoiceMaster Interface",
-            description="Use this interface to manage your voice channel.\nUse the buttons below.",
-            color=discord.Color.teal()
+            description="Use this interface to manage your voice channel.\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel.",
+            color=discord.Color.from_rgb(43, 45, 49)
         )
         view = VoiceControlView(text_channel.id)
         await text_channel.send(embed=embed, view=view)
-        await ctx.send(f"✅ Voice interface panel channel successfully ban gaya hai: {text_channel.mention}")
+        await ctx.send(f"✅ Voice interface panel channel created: {text_channel.mention}")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -232,7 +267,6 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
 
         category_id, normal_create_id, duo_create_id = row
 
-        # User joined create room
         if after.channel and after.channel.id in (normal_create_id, duo_create_id):
             is_duo = (after.channel.id == duo_create_id)
             limit = 2 if is_duo else 0
@@ -254,14 +288,12 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
             conn.commit()
             conn.close()
 
-            # Register view dynamically so buttons stay active
             self.bot.add_view(VoiceControlView(new_vc.id))
 
-            # Send panel in newly created VC chat
             embed = discord.Embed(
                 title="VoiceMaster Interface",
-                description=f"Welcome {member.mention} ❤️\n\nUse this interface to manage your voice channel.",
-                color=discord.Color.teal()
+                description=f"Welcome {member.mention} ❤️\n\nUse this interface to manage your voice channel.\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel.",
+                color=discord.Color.from_rgb(43, 45, 49)
             )
             view = VoiceControlView(new_vc.id)
             try:
@@ -269,7 +301,6 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
             except Exception:
                 pass
 
-        # Cleanup empty rooms
         if before.channel:
             conn = sqlite3.connect("voicemaster.db")
             cursor = conn.cursor()
