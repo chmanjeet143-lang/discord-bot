@@ -19,7 +19,9 @@ def save_data(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-class AdvancedLeveling(commands.Cog):
+class Level(commands.Cog):
+    """Explore all commands related to Leveling system."""
+    
     def __init__(self, bot):
         self.bot = bot
         self.vc_xp_loop.start()
@@ -191,7 +193,6 @@ class AdvancedLeveling(commands.Cog):
             card_width, card_height = 930, 282
             card = Image.new("RGBA", (card_width, card_height), (20, 20, 25, 255))
             
-            # Custom Background Image Load Karna
             if bg_url:
                 try:
                     async with aiohttp.ClientSession() as session:
@@ -204,12 +205,10 @@ class AdvancedLeveling(commands.Cog):
                 except Exception:
                     pass
 
-            # Dark Overlay for Readability
             overlay = Image.new("RGBA", (card_width, card_height), (0, 0, 0, 160))
             card = Image.alpha_composite(card, overlay)
             draw = ImageDraw.Draw(card)
 
-            # User Avatar Circular Shape me Paste Karna
             avatar_url = member.display_avatar.url
             try:
                 async with aiohttp.ClientSession() as session:
@@ -234,7 +233,6 @@ class AdvancedLeveling(commands.Cog):
                 font_large = ImageFont.load_default()
                 font_medium = ImageFont.load_default()
 
-            # Username & Big Stats Display
             draw.text((260, 45), f"{member.name}", fill=(255, 255, 255, 255), font=font_large)
             
             msg_level = u_info['msg_level']
@@ -244,7 +242,6 @@ class AdvancedLeveling(commands.Cog):
             draw.text((260, 105), f"LEVEL: {msg_level}", fill=(153, 45, 255, 255), font=font_large)
             draw.text((600, 110), f"XP: {msg_xp} / {next_xp}", fill=(220, 220, 220, 255), font=font_medium)
 
-            # Progress Bar
             bar_x, bar_y, bar_w, bar_h = 260, 175, 600, 30
             draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=15, fill=(50, 50, 60, 255))
             
@@ -285,3 +282,12 @@ class AdvancedLeveling(commands.Cog):
 
         desc = ""
         for i, (user_id, info) in enumerate(sorted_users, start=1):
+            user = ctx.guild.get_member(int(user_id))
+            name = user.name if user else f"User ID: {user_id}"
+            desc += f"**{i}.** {name} — Level: **{info['msg_level']}** (XP: {info['msg_xp']})\n"
+
+        embed.description = desc
+        await ctx.send(embed=embed)
+
+async def setup(bot):
+    await bot.add_cog(Level(bot))
