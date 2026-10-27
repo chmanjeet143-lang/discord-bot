@@ -3,96 +3,87 @@ from discord.ext import commands
 import json
 import os
 
-DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
-BOOST_CONFIG_FILE = "boost_config.json"
+CONFIG_FILE = "boost_config.json"
 
-def create_embed(guild, title="", description="", color=0x2B2D31):
-    thumbnail_url = guild.icon.url if guild and guild.icon else DEFAULT_AVATAR
-    embed = discord.Embed(title=title, description=description, color=color)
-    embed.set_thumbnail(url=thumbnail_url)
-    embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
-    return embed
-
-def load_boost_config():
-    if os.path.exists(BOOST_CONFIG_FILE):
-        try:
-            with open(BOOST_CONFIG_FILE, "r") as f:
-                return json.load(f)
-        except:
-            return {}
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
     return {}
 
-def save_boost_config(data):
-    try:
-        with open(BOOST_CONFIG_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-    except:
-        pass
+def save_config(data):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
-class BoostSystem(commands.Cog):
+class Boost(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.Cog.listener()
-    async def on_member_update(self, before, after):
-        if after.bot:
-            return
-
-        # Check if user started boosting the server
-        if before.premium_since is None and after.premium_since is not None:
-            guild = after.guild
-            guild_id = str(guild.id)
-            config = load_boost_config()
-
-            if guild_id in config:
-                channel_id = config[guild_id].get("channel_id")
-                if channel_id:
-                    channel = guild.get_channel(int(channel_id))
-                    if channel:
-                        default_msg = (
-                            "<:boosters:1534157159418560542> ** BOOST ALERT ! **\n"
-                            "Huge thanks to {user} for boosting the server ! <:cute_billi:1534157984001822791>\n\n"
-                            "We really appreciate your awesome support !"
-                        )
-                        custom_msg = config[guild_id].get("message", default_msg)
-                        formatted_msg = custom_msg.replace("{user}", after.mention)
-
-                        try:
-                            embed = create_embed(
-                                guild,
-                                title="🚀 New Server Boost!",
-                                description=formatted_msg,
-                                color=discord.Color.magenta()
-                            )
-                            await channel.send(embed=embed)
-                        except:
-                            pass
-
-    @commands.command(name="boostsetup")
-    @commands.has_permissions(manage_guild=True)
-    async def boost_setup(self, ctx, channel: discord.TextChannel):
+    # 1. Boost Channel Set karne ka command
+    @commands.command(name="setboostchannel")
+    @commands.has_permissions(administrator=True)
+    async def set_boost_channel(self, ctx, channel: discord.TextChannel):
+        config = load_config()
         guild_id = str(ctx.guild.id)
-        config = load_boost_config()
-
+        
         if guild_id not in config:
             config[guild_id] = {}
-
+            
         config[guild_id]["channel_id"] = channel.id
-        default_msg = (
-            "<:boosters:1534157159418560542> ** BOOST ALERT ! **\n"
-            "Huge thanks to {user} for boosting the server ! <:cute_billi:1534157984001822791>\n\n"
-            "We really appreciate your awesome support !"
-        )
-        config[guild_id]["message"] = default_msg
-        save_boost_config(config)
-
-        embed = create_embed(
-            ctx.guild,
-            title="⚙️ Boost Alert Configured",
-            description=f"Successfully set boost alert channel to {channel.mention}!\n\n**Message Preview:**\n" + default_msg.replace("{user}", ctx.author.mention),
-            color=discord.Color.magenta()
+        if "message" not in config[guild_id]:
+            config[guild_id]["message"] = "🎉 Thank you {user} for boosting **{server}**! We now have {boost_count} boosts."
+            
+        save_config(config)
+        
+        embed = discord.Embed(
+            description=f"✅ Boost channel successfully set to {channel.mention}!",
+            color=discord.Color.green()
         )
         await ctx.send(embed=embed)
 
+    # 2. Custom Boost Message Set karne ka command
+    @commands.command(name="setboostmsg")
+    @commands.has_permissions(administrator=True)
+    async def set_boost_msg(self, ctx, *, message: str):
+        config = load_config()
+        guild_id = str(ctx.guild.id)
+        
+        if guild_id not in config:
+            config[guild_id] = {}
+            
+        config[guild_id]["message"] = message
+        save_config(config)
+        
+        preview = message.format(user=ctx.author.mention, server=ctx.guild.name, boost_count=ctx.guild.premium_subscription_count)
+        
+        embed = discord.Embed(
+            title="✅ Boost Message Updated",
+            description=f"**New Message:**\n{message}\n\n**Preview:**\n{preview}",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    # 3. Event Listener jo boost detect karega
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        if before.premium_since is None and after.premium_since is not None:
+            config = load_config()
+            guild_id = str(after.guild.id)
+            
+            if guild_id in config and "channel_id" in config[guild_id]:
+                channel_id = config[guild_id]["channel_id"]
+                channel = after.guild.get_channel(channel_id)
+                
+                if channel:
+                    raw_msg = config[guild_id].get("message", "Thanks {user} for boosting!")
+                    
+                    formatted_msg = raw_msg.format(
+                        user=after.mention,
+                        server=after.guild.name,
+                        boost_count=after.guild.premium_subscription_count
+                    )
+                    
+                    await channel.send(formatted_msg)
+
 async def setup(bot):
-    await bot.add_cog(BoostSystem(bot))
+    await bot.add_cog(Boost(bot))
