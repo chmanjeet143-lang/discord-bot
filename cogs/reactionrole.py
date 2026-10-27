@@ -175,6 +175,7 @@ class ReactionRole(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        # Sirf tabhi chale jab message mein actual mentions (tags) hon
         if not message.mentions:
             return
 
