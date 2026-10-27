@@ -175,10 +175,12 @@ class ReactionRole(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        # Sirf tabhi chale jab message mein actual mentions (tags) hon
+        # Agar message mein koi mention hi nahi hai, toh yahin return ho jao
         if not message.mentions:
             return
 
+        # Check karo ki kya user ka ID message ke content mein actual text/mention ke roop mein shamil hai
+        # Reply karne par discord reference banta hai lekin zaroori nahi text mein mention ho.
         config = load_config()
         guild_id = str(message.guild.id)
 
@@ -187,7 +189,8 @@ class ReactionRole(commands.Cog):
             
             for mentioned_user in message.mentions:
                 user_id = str(mentioned_user.id)
-                if user_id in users_config:
+                # Ye ensure karne ke liye ki mention text ke andar explicitly present ho (sirf reply reference ki wajah se trigger na ho)
+                if user_id in users_config and f"<@{user_id}>" in message.content or f"<@!{user_id}>" in message.content:
                     emoji = users_config[user_id]["emoji"]
 
                     try:
