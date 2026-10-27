@@ -142,6 +142,17 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
         conn.commit()
         conn.close()
 
+    @commands.Cog.listener()
+    async def on_ready(self):
+        # Bot restart hone par purane active channels ke buttons ko fir se active karna
+        conn = sqlite3.connect("voicemaster.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT channel_id FROM active_channels")
+        rows = cursor.fetchall()
+        conn.close()
+        for row in rows:
+            self.bot.add_view(VoiceControlView(row[0]))
+
     @commands.group(invoke_without_command=True)
     async def vm(self, ctx):
         """Voice Master help menu."""
@@ -242,6 +253,9 @@ class VoiceMaster(commands.Cog, description="Dynamic Voice Channel system with c
                            (new_vc.id, guild.id, member.id, channel_type))
             conn.commit()
             conn.close()
+
+            # Register view dynamically so buttons stay active
+            self.bot.add_view(VoiceControlView(new_vc.id))
 
             # Send panel in newly created VC chat
             embed = discord.Embed(
