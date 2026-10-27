@@ -45,7 +45,7 @@ class ReactionRole(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    # 2. Add Reaction Role to Last Message (Auto-deletes command & bot msg after 2s)
+    # 2. Add Reaction Role to Last Message
     @commands.command(name="addrr", help="Add reaction role to the last message in the channel.\nUsage: &addrr @role 🎉")
     @commands.has_permissions(administrator=True)
     async def add_reaction_role_last(self, ctx, role: discord.Role = None, emoji: str = None):
@@ -62,7 +62,6 @@ class ReactionRole(commands.Cog):
             )
             return await ctx.send(embed=embed, delete_after=5)
 
-        # Fetch last message in the channel (excluding the deleted command message)
         async for message in ctx.channel.history(limit=5):
             if message.id != ctx.message.id:
                 target_msg = message
@@ -97,19 +96,19 @@ class ReactionRole(commands.Cog):
         )
         await ctx.send(embed=embed, delete_after=2)
 
-    # 3. User-Specific Reaction Role Command (`addrruser`)
-    @commands.command(name="addrruser", help="Set up a reaction role for a specific user's messages.\nUsage: &addrruser @user @role 🎉")
+    # 3. User-Specific Mention Emoji Command (`&addrruser @user emoji`)
+    @commands.command(name="addrruser", help="Set up an emoji reaction when a specific user is tagged.\nUsage: &addrruser @user 🎉")
     @commands.has_permissions(administrator=True)
-    async def add_reaction_role_user(self, ctx, member: discord.Member = None, role: discord.Role = None, emoji: str = None):
+    async def add_reaction_role_user(self, ctx, member: discord.Member = None, emoji: str = None):
         try:
             await ctx.message.delete()
         except:
             pass
 
-        if not member or not role or not emoji:
+        if not member or not emoji:
             embed = discord.Embed(
-                title="👤 User Reaction Role Command",
-                description="Set reaction role when a specific user sends a message.\n\n**Usage:**\n`&addrruser @user @role 🎉`",
+                title="👤 Mention Emoji Command",
+                description="Set reaction when a specific user is tagged in messages.\n\n**Usage:**\n`&addrruser @user 🎉`",
                 color=discord.Color.blue()
             )
             return await ctx.send(embed=embed, delete_after=5)
@@ -123,17 +122,17 @@ class ReactionRole(commands.Cog):
         if "users" not in config[guild_id]:
             config[guild_id]["users"] = {}
 
-        config[guild_id]["users"][user_id] = {"role_id": role.id, "emoji": emoji}
+        config[guild_id]["users"][user_id] = {"emoji": emoji}
         save_config(config)
 
         embed = discord.Embed(
-            description=f"✅ User-specific reaction role set for {member.mention}!\n**Role:** {role.mention}\n**Emoji:** {emoji}",
+            description=f"✅ Mention emoji reaction set for {member.mention}!\n**Emoji:** {emoji}",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed, delete_after=3)
 
-    # 4. Remove User-Specific Reaction Role Command (`removerruser`)
-    @commands.command(name="removerruser", help="Remove reaction role mapping for a specific user.\nUsage: &removerruser @user")
+    # 4. Remove User-Specific Mention Emoji (`&removerruser @user`)
+    @commands.command(name="removerruser", help="Remove mention emoji mapping for a specific user.\nUsage: &removerruser @user")
     @commands.has_permissions(administrator=True)
     async def remove_reaction_role_user(self, ctx, member: discord.Member = None):
         try:
@@ -143,8 +142,8 @@ class ReactionRole(commands.Cog):
 
         if not member:
             embed = discord.Embed(
-                title="🗑️ Remove User Reaction Role",
-                description="Remove reaction role configuration for a user.\n\n**Usage:**\n`&removerruser @user`",
+                title="🗑️ Remove Mention Emoji",
+                description="Remove mention emoji configuration for a user.\n\n**Usage:**\n`&removerruser @user`",
                 color=discord.Color.blue()
             )
             return await ctx.send(embed=embed, delete_after=5)
@@ -158,48 +157,42 @@ class ReactionRole(commands.Cog):
             save_config(config)
 
             embed = discord.Embed(
-                description=f"✅ Reaction role configuration removed for {member.mention}!",
+                description=f"✅ Mention emoji configuration removed for {member.mention}!",
                 color=discord.Color.green()
             )
             await ctx.send(embed=embed, delete_after=3)
         else:
             embed = discord.Embed(
-                description=f"❌ No reaction role configuration found for {member.mention}!",
+                description=f"❌ No mention emoji configuration found for {member.mention}!",
                 color=discord.Color.red()
             )
             await ctx.send(embed=embed, delete_after=3)
 
     # --- LISTENERS ---
 
-    # Listener: Jab bhi koi message aae, agar wo configured user ka hai toh bot us par emoji react kar de
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
             return
 
+        if not message.mentions:
+            return
+
         config = load_config()
         guild_id = str(message.guild.id)
-        user_id = str(message.author.id)
 
         if guild_id in config and "users" in config[guild_id]:
             users_config = config[guild_id]["users"]
-            if user_id in users_config:
-                emoji = users_config[user_id]["emoji"]
-                role_id = users_config[user_id]["role_id"]
-                
-                # Also save this message ID into messages config automatically so reaction works!
-                msg_id = str(message.id)
-                if "messages" not in config[guild_id]:
-                    config[guild_id]["messages"] = {}
-                if msg_id not in config[guild_id]["messages"]:
-                    config[guild_id]["messages"][msg_id] = {}
-                config[guild_id]["messages"][msg_id][emoji] = role_id
-                save_config(config)
+            
+            for mentioned_user in message.mentions:
+                user_id = str(mentioned_user.id)
+                if user_id in users_config:
+                    emoji = users_config[user_id]["emoji"]
 
-                try:
-                    await message.add_reaction(emoji)
-                except:
-                    pass
+                    try:
+                        await message.add_reaction(emoji)
+                    except:
+                        pass
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
@@ -208,7 +201,10 @@ class ReactionRole(commands.Cog):
         
         guild = self.bot.get_guild(payload.guild_id)
         if not guild:
-            guild = await self.bot.fetch_guild(payload.guild_id)
+            try:
+                guild = await self.bot.fetch_guild(payload.guild_id)
+            except:
+                return
         if not guild:
             return
         
