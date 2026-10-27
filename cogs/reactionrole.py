@@ -95,7 +95,6 @@ class ReactionRole(commands.Cog):
             description=f"✅ Reaction role successfully set!\n**Role:** {role.mention}\n**Emoji:** {emoji}",
             color=discord.Color.green()
         )
-        # Deletes bot's confirmation message after 2 seconds
         await ctx.send(embed=embed, delete_after=2)
 
     # 3. User-Specific Reaction Role Command (`addrruser`)
@@ -110,7 +109,7 @@ class ReactionRole(commands.Cog):
         if not member or not role or not emoji:
             embed = discord.Embed(
                 title="👤 User Reaction Role Command",
-                description="Set reaction role for any message sent by a specific user.\n\n**Usage:**\n`&addrruser @user @role 🎉`",
+                description="Set reaction role when a specific user sends a message.\n\n**Usage:**\n`&addrruser @user @role 🎉`",
                 color=discord.Color.blue()
             )
             return await ctx.send(embed=embed, delete_after=5)
@@ -170,7 +169,37 @@ class ReactionRole(commands.Cog):
             )
             await ctx.send(embed=embed, delete_after=3)
 
-    # --- LISTENERS (Persistent & Safe across restarts) ---
+    # --- LISTENERS ---
+
+    # Listener: Jab bhi koi message aae, agar wo configured user ka hai toh bot us par emoji react kar de
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot or not message.guild:
+            return
+
+        config = load_config()
+        guild_id = str(message.guild.id)
+        user_id = str(message.author.id)
+
+        if guild_id in config and "users" in config[guild_id]:
+            users_config = config[guild_id]["users"]
+            if user_id in users_config:
+                emoji = users_config[user_id]["emoji"]
+                role_id = users_config[user_id]["role_id"]
+                
+                # Also save this message ID into messages config automatically so reaction works!
+                msg_id = str(message.id)
+                if "messages" not in config[guild_id]:
+                    config[guild_id]["messages"] = {}
+                if msg_id not in config[guild_id]["messages"]:
+                    config[guild_id]["messages"][msg_id] = {}
+                config[guild_id]["messages"][msg_id][emoji] = role_id
+                save_config(config)
+
+                try:
+                    await message.add_reaction(emoji)
+                except:
+                    pass
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
@@ -179,10 +208,18 @@ class ReactionRole(commands.Cog):
         
         guild = self.bot.get_guild(payload.guild_id)
         if not guild:
+            guild = await self.bot.fetch_guild(payload.guild_id)
+        if not guild:
             return
         
-        member = guild.get_member(payload.user_id) or await guild.fetch_member(payload.user_id)
-        if not member or member.bot:
+        member = guild.get_member(payload.user_id)
+        if not member:
+            try:
+                member = await guild.fetch_member(payload.user_id)
+            except:
+                return
+                
+        if member.bot:
             return
 
         config = load_config()
@@ -191,7 +228,6 @@ class ReactionRole(commands.Cog):
         emoji = str(payload.emoji)
 
         if guild_id in config:
-            # 1. Check Message-based Reaction Roles
             messages_config = config[guild_id].get("messages", {})
             if msg_id in messages_config and emoji in messages_config[msg_id]:
                 role_id = messages_config[msg_id][emoji]
@@ -201,23 +237,6 @@ class ReactionRole(commands.Cog):
                         await member.add_roles(role)
                     except:
                         pass
-                return
-
-            # 2. Check User-specific Reaction Roles (`addrruser`)
-            users_config = config[guild_id].get("users", {})
-            if users_config:
-                try:
-                    channel = self.bot.get_channel(payload.channel_id) or await self.bot.fetch_channel(payload.channel_id)
-                    message = await channel.fetch_message(payload.message_id)
-                    author_id_str = str(message.author.id)
-                    if author_id_str in users_config:
-                        u_data = users_config[author_id_str]
-                        if emoji == u_data["emoji"]:
-                            role = guild.get_role(u_data["role_id"])
-                            if role:
-                                await member.add_roles(role)
-                except:
-                    pass
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
@@ -226,10 +245,22 @@ class ReactionRole(commands.Cog):
 
         guild = self.bot.get_guild(payload.guild_id)
         if not guild:
+            try:
+                guild = await self.bot.fetch_guild(payload.guild_id)
+            except:
+                return
+
+        if not guild:
             return
 
-        member = guild.get_member(payload.user_id) or await guild.fetch_member(payload.user_id)
-        if not member or member.bot:
+        member = guild.get_member(payload.user_id)
+        if not member:
+            try:
+                member = await guild.fetch_member(payload.user_id)
+            except:
+                return
+
+        if member.bot:
             return
 
         config = load_config()
@@ -238,7 +269,6 @@ class ReactionRole(commands.Cog):
         emoji = str(payload.emoji)
 
         if guild_id in config:
-            # 1. Check Message-based Reaction Roles
             messages_config = config[guild_id].get("messages", {})
             if msg_id in messages_config and emoji in messages_config[msg_id]:
                 role_id = messages_config[msg_id][emoji]
@@ -248,23 +278,6 @@ class ReactionRole(commands.Cog):
                         await member.remove_roles(role)
                     except:
                         pass
-                return
-
-            # 2. Check User-specific Reaction Roles (`addrruser`)
-            users_config = config[guild_id].get("users", {})
-            if users_config:
-                try:
-                    channel = self.bot.get_channel(payload.channel_id) or await self.bot.fetch_channel(payload.channel_id)
-                    message = await channel.fetch_message(payload.message_id)
-                    author_id_str = str(message.author.id)
-                    if author_id_str in users_config:
-                        u_data = users_config[author_id_str]
-                        if emoji == u_data["emoji"]:
-                            role = guild.get_role(u_data["role_id"])
-                            if role:
-                                await member.remove_roles(role)
-                except:
-                    pass
 
 async def setup(bot):
     await bot.add_cog(ReactionRole(bot))
