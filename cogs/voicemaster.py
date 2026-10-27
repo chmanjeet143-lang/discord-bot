@@ -173,7 +173,8 @@ class VoiceMaster(commands.Cog, description="Explore all commands related to Voi
                 guild_id INTEGER PRIMARY KEY,
                 category_id INTEGER,
                 normal_create_id INTEGER,
-                duo_create_id INTEGER
+                duo_create_id INTEGER,
+                panel_image TEXT
             )
         ''')
         cursor.execute('''
@@ -187,6 +188,24 @@ class VoiceMaster(commands.Cog, description="Explore all commands related to Voi
         conn.commit()
         conn.close()
 
+    def get_panel_embed(self, guild_id):
+        conn = sqlite3.connect("voicemaster.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT panel_image FROM guild_settings WHERE guild_id = ?", (guild_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        panel_image = row[0] if row and row[0] else None
+
+        embed = discord.Embed(
+            title="VoiceMaster Interface",
+            description="Use this interface to manage your voice channel.\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel.",
+            color=discord.Color.from_rgb(43, 45, 49)
+        )
+        if panel_image:
+            embed.set_image(url=panel_image)
+        return embed
+
     @commands.Cog.listener()
     async def on_ready(self):
         conn = sqlite3.connect("voicemaster.db")
@@ -199,7 +218,27 @@ class VoiceMaster(commands.Cog, description="Explore all commands related to Voi
 
     @commands.group(invoke_without_command=True)
     async def vm(self, ctx):
-        await ctx.send("❌ Usage: `!vm panel`, `!vm setup`, or `!vm setup duo`")
+        await ctx.send("❌ Usage: `!vm panel`, `!vm setup`, `!vm setup duo`, or `!vm img <link>`")
+
+    @vm.command(name="img", help="Set or update the Voice Master panel banner image.")
+    async def vm_img(self, ctx, url: str):
+        """
+        Set or update the custom banner image for Voice Master panels.
+        Usage: !vm img <image_link>
+        """
+        if not ctx.author.guild_permissions.administrator:
+            return await ctx.send("❌ You need Administrator permission.")
+        
+        conn = sqlite3.connect("voicemaster.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO guild_settings (guild_id, panel_image) 
+            VALUES (?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET panel_image=excluded.panel_image
+        ''', (ctx.guild.id, url))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"✅ Voice Master panel banner image has been updated successfully!\nURL: {url}")
 
     @vm.command(name="setup", help="Create the normal Join-to-Create voice channel and category.")
     async def vm_setup(self, ctx, mode: str = "normal"):
@@ -244,11 +283,7 @@ class VoiceMaster(commands.Cog, description="Explore all commands related to Voi
         guild = ctx.guild
         text_channel = await guild.create_text_channel("voice-interface")
         
-        embed = discord.Embed(
-            title="VoiceMaster Interface",
-            description="Use this interface to manage your voice channel.\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel.",
-            color=discord.Color.from_rgb(43, 45, 49)
-        )
+        embed = self.get_panel_embed(guild.id)
         view = VoiceControlView(text_channel.id)
         await text_channel.send(embed=embed, view=view)
         await ctx.send(f"✅ Voice interface panel channel created: {text_channel.mention}")
@@ -290,11 +325,9 @@ class VoiceMaster(commands.Cog, description="Explore all commands related to Voi
 
             self.bot.add_view(VoiceControlView(new_vc.id))
 
-            embed = discord.Embed(
-                title="VoiceMaster Interface",
-                description=f"Welcome {member.mention} ❤️\n\nUse this interface to manage your voice channel.\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel.",
-                color=discord.Color.from_rgb(43, 45, 49)
-            )
+            embed = self.get_panel_embed(guild.id)
+            embed.description = f"Welcome {member.mention} ❤️\n\nUse this interface to manage your voice channel.\nYou can also use slash commands!\n\nUse the buttons below to manage your voice channel."
+            
             view = VoiceControlView(new_vc.id)
             try:
                 await new_vc.send(embed=embed, view=view)
