@@ -53,7 +53,10 @@ class Moderation(commands.Cog):
         except Exception as e:
             print(f"Error saving warnings: {e}")
 
-    @commands.command(name="ban")
+    @commands.command(
+        name="ban",
+        help="Bans a member from the server.\nExample: &ban @User Spamming in chat"
+    )
     @commands.has_permissions(ban_members=True)
     async def ban_command(self, ctx, member: discord.Member, *, reason: str = "No reason provided"):
         if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
@@ -69,7 +72,10 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="unban")
+    @commands.command(
+        name="unban",
+        help="Unbans a user using their User ID.\nExample: &unban 123456789012345678 Appealed"
+    )
     @commands.has_permissions(ban_members=True)
     async def unban_command(self, ctx, user_id: int, *, reason: str = "No reason provided"):
         try:
@@ -86,7 +92,10 @@ class Moderation(commands.Cog):
             embed = create_embed(ctx.guild, title="🛡️ Error", description="Could not find a banned user with that ID or they are already unbanned.", color=discord.Color.red())
             await ctx.send(embed=embed)
 
-    @commands.command(name="kick")
+    @commands.command(
+        name="kick",
+        help="Kicks a member from the server.\nExample: &kick @User Breaking rules"
+    )
     @commands.has_permissions(kick_members=True)
     async def kick_command(self, ctx, member: discord.Member, *, reason: str = "No reason provided"):
         if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
@@ -102,7 +111,11 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="mute", aliases=["timeout"])
+    @commands.command(
+        name="mute",
+        aliases=["timeout"],
+        help="Timeouts a member for a specified duration.\nExample: &mute @User 10m Spamming"
+    )
     @commands.has_permissions(moderate_members=True)
     async def mute_command(self, ctx, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
         delta = parse_time(duration)
@@ -123,7 +136,11 @@ class Moderation(commands.Cog):
             embed = create_embed(ctx.guild, title="🛡️ Error", description=f"An error occurred while attempting to timeout the member: {e}", color=discord.Color.red())
             await ctx.send(embed=embed)
 
-    @commands.command(name="unmute", aliases=["untimeout"])
+    @commands.command(
+        name="unmute",
+        aliases=["untimeout"],
+        help="Removes timeout from a member.\nExample: &unmute @User Appeal accepted"
+    )
     @commands.has_permissions(moderate_members=True)
     async def unmute_command(self, ctx, member: discord.Member, *, reason: str = "No reason provided"):
         try:
@@ -139,7 +156,10 @@ class Moderation(commands.Cog):
             embed = create_embed(ctx.guild, title="🛡️ Error", description=f"Could not remove timeout: {e}", color=discord.Color.red())
             await ctx.send(embed=embed)
 
-    @commands.command(name="warn")
+    @commands.command(
+        name="warn",
+        help="Issues a warning to a member.\nExample: &warn @User Bad behavior"
+    )
     @commands.has_permissions(manage_messages=True)
     async def warn_command(self, ctx, member: discord.Member, *, reason: str = "No reason provided"):
         guild_id = str(ctx.guild.id)
@@ -162,13 +182,15 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="warnings")
+    @commands.command(
+        name="warnings",
+        help="Views warnings for a specific member or all members in the server.\nExample: &warnings @User"
+    )
     @commands.has_permissions(manage_messages=True)
     async def warnings_command(self, ctx, member: discord.Member = None):
         guild_id = str(ctx.guild.id)
         guild_warns = self.warnings_store.get(guild_id, {})
         
-        # Agar kisi specific member ko tag kiya hai
         if member:
             user_id = str(member.id)
             warns = guild_warns.get(user_id, [])
@@ -186,7 +208,6 @@ class Moderation(commands.Cog):
             )
             return await ctx.send(embed=embed)
 
-        # Agar bina mention ke &warnings likha hai toh saare warned users ki list dikhegi
         if not guild_warns:
             embed = create_embed(ctx.guild, title="⚠️ Server Warnings", description="No users have been warned in this server yet.", color=discord.Color.green())
             return await ctx.send(embed=embed)
@@ -206,7 +227,11 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="unwarn", aliases=["clearwarns"])
+    @commands.command(
+        name="unwarn",
+        aliases=["clearwarns"],
+        help="Clears all warnings for a specific member.\nExample: &unwarn @User"
+    )
     @commands.has_permissions(manage_messages=True)
     async def unwarn_command(self, ctx, member: discord.Member):
         guild_id = str(ctx.guild.id)
@@ -220,7 +245,11 @@ class Moderation(commands.Cog):
             embed = create_embed(ctx.guild, title="⚠️ No Warnings", description=f"**{member.mention}** has no warnings to remove.", color=discord.Color.orange())
         await ctx.send(embed=embed)
 
-    @commands.command(name="clear", aliases=["purge"])
+    @commands.command(
+        name="clear",
+        aliases=["purge"],
+        help="Deletes a specified number of messages from the channel.\nExample: &clear 20"
+    )
     @commands.has_permissions(manage_messages=True)
     async def clear_command(self, ctx, amount: int = 5):
         if amount > 100:
@@ -239,7 +268,10 @@ class Moderation(commands.Cog):
         except:
             pass
 
-    @commands.command(name="slowmode")
+    @commands.command(
+        name="slowmode",
+        help="Sets the slowmode delay for the current channel in seconds.\nExample: &slowmode 5"
+    )
     @commands.has_permissions(manage_channels=True)
     async def slowmode_command(self, ctx, seconds: int = 0):
         await ctx.channel.edit(slowmode_delay=seconds)
@@ -249,7 +281,11 @@ class Moderation(commands.Cog):
             embed = create_embed(ctx.guild, title="⏳ Slowmode Updated", description=f"Channel slowmode has been set to **{seconds} seconds**.", color=discord.Color.blue())
         await ctx.send(embed=embed)
 
-    @commands.command(name="lock", aliases=["lockdown"])
+    @commands.command(
+        name="lock",
+        aliases=["lockdown"],
+        help="Locks a text channel to prevent members from sending messages.\nExample: &lock #general"
+    )
     @commands.has_permissions(manage_channels=True)
     async def lock_command(self, ctx, channel: discord.TextChannel = None):
         target_channel = channel or ctx.channel
@@ -262,7 +298,10 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="unlock")
+    @commands.command(
+        name="unlock",
+        help="Unlocks a previously locked text channel.\nExample: &unlock #general"
+    )
     @commands.has_permissions(manage_channels=True)
     async def unlock_command(self, ctx, channel: discord.TextChannel = None):
         target_channel = channel or ctx.channel
