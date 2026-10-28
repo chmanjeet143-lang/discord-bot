@@ -15,40 +15,42 @@ class HelpDropdown(discord.ui.Select):
         self.bot = bot
         options = []
         
-        # Har category ke liye specific emojis yahan set kiye hain
+        # Har category ke liye bilkul alag aur unique emojis set kiye hain
         emoji_map = {
-            "moderation": "🛡️",
             "automod": "🤖",
+            "boost": "🚀",
+            "bump": "📢",
+            "clone": "📋",
             "giveaway": "🎉",
-            "tickets": "🎫",
-            "supporttickets": "🎫",
-            "support ticket": "🎫",
-            "utility": "⚙️",
             "information": "📊",
+            "jail": "⛓️",
             "leveling": "⭐",
-            "welcome": "👋",
+            "moderation": "🛡️",
+            "supporttickets": "🎫",
+            "tickets": "🎫",
+            "utility": "⚙️",
             "welcome1": "👋",
             "welcome2": "✨",
-            "bump": "📢",
-            "boost": "🚀",
-            "clone": "📋",
-            "jail": "⛓️"
+            "welcome": "💌"
         }
 
-        for cog_name in self.bot.cogs:
-            if cog_name.lower() in ["helpcog", "help"]:
-                continue
-            
+        # Available cogs ki list jo bot mein loaded hain (helpcog/help ko chhod kar)
+        available_cogs = [cog for cog in self.bot.cogs if cog.lower() not in ["helpcog", "help"]]
+
+        # Cogs ko A to Z (alphabetically) sort karna
+        sorted_cogs = sorted(available_cogs, key=lambda name: name.lower())
+
+        for cog_name in sorted_cogs:
             cog = self.bot.get_cog(cog_name)
-            if not any(not cmd.hidden for cmd in cog.get_commands()):
+            if not cog or not any(not cmd.hidden for cmd in cog.get_commands()):
                 continue
 
             display_name = cog_name
             if cog_name.lower() == "supporttickets":
                 display_name = "Support Tickets"
 
-            # Agar exact match na mile toh naam ke hisaab se koi acha emoji ya default star/sparkle le lega
-            emoji = emoji_map.get(cog_name.lower(), "✨")
+            # Unique emoji map se uthayega, agar nahi mila toh default 🔹 dega
+            emoji = emoji_map.get(cog_name.lower(), "🔹")
 
             options.append(
                 discord.SelectOption(
@@ -76,7 +78,6 @@ class HelpDropdown(discord.ui.Select):
             if cmd.hidden:
                 continue
             
-            # Check agar command group hai (subcommands hain)
             if isinstance(cmd, commands.Group):
                 sub_cmds = [sub.name for sub in cmd.commands if not sub.hidden]
                 sub_str = f" (Subcommands: {', '.join(sub_cmds)})" if sub_cmds else ""
