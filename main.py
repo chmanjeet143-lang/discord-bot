@@ -28,7 +28,8 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True
 
-bot = commands.Bot(command_prefix="&", intents=intents)
+# Yahan case_insensitive ko True kar diya gaya hai taaki help/Help/HELP sabhi par chale
+bot = commands.Bot(command_prefix="&", intents=intents, case_insensitive=True)
 
 # Default help command ko remove karte hain taaki hamara custom help menu chale
 bot.remove_command('help')
