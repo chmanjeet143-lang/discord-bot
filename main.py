@@ -27,11 +27,11 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.members = True
+intents.voice_states = True  # <--- Yeh add karna zaroori hai VC Role ke liye!
 
-# Yahan case_insensitive ko True kar diya gaya hai taaki help/Help/HELP sabhi par chale
 bot = commands.Bot(command_prefix="&", intents=intents, case_insensitive=True)
 
-# Default help command ko remove karte hain taaki hamara custom help menu chale
+# Default help command ko remove karte hain
 bot.remove_command('help')
 
 @bot.event
@@ -41,7 +41,7 @@ async def on_ready():
     print(f'Moonlight Heaven Bot is 100% Online!')
     print(f'-----------------------------------')
 
-# AUTOMATIC COG LOADER: Ab cogs/ folder ki har nayi file apne aap load hogi!
+# AUTOMATIC COG LOADER
 async def setup_hook():
     for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
