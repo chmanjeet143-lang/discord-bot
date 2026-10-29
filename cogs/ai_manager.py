@@ -1,0 +1,60 @@
+import os
+import discord
+from discord.ext import commands
+from google import genai
+
+class MoonlightAIManager(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        # Railway से Gemini API Key उठा रहा है
+        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+    @commands.command(name="ai", help="Talk to Moonlight Heaven AI manager.")
+    async def ai_talk(self, ctx, *, message: str):
+        # बॉट की पर्सनालिटी और डिटेल्स यहाँ सेट हैं
+        system_instruction = (
+            "You are the official AI management system for the Discord server 'Moonlight Heaven'. "
+            "Your creator and developer is 'Zeus'. "
+            "Your home is the 'Moonlight Heaven' server. "
+            "You are smart, strict, highly professional, and dedicated to server management, "
+            "jamming mode, and event modes. Always stay in character, respect your creator Zeus, "
+            "and represent Moonlight Heaven with pride. Keep your answers clear, structured, and helpful."
+        )
+
+        full_prompt = f"{system_instruction}\n\nUser message: {message}"
+
+        try:
+            # टाइपिंग इंडिकेटर ताकि यूजर को पता चले एआई सोच रहा है
+            async with ctx.typing():
+                response = self.client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=full_prompt,
+                )
+                
+                # अगर जवाब लंबा हो तो उसे अच्छे से मैनेज करना
+                reply_text = response.text
+                if len(reply_text) > 2000:
+                    # अगर डिस्कॉर्ड की लिमिट से बड़ा है तो टुकड़ों में भेजना
+                    for i in range(0, len(reply_text), 2000):
+                        await ctx.send(reply_text[i:i+2000])
+                else:
+                    await ctx.send(reply_text)
+
+        except Exception as e:
+            await ctx.send(f"❌ अरे भाई, एआई से कनेक्ट करने में दिक्कत आ रही है: `{e}`")
+
+    @commands.command(name="ai_status", help="Check AI and server identity status.")
+    async def ai_status(self, ctx):
+        embed = discord.Embed(
+            title="🌙 Moonlight Heaven - AI System Status",
+            description="AI management system is fully active and integrated.",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="Bot Name", value="Moonlight Heaven", inline=True)
+        embed.add_field(name="Creator", value="Zeus", inline=True)
+        embed.add_field(name="Home Server", value="Moonlight Heaven Server", inline=False)
+        embed.set_footer(text="Powered by Gemini AI & Railway")
+        await ctx.send(embed=embed)
+
+async def setup(bot):
+    await bot.add_cog(MoonlightAIManager(bot))
