@@ -1,11 +1,11 @@
 import discord
 from discord.ext import commands
 import datetime
+import random
 
-class MoonlightLocalAssistant(commands.Cog):
+class MoonlightHumanAssistant(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # सर्वर के रूल्स और कस्टम मेमोरी को याद रखने की जगह
         self.server_rules = [
             "किसी भी लड़की या मेंबर की बेइज्जती या हैरेसमेंट नहीं करनी है।"
         ]
@@ -15,44 +15,70 @@ class MoonlightLocalAssistant(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        # अगर कमांड है तो उसे कमांड प्रोसेसर पर जाने दो
         if message.content.startswith('&'):
             return
 
         content_lower = message.content.lower()
         msg_text = message.content
 
-        # 1. हाय-हैलो और आम बातचीत का जवाब (ताकि रोबोट न लगे)
-        if any(w in content_lower for w in ["hi", "hello", "hey", "হাই", "हाय", "हलो"]):
-            await message.channel.send(f"नमस्ते {message.author.mention} सर! बताइए, सर्वर में क्या हाल-चाल हैं और मेरे लिए क्या हुक्म है?")
+        # 1. बातचीत और हाल-चाल का इंसानी अंदाज़
+        if "hinglish" in content_lower or "language" in content_lower:
+            await message.channel.send("समझ गया बॉस! अब से एकदम Hinglish में और तेरी ही भाषा में बात होगी, कोई रोबोटिक सीन नहीं।")
             return
 
-        if any(w in content_lower for w in ["kaise ho", "how are you", "कैसा है", "ठीक हो"]):
-            await message.channel.send(f"मैं एकदम ठीक हूँ सर, आपकी सेवा में हाज़िर हूँ और सर्वर पर पूरी नजर बनाए हुए हूँ!")
+        if any(w in content_lower for w in ["hi", "hello", "hey", "hii", "hai"]):
+            replies = [
+                f"हाँ भाई {message.author.mention}, बोल क्या चल रहा है?",
+                f"नमस्ते सर! बोलो, क्या हाल-चाल हैं?",
+                f"सुनाओ {message.author.mention}, सब ठीक-ठाक?"
+            ]
+            await message.channel.send(random.choice(replies))
             return
 
-        # 2. नया रूल सीखने या समझाने के लिए (जैसे: "सुन, नया रूल यह है...")
-        if "rule" in content_lower and ("add" in content_lower or "जोड़" in content_lower or "ये है" in content_lower):
+        if any(w in content_lower for w in ["kaise ho", "how are you", "कैसा है", "ठीक हो", "tu bta", "तू बता", "me achha hu"]):
+            replies = [
+                "मैं एकदम बढ़िया भाई! तू सुना, सब सेट है?",
+                "मस्त एकदम! तू बता, आज सर्वर में क्या प्लान है?",
+                "मैं फर्स्ट क्लास हूँ सर, तू बता तेरी तरफ क्या चल रहा है?"
+            ]
+            await message.channel.send(random.choice(replies))
+            return
+
+        if any(w in content_lower for w in ["bol ab", "chal bol", "bata"]):
+            replies = [
+                "हाँ बोल भाई, सुन रहा हूँ तेरी पूरी बात।",
+                "बताओ सर, क्या हुक्म है? क्या करना है अभी?",
+                "बोलो-बोलो, सर्वर की कमान अपने हाथ में है।"
+            ]
+            await message.channel.send(random.choice(replies))
+            return
+
+        if any(w in content_lower for w in ["chup", "shut up", "nikal", "chup kar"]):
+            replies = [
+                "अरे ठीक है भाई, चुप हो गया! 🤐",
+                "चलो ठीक है, अब काम पर ध्यान देता हूँ।",
+                "ओके बॉस, शांत!"
+            ]
+            await message.channel.send(random.choice(replies))
+            return
+
+        # 2. नया रूल सीखने या समझाने के लिए
+        if "rule" in content_lower and ("add" in content_lower or "जोड़" in content_lower or "ये है" in content_lower or "नया" in content_lower):
             self.server_rules.append(msg_text)
-            await message.channel.send(f"✅ ठीक है सर! मैंने यह नया रूल अपनी मेमोरी में नोट कर लिया है और अब से इस पर कड़ी नजर रखूँगा।")
+            await message.channel.send(f"✅ एकदम नोट कर लिया भाई! यह नया रूल अब से मेरे दिमाग में है, कोई भी तोड़ेगा तो सीधा एक्शन लूँगा।")
             return
 
-        # 3. ऑटो-मॉडरेशन: बदतमीजी या गाली पकड़े जाने पर सजा देना
+        # 3. ऑटो-मॉडरेशन: बदतमीजी या गाली पकड़े जाने पर बाकायदा समझाकर टाइमआउट देना
         abuse_words = ["gaali", "madarchod", "bhenchod", "bsdk", "chutiya"]
         has_abuse = any(word in content_lower for word in abuse_words)
 
         if has_abuse:
             try:
-                # गंदा मैसेज तुरंत डिलीट करेंगे
                 await message.delete()
-
-                # 5 मिनट का टाइमआउट देंगे
                 duration = datetime.timedelta(minutes=5)
-                await message.author.timeout(duration, reason="Server Rule Violation: Abuse/Harassment")
-
-                # प्रोफेशनल और सख्त लहजे में चेतावनी
+                await message.author.timeout(duration, reason="Server Rule Violation: Harassment/Abuse")
                 await message.channel.send(
-                    f"⚠️ {message.author.mention} सुन भाई! तुमने यहाँ अभद्र भाषा का प्रयोग किया है जो हमारे सर्वर के नियमों और हैरेसमेंट के खिलाफ है। इससे माहौल खराब होता है, इसलिए मैं तुम्हें 5 मिनट का टाइमआउट दे रहा हूँ। आगे से ऐसा मत करना।"
+                    f"⚠️ {message.author.mention} भाई, तूने यहाँ गलत भाषा का इस्तेमाल किया है जो हैरेसमेंट और सर्वर के नियमों के खिलाफ है। इससे माहौल खराब होता है, इसलिए मैं तुझे 5 मिनट का टाइमआउट दे रहा हूँ। आगे से ध्यान रखना!"
                 )
                 return
             except Exception as e:
@@ -65,39 +91,27 @@ class MoonlightLocalAssistant(commands.Cog):
             if any(k in content_lower for k in ["ban", "बैन"]):
                 try:
                     await target.ban(reason=f"Action requested by {message.author.name}")
-                    await message.channel.send(f"✅ ओके सर! **{target.name}** को सर्वर से बैन कर दिया गया है, अब ये यहाँ नहीं दिखेगा।")
+                    await message.channel.send(f"✅ ओके सर! **{target.name}** को रास्ते से हटा दिया है (बैन कर दिया)।")
                     return
                 except Exception as e:
-                    await message.channel.send(f"❌ सर, इसे बैन करने में दिक्कत आ रही है।")
+                    await message.channel.send(f"❌ भाई, इसे बैन करने में दिक्कत आ रही है, शायद इसकी परमिशन मुझसे ऊपर है।")
 
             elif any(k in content_lower for k in ["kick", "किक"]):
                 try:
                     await target.kick(reason=f"Action requested by {message.author.name}")
-                    await message.channel.send(f"✅ जी सर, **{target.name}** को किक कर दिया है।")
+                    await message.channel.send(f"✅ डन सर! **{target.name}** को किक मार दिया है।")
                     return
                 except Exception as e:
-                    await message.channel.send(f"❌ सर, इसे किक नहीं कर पा रहा हूँ।")
+                    await message.channel.send(f"❌ भाई, इसे किक नहीं कर पा रहा हूँ।")
 
             elif any(k in content_lower for k in ["timeout", "time out", "चुप करा", "म्यूट"]):
                 try:
                     duration = datetime.timedelta(minutes=10)
                     await target.timeout(duration, reason=f"Action requested by {message.author.name}")
-                    await message.channel.send(f"✅ ठीक है सर, **{target.name}** को 10 मिनट का टाइमआउट दे दिया है, यह शांत रहेगा।")
+                    await message.channel.send(f"✅ ठीक है भाई, **{target.name}** को 10 मिनट की चुप्प करा दी है (टाइमआउट दे दिया है)।")
                     return
                 except Exception as e:
-                    await message.channel.send(f"❌ सर, इसे टाइमआउट देने में एरर आ गई।")
-
-    # बॉट की जानकारी देखने की कमांड
-    @commands.command(name="assistant_info", help="Shows assistant status.")
-    async def assistant_info(self, ctx):
-        embed = discord.Embed(
-            title="🌙 Moonlight Heaven - Local Assistant",
-            description="Pure Python Smart Assistant is active. No external AI lag!",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="Active Rules Count", value=str(len(self.server_rules)), inline=True)
-        embed.add_field(name="Mode", value="Server Manager & Chat Assistant", inline=True)
-        await ctx.send(embed=embed)
+                    await message.channel.send(f"❌ भाई, इसे टाइमआउट देने में एरर आ गई।")
 
 async def setup(bot):
-    await bot.add_cog(MoonlightLocalAssistant(bot))
+    await bot.add_cog(MoonlightHumanAssistant(bot))
