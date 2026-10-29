@@ -2,6 +2,7 @@ import os
 import discord
 from discord.ext import commands
 from google import genai
+from google.genai import types
 
 class MoonlightAIManager(commands.Cog):
     def __init__(self, bot):
@@ -19,13 +20,16 @@ class MoonlightAIManager(commands.Cog):
             "and represent Moonlight Heaven with pride. Keep your answers clear, structured, and helpful."
         )
 
-        full_prompt = f"{system_instruction}\n\nUser message: {message}"
-
         try:
             async with ctx.typing():
+                # नए google-genai SDK में system instruction देने का सही तरीका config के ज़रिए है
                 response = self.client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=full_prompt,
+                    model="gemini-2.5-flash",
+                    contents=message,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.7,
+                    ),
                 )
                 
                 reply_text = response.text
