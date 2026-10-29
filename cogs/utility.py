@@ -59,7 +59,7 @@ class Utility(commands.Cog, name="Utility"):
         self.vc_joins = {}
         self.afk_users = {}
 
-    @commands.command(name="start", help="Start or configure the counting game with a custom starting number and emoji.\n\n**Example:** &start 1 #counting ✅")
+    @commands.command(name="start", hidden=True, help="Start or configure the counting game with a custom starting number and emoji.\n\n**Example:** &start 1 #counting ✅")
     @commands.has_permissions(manage_channels=True)
     async def start_counting(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
         self.current_count = number
@@ -140,13 +140,34 @@ class Utility(commands.Cog, name="Utility"):
             except ValueError:
                 return  
 
-            # Anti-Double Count Check (Same user cannot count twice in a row)
-            if author_id == self.last_user_id:
+            # Anti-Double Count & Wrong Number Check with Auto-Delete
+            if author_id == self.last_user_id or number != self.current_count:
                 try:
                     await message.delete()
                 except:
                     pass
-                return await message.channel.send(f"❌ {message.author.mention}, you cannot count twice in a row! Wait for someone else.", delete_after=5)
+                
+                error_desc = (
+                    f"❌ {message.author.mention}, you cannot count twice in a row!" 
+                    if author_id == self.last_user_id 
+                    else f"❌ {message.author.mention}, that's incorrect! Next correct number is **{self.current_count}**."
+                )
+                
+                embed = create_embed(
+                    message.guild,
+                    title="⚠️ Counting Error",
+                    description=error_desc,
+                    color=discord.Color.red()
+                )
+                err_msg = await message.channel.send(embed=embed)
+                
+                import asyncio
+                await asyncio.sleep(4)
+                try:
+                    await err_msg.delete()
+                except:
+                    pass
+                return
 
             if number == self.current_count:
                 try:
@@ -155,14 +176,6 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 self.current_count += 1
                 self.last_user_id = author_id
-            else:
-                embed = create_embed(
-                    message.guild,
-                    title="✨ Wrong Number!",
-                    description=f"Oops {message.author.mention}, that's incorrect. Next correct number is: **{self.current_count}**",
-                    color=discord.Color.orange()
-                )
-                await message.channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
