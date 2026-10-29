@@ -23,9 +23,8 @@ class MoonlightAIManager(commands.Cog):
 
         try:
             async with ctx.typing():
-                # Yahan model ka naam gemini-3.8-flash kar diya hai
                 response = self.client.models.generate_content(
-                    model="gemini-3.8-flash",
+                    model="gemini-2.0-flash",
                     contents=full_prompt,
                 )
                 
@@ -37,7 +36,7 @@ class MoonlightAIManager(commands.Cog):
                     await ctx.send(reply_text)
 
         except Exception as e:
-            await ctx.send(f"❌ Are bhai, AI se connect karne mein dikkat aa rahi hai: `{e}`")
+            await ctx.send(f"❌ अरे भाई, एआई से कनेक्ट करने में दिक्कत आ रही है: `{e}`")
 
     @commands.command(name="ai_status", help="Check AI and server identity status.")
     async def ai_status(self, ctx):
