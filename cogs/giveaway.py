@@ -37,6 +37,7 @@ def parse_time(time_str: str):
 class Giveaway(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.active_giveaways = {}
         self.load_giveaways()
         self.check_giveaways.start()
 
@@ -62,7 +63,7 @@ class Giveaway(commands.Cog):
 
     @tasks.loop(seconds=15)
     async def check_giveaways(self):
-        now = datetime.datetime.utcnow().timestamp()
+        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
         expired = []
         
         for msg_id_str, data in list(self.active_giveaways.items()):
@@ -70,9 +71,10 @@ class Giveaway(commands.Cog):
                 expired.append(msg_id_str)
 
         for msg_id_str in expired:
-            data = self.active_giveaways.pop(msg_id_str)
-            self.save_giveaways()
-            await self.end_giveaway_task(data)
+            data = self.active_giveaways.pop(msg_id_str, None)
+            if data:
+                self.save_giveaways()
+                await self.end_giveaway_task(data)
 
     @check_giveaways.before_loop
     async def before_check_giveaways(self):
@@ -101,9 +103,8 @@ class Giveaway(commands.Cog):
         prize = data["prize"]
         winners_count = data["winners_count"]
 
-        embed = message.embeds[0] if message.embeds else create_embed(guild, title="🎉 GIVEAWAY ENDED 🎉")
-
         if len(users) == 0:
+            embed = message.embeds[0] if message.embeds else create_embed(guild)
             embed.title = "🎉 GIVEAWAY ENDED (No Entries)"
             embed.description = f"The giveaway for **{prize}** has ended, but unfortunately no one reacted to participate."
             embed.color = discord.Color.orange()
@@ -117,6 +118,7 @@ class Giveaway(commands.Cog):
         winners = random.sample(users, actual_winners_count)
         winners_mention = ", ".join([f"<@{w}>" for w in winners])
 
+        embed = message.embeds[0] if message.embeds else create_embed(guild)
         embed.title = "🎉 GIVEAWAY ENDED 🎉"
         embed.description = (
             f"The giveaway for **{prize}** has concluded!\n\n"
@@ -149,7 +151,7 @@ class Giveaway(commands.Cog):
             embed = create_embed(ctx.guild, title="🎉 Invalid Time Format", description="Please use a valid duration format like `10s`, `5m`, `2h`, or `1d`.", color=discord.Color.red())
             return await ctx.send(embed=embed)
 
-        end_time = datetime.datetime.utcnow() + delta
+        end_time = datetime.datetime.now(datetime.timezone.utc) + delta
         end_timestamp = int(end_time.timestamp())
 
         embed = create_embed(
@@ -159,7 +161,7 @@ class Giveaway(commands.Cog):
                         f"🎁 **Prize:** **{prize}**\n"
                         f"👑 **Winners:** `{winners_count}`\n"
                         f"⏳ **Ends At:** <t:{end_timestamp}:R> (<t:{end_timestamp}:F>)\n"
-                        f"hosted by: {ctx.author.mention}\n\n"
+                        f"Hosted by: {ctx.author.mention}\n\n"
                         f"React with 🎉 below to enter the giveaway!",
             color=discord.Color.gold()
         )
@@ -167,7 +169,6 @@ class Giveaway(commands.Cog):
         message = await ctx.send(embed=embed)
         await message.add_reaction("🎉")
 
-        # Save to active giveaways dictionary and JSON file
         self.active_giveaways[str(message.id)] = {
             "message_id": message.id,
             "channel_id": ctx.channel.id,
