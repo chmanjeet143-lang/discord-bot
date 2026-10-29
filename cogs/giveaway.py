@@ -34,29 +34,27 @@ def parse_time(time_str: str):
         return datetime.timedelta(days=amount)
     return None
 
-class GiveawayControlView(discord.ui.View):
+class GiveawayDMControlView(discord.ui.View):
     def __init__(self, cog, message_id_str):
         super().__init__(timeout=None)
         self.cog = cog
         self.message_id_str = message_id_str
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message("❌ You do not have permission to manage giveaways!", ephemeral=True)
-            return False
-        return True
-
-    @discord.ui.button(label="Reroll Winner", style=discord.ButtonStyle.secondary, emoji="🔄", custom_id="giveaway_reroll_btn")
+    @discord.ui.button(label="Reroll", style=discord.ButtonStyle.secondary, emoji="🔄", custom_id="gw_dm_reroll")
     async def reroll_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = self.cog.active_giveaways.get(self.message_id_str)
         if not data:
             return await interaction.response.send_message("❌ This giveaway data is no longer active.", ephemeral=True)
 
+        guild = self.cog.bot.get_guild(data["guild_id"])
+        if not guild:
+            return await interaction.response.send_message("❌ Guild not found.", ephemeral=True)
+
         try:
-            channel = interaction.guild.get_channel(data["channel_id"])
+            channel = guild.get_channel(data["channel_id"])
             message = await channel.fetch_message(data["message_id"])
         except Exception:
-            return await interaction.response.send_message("❌ Could not fetch the giveaway message.", ephemeral=True)
+            return await interaction.response.send_message("❌ Could not fetch the public giveaway message.", ephemeral=True)
 
         users = []
         for reaction in message.reactions:
@@ -72,37 +70,26 @@ class GiveawayControlView(discord.ui.View):
         actual_winners_count = min(winners_count, len(users))
         new_winners = random.sample(users, actual_winners_count)
         data["current_winners"] = new_winners
+        self.cog.save_giveaways()
 
         winners_mention = ", ".join([f"<@{w}>" for w in new_winners])
-        ended_time_str = datetime.datetime.fromtimestamp(data["end_time"], datetime.timezone.utc).strftime("%d/%m/%Y, %H:%M")
+        await interaction.response.edit_message(content=f"🔄 **Rerolled!** New temporary winner selected: {winners_mention}.\nClick **Confirm** when you are ready to announce.", view=self)
 
-        embed = create_embed(
-            interaction.guild,
-            title="🎁 Giveaway Ended 🎁",
-            description=(
-                f"🎁 **{data['prize']}**\n\n"
-                f"• Hosted by: <@{data['host_id']}>\n"
-                f"• Total participant(s) : {len(users)}\n\n"
-                f"• **Winner :**\n{winners_mention}\n\n"
-                f"Ended | {ended_time_str}"
-            ),
-            color=discord.Color.gold()
-        )
-
-        await message.edit(embed=embed, view=self)
-        await interaction.response.send_message(f"🔄 Rerolled! New temporary winner selected: {winners_mention}. Click **Confirm Winner** when you are ready.", ephemeral=True)
-
-    @discord.ui.button(label="Confirm Winner", style=discord.ButtonStyle.success, emoji="✅", custom_id="giveaway_confirm_btn")
+    @discord.ui.button(label="Confirm Winner", style=discord.ButtonStyle.success, emoji="✅", custom_id="gw_dm_confirm")
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = self.cog.active_giveaways.get(self.message_id_str)
         if not data:
             return await interaction.response.send_message("❌ This giveaway data is no longer active.", ephemeral=True)
 
+        guild = self.cog.bot.get_guild(data["guild_id"])
+        if not guild:
+            return await interaction.response.send_message("❌ Guild not found.", ephemeral=True)
+
         try:
-            channel = interaction.guild.get_channel(data["channel_id"])
+            channel = guild.get_channel(data["channel_id"])
             message = await channel.fetch_message(data["message_id"])
         except Exception:
-            return await interaction.response.send_message("❌ Could not fetch the giveaway message.", ephemeral=True)
+            return await interaction.response.send_message("❌ Could not fetch the public giveaway message.", ephemeral=True)
 
         winners = data.get("current_winners", [])
         if not winners:
@@ -112,8 +99,9 @@ class GiveawayControlView(discord.ui.View):
         ended_time_str = datetime.datetime.fromtimestamp(data["end_time"], datetime.timezone.utc).strftime("%d/%m/%Y, %H:%M")
         users_count = data.get("total_participants", 0)
 
+        # Update public message to final ended state (No buttons for normal members)
         embed = create_embed(
-            interaction.guild,
+            guild,
             title="🎁 Giveaway Ended 🎁",
             description=(
                 f"🎁 **{data['prize']}**\n\n"
@@ -125,24 +113,25 @@ class GiveawayControlView(discord.ui.View):
             color=discord.Color.green()
         )
 
-        # Disable buttons after confirmation
-        for child in self.children:
-            child.disabled = True
+        try:
+            await message.edit(embed=embed, view=None)
+        except Exception:
+            pass
 
-        await message.edit(embed=embed, view=self)
-
-        # Send final public congratulatory message like Image 1
+        # Send public congratulations message in channel
         announcement = f"Congrats, {winners_mention} you have won **{data['prize']}**, hosted by <@{data['host_id']}>"
         try:
             await channel.send(content=announcement)
         except Exception:
             pass
 
-        # Remove from active giveaways json
+        # Disable buttons in DM and clean up
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(content=f"✅ **Confirmed!** Winner {winners_mention} has been successfully announced publicly.", view=self)
+
         self.cog.active_giveaways.pop(self.message_id_str, None)
         self.cog.save_giveaways()
-
-        await interaction.response.send_message("✅ Giveaway winner successfully confirmed and announced!", ephemeral=True)
 
 
 class Giveaway(commands.Cog):
@@ -185,13 +174,13 @@ class Giveaway(commands.Cog):
             data = self.active_giveaways[msg_id_str]
             data["pending_confirmation"] = True
             self.save_giveaways()
-            await self.prompt_giveaway_pending(data)
+            await self.send_host_dm(data)
 
     @check_giveaways.before_loop
     async def before_check_giveaways(self):
         await self.bot.wait_until_ready()
 
-    async def prompt_giveaway_pending(self, data):
+    async def send_host_dm(self, data):
         guild = self.bot.get_guild(data["guild_id"])
         if not guild:
             return
@@ -234,25 +223,26 @@ class Giveaway(commands.Cog):
         self.save_giveaways()
 
         winners_mention = ", ".join([f"<@{w}>" for w in winners])
-        ended_time_str = datetime.datetime.now(datetime.timezone.utc).strftime("%d/%m/%Y, %H:%M")
 
-        embed = create_embed(
-            guild,
-            title="🎁 Giveaway Ended 🎁",
-            description=(
-                f"🎁 **{prize}**\n\n"
-                f"• Hosted by: <@{data['host_id']}>\n"
-                f"• Total participant(s) : {len(users)}\n\n"
-                f"• **Winner (Pending Confirmation) :**\n{winners_mention}\n\n"
-                f"Ended | {ended_time_str}"
-            ),
-            color=discord.Color.gold()
-        )
+        # Fetch Host Member to DM
+        host = guild.get_member(data["host_id"])
+        if not host:
+            try:
+                host = await guild.fetch_member(data["host_id"])
+            except Exception:
+                return
 
-        view = GiveawayControlView(self, str(message.id))
+        view = GiveawayDMControlView(self, str(message.id))
         try:
-            await message.edit(embed=embed, view=view)
+            await host.send(
+                content=f"🔔 **Giveaway Ended for: {prize}**\n"
+                        f"• Total Participants: {len(users)}\n"
+                        f"• Temporary Winner: {winners_mention}\n\n"
+                        f"Zeus, please choose to **Reroll** or **Confirm** below:",
+                view=view
+            )
         except Exception:
+            # Fallback if DMs are closed: send temporary notice in channel or handle gracefully
             pass
 
     @commands.command(
