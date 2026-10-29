@@ -138,6 +138,11 @@ class Utility(commands.Cog, name="Utility"):
             try:
                 number = int(message.content.strip())
             except ValueError:
+                # Agar koi number ki jagah text/kuch aur likhe, toh sirf uska message delete kar do
+                try:
+                    await message.delete()
+                except:
+                    pass
                 return  
 
             # Anti-Double Count & Wrong Number Check with Auto-Delete
