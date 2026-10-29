@@ -3,7 +3,6 @@ from discord.ext import commands
 import json
 import os
 
-# JSON file ka path
 DATA_FILE = "noprefix.json"
 
 def load_data():
@@ -20,20 +19,37 @@ def save_data(data):
         json.dump(data, f, indent=4)
 
 class NoPrefix(commands.Cog):
+    """NoPrefix management commands for trusted users."""
     def __init__(self, bot):
         self.bot = bot
 
-    # 1. &no prefix add / remove / list group command
     @commands.group(name="no", invoke_without_command=True)
     async def no_prefix(self, ctx):
-        await ctx.send("❌ Use `&no prefix add @user`, `&no prefix remove @user`, ya `&no prefix list`.")
+        embed = discord.Embed(
+            title="Category • NoPrefix",
+            description="Here are all the available commands under **NoPrefix**:\n\n"
+                        "• `&no prefix add` — Add a user to the no-prefix list.\n"
+                        "• `&no prefix remove` — Remove a user from the no-prefix list.\n"
+                        "• `&no prefix list` — View all users in the no-prefix list.",
+            color=discord.Color.blurple()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+        await ctx.send(embed=embed)
 
     @no_prefix.group(name="prefix", invoke_without_command=True)
     async def no_prefix_sub(self, ctx):
-        await ctx.send("❌ Sahi format use karein: `&no prefix add/remove/list`")
+        embed = discord.Embed(
+            title="Category • NoPrefix",
+            description="❌ Sahi format use karein:\n\n"
+                        "• `&no prefix add @user` — Add user\n"
+                        "• `&no prefix remove @user` — Remove user\n"
+                        "• `&no prefix list` — View list",
+            color=discord.Color.red()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+        await ctx.send(embed=embed)
 
-    # &no prefix add <user>
-    @no_prefix_sub.command(name="add")
+    @no_prefix_sub.command(name="add", help="Add a user to the no-prefix list.")
     @commands.has_permissions(administrator=True)
     async def no_prefix_add(self, ctx, member: discord.Member):
         data = load_data()
@@ -43,45 +59,75 @@ class NoPrefix(commands.Cog):
             data[guild_id] = []
 
         if member.id in data[guild_id]:
-            return await ctx.send(f"⚠️ **{member.display_name}** pehle se hi no-prefix list mein hai!")
+            embed = discord.Embed(
+                title="NoPrefix • Warning",
+                description=f"⚠️ **{member.display_name}** pehle se hi no-prefix list mein hai!",
+                color=discord.Color.gold()
+            )
+            embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+            return await ctx.send(embed=embed)
 
         data[guild_id].append(member.id)
         save_data(data)
-        await ctx.send(f"✅ Successfully **{member.display_name}** ko no-prefix list mein add kar diya gaya hai!")
+        
+        embed = discord.Embed(
+            title="NoPrefix • Added",
+            description=f"✅ Successfully **{member.display_name}** ko no-prefix list mein add kar diya gaya hai!",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+        await ctx.send(embed=embed)
 
-    # &no prefix remove <user>
-    @no_prefix_sub.command(name="remove")
+    @no_prefix_sub.command(name="remove", help="Remove a user from the no-prefix list.")
     @commands.has_permissions(administrator=True)
     async def no_prefix_remove(self, ctx, member: discord.Member):
         data = load_data()
         guild_id = str(ctx.guild.id)
 
         if guild_id not in data or member.id not in data[guild_id]:
-            return await ctx.send(f"❌ **{member.display_name}** no-prefix list mein maujood nahi hai!")
+            embed = discord.Embed(
+                title="NoPrefix • Error",
+                description=f"❌ **{member.display_name}** no-prefix list mein maujood nahi hai!",
+                color=discord.Color.red()
+            )
+            embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+            return await ctx.send(embed=embed)
 
         data[guild_id].remove(member.id)
         save_data(data)
-        await ctx.send(f"✅ Successfully **{member.display_name}** ko no-prefix list se hata diya gaya hai!")
+        
+        embed = discord.Embed(
+            title="NoPrefix • Removed",
+            description=f"✅ Successfully **{member.display_name}** ko no-prefix list se hata diya gaya hai!",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+        await ctx.send(embed=embed)
 
-    # &no prefix list
-    @no_prefix_sub.command(name="list")
+    @no_prefix_sub.command(name="list", help="View all users in the no-prefix list.")
     async def no_prefix_list(self, ctx):
         data = load_data()
         guild_id = str(ctx.guild.id)
 
         if guild_id not in data or not data[guild_id]:
-            return await ctx.send("📂 Is server par koi bhi user no-prefix list mein nahi hai.")
+            embed = discord.Embed(
+                title="Server No-Prefix Users",
+                description="📂 Is server par koi bhi user no-prefix list mein nahi hai.",
+                color=discord.Color.orange()
+            )
+            embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
+            return await ctx.send(embed=embed)
 
         mentions = [f"<@{uid}>" for uid in data[guild_id]]
         
         embed = discord.Embed(
-            setTitle="📜 Server No-Prefix Users",
+            title="📜 Server No-Prefix Users",
             description="\n".join(mentions),
             color=discord.Color.blurple()
         )
+        embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
         await ctx.send(embed=embed)
 
-    # 2. Listener: Jab no-prefix user bina prefix ke message kare
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
@@ -90,14 +136,9 @@ class NoPrefix(commands.Cog):
         data = load_data()
         guild_id = str(message.guild.id)
         
-        # Check agar user is guild ki no-prefix list mein hai
         if guild_id in data and message.author.id in data[guild_id]:
-            # Agar message '&' ya kisi aur prefix se shuru nahi hota, toh usko command banakar process karein
-            # (Aapka bot ka default prefix check karke ya direct invoke kara sakte hain)
-            prefix = "&" # Aapke bot ka jo bhi prefix ho
+            prefix = "&"
             if not message.content.startswith(prefix):
-                # Message ko command mein convert karne ke liye bot ka process_commands use hota hai
-                # Lekin uske liye message content ke aage prefix lagana padega temporarily
                 message.content = prefix + message.content
                 await self.bot.process_commands(message)
 
