@@ -6,12 +6,10 @@ from google import genai
 class MoonlightAIManager(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Railway से Gemini API Key उठा रहा है
         self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
     @commands.command(name="ai", help="Talk to Moonlight Heaven AI manager.")
     async def ai_talk(self, ctx, *, message: str):
-        # बॉट की पर्सनालिटी और डिटेल्स यहाँ सेट हैं
         system_instruction = (
             "You are the official AI management system for the Discord server 'Moonlight Heaven'. "
             "Your creator and developer is 'Zeus'. "
@@ -24,17 +22,15 @@ class MoonlightAIManager(commands.Cog):
         full_prompt = f"{system_instruction}\n\nUser message: {message}"
 
         try:
-            # टाइपिंग इंडिकेटर ताकि यूजर को पता चले एआई सोच रहा है
             async with ctx.typing():
+                # यहाँ मॉडल का नाम बदलकर gemini-1.5-flash कर दिया है
                 response = self.client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-1.5-flash",
                     contents=full_prompt,
                 )
                 
-                # अगर जवाब लंबा हो तो उसे अच्छे से मैनेज करना
                 reply_text = response.text
                 if len(reply_text) > 2000:
-                    # अगर डिस्कॉर्ड की लिमिट से बड़ा है तो टुकड़ों में भेजना
                     for i in range(0, len(reply_text), 2000):
                         await ctx.send(reply_text[i:i+2000])
                 else:
