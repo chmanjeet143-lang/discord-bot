@@ -18,38 +18,25 @@ def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-class NoPrefix(commands.Cog):
+class NoPrefix(commands.Cog, name="NoPrefix"):
     """NoPrefix management commands for trusted users."""
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.group(name="no", invoke_without_command=True)
-    async def no_prefix(self, ctx):
+    @commands.command(name="no", help="View all available NoPrefix commands and descriptions.")
+    async def no_prefix_main(self, ctx):
         embed = discord.Embed(
             title="Category • NoPrefix",
             description="Here are all the available commands under **NoPrefix**:\n\n"
-                        "• `&no prefix add` — Add a user to the no-prefix list.\n"
-                        "• `&no prefix remove` — Remove a user from the no-prefix list.\n"
-                        "• `&no prefix list` — View all users in the no-prefix list.",
+                        "• `&no add` — Add a user to the no-prefix list.\n"
+                        "• `&no remove` — Remove a user from the no-prefix list.\n"
+                        "• `&no list` — View all users in the no-prefix list.",
             color=discord.Color.blurple()
         )
         embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
         await ctx.send(embed=embed)
 
-    @no_prefix.group(name="prefix", invoke_without_command=True)
-    async def no_prefix_sub(self, ctx):
-        embed = discord.Embed(
-            title="Category • NoPrefix",
-            description="❌ Sahi format use karein:\n\n"
-                        "• `&no prefix add @user` — Add user\n"
-                        "• `&no prefix remove @user` — Remove user\n"
-                        "• `&no prefix list` — View list",
-            color=discord.Color.red()
-        )
-        embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
-        await ctx.send(embed=embed)
-
-    @no_prefix_sub.command(name="add", help="Add a user to the no-prefix list.")
+    @commands.command(name="add", help="Add a user to the no-prefix list.")
     @commands.has_permissions(administrator=True)
     async def no_prefix_add(self, ctx, member: discord.Member):
         data = load_data()
@@ -78,7 +65,7 @@ class NoPrefix(commands.Cog):
         embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
         await ctx.send(embed=embed)
 
-    @no_prefix_sub.command(name="remove", help="Remove a user from the no-prefix list.")
+    @commands.command(name="remove", help="Remove a user from the no-prefix list.")
     @commands.has_permissions(administrator=True)
     async def no_prefix_remove(self, ctx, member: discord.Member):
         data = load_data()
@@ -104,7 +91,7 @@ class NoPrefix(commands.Cog):
         embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
         await ctx.send(embed=embed)
 
-    @no_prefix_sub.command(name="list", help="View all users in the no-prefix list.")
+    @commands.command(name="list", help="View all users in the no-prefix list.")
     async def no_prefix_list(self, ctx):
         data = load_data()
         guild_id = str(ctx.guild.id)
