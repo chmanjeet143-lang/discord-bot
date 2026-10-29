@@ -11,11 +11,30 @@ class MoonlightHeavenControlPanel(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        # Start the background 6-hour automatic backup loop
-        self.auto_backup_loop.start()
+        if not self.auto_backup_loop.is_running():
+            self.auto_backup_loop.start()
 
     def cog_unload(self):
         self.auto_backup_loop.cancel()
+
+    # --- Error Handler for this Cog ---
+    async def cog_command_error(self, ctx, error):
+        if isinstance(error, commands.MissingPermissions):
+            return
+        elif isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(
+                title="❌ Missing Arguments",
+                description=f"Aapne zaroori details nahi di hain!\n**Error:** `{error}`",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, delete_after=7)
+        else:
+            embed = discord.Embed(
+                title="⚠️ Command Error",
+                description=f"Kuch technical issue aa gaya hai:\n```py\n{error}\n```",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, delete_after=10)
 
     # ==========================================
     # 1. SECRET CONTROL PANEL COMMAND (&hide)
@@ -36,9 +55,7 @@ class MoonlightHeavenControlPanel(commands.Cog):
         
         embed.add_field(
             name="📩 Smart DM System",
-            value="`&dm @user <msg>` - Send a DM to a specific user.
-`&dm @Role <msg>` - Send a bulk DM to all non-bot role members.
-*Permissions: Administrator Only*",
+            value="`&dm @user <msg>` - Send a DM to a specific user.\n`&dm @Role <msg>` - Send a bulk DM to all non-bot role members.\n*Permissions: Administrator Only*",
             inline=False
         )
         
@@ -50,9 +67,7 @@ class MoonlightHeavenControlPanel(commands.Cog):
         
         embed.add_field(
             name="💾 Backup & Restore System",
-            value="`&backup` - Take an instant manual backup of channels, roles, and permissions.
-`&restore` - Safely rebuilds and restores the server state within rate limits.
-*(Background auto-backup runs every 6 hours automatically)*",
+            value="`&backup` - Take an instant manual backup of channels, roles, and permissions.\n`&restore` - Safely rebuilds and restores the server state within rate limits.\n*(Background auto-backup runs every 6 hours automatically)*",
             inline=False
         )
         
@@ -74,9 +89,7 @@ class MoonlightHeavenControlPanel(commands.Cog):
     # ==========================================
     # 2. FLEXIBLE DM COMMAND (&dm)
     # ==========================================
-    @commands.command(name="dm", help="Send a DM to a user or all members of a role.
-
-**Example:** &dm @username Hello! OR &dm @RoleName Announcement!")
+    @commands.command(name="dm", help="Send a DM to a user or all members of a role.\n\n**Example:** &dm @username Hello! OR &dm @RoleName Announcement!")
     @commands.has_permissions(administrator=True)
     async def dm_command(self, ctx, target: typing.Union[discord.Member, discord.Role], *, message: str):
         try:
@@ -97,7 +110,7 @@ class MoonlightHeavenControlPanel(commands.Cog):
             success_count = 0
             fail_count = 0
             
-            progress_msg = await ctx.send(f"⏳ **{target.name}** role ke members ko DMs bheje ja rahe hain...")
+            progress_msg = await ctx.send(f"⏳ **{target.name}** role ke members ko DMs bheje ja rahe ہیں...")
 
             for member in target.members:
                 if member.bot:
@@ -113,9 +126,7 @@ class MoonlightHeavenControlPanel(commands.Cog):
             except:
                 pass
 
-            await ctx.send(f"✅ Role **{target.name}** ke liye DM process poori ho gayi!
-• Successful: {success_count}
-• Failed (DMs closed/Blocked): {fail_count}", delete_after=10)
+            await ctx.send(f"✅ Role **{target.name}** ke liye DM process poori ho gayi!\n• Successful: {success_count}\n• Failed (DMs closed/Blocked): {fail_count}", delete_after=10)
 
     # ==========================================
     # 3. VC ROLE SYSTEM (Auto Join/Leave)
@@ -128,7 +139,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
         guild = member.guild
         role_name = "In VC"
         
-        # Find or create the "In VC" role automatically
         vc_role = discord.utils.get(guild.roles, name=role_name)
         if not vc_role:
             try:
@@ -136,7 +146,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
             except:
                 return
 
-        # User joined a VC
         if before.channel is None and after.channel is not None:
             try:
                 if vc_role not in member.roles:
@@ -144,7 +153,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
             except:
                 pass
 
-        # User left a VC completely
         elif before.channel is not None and after.channel is None:
             try:
                 if vc_role in member.roles:
@@ -163,7 +171,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
             "channels": []
         }
 
-        # Backup Roles (excluding @everyone and managed/bot roles)
         for role in sorted(guild.roles, key=lambda r: r.position, reverse=True):
             if role.is_default() or role.managed:
                 continue
@@ -176,7 +183,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
                 "position": role.position
             })
 
-        # Backup Categories and Channels
         for category in guild.categories:
             cat_data = {
                 "name": category.name,
@@ -202,7 +208,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
                 })
             backup_data["categories"].append(cat_data)
 
-        # Uncategorized Channels
         uncat_data = {"name": "Uncategorized", "position": 0, "channels": []}
         for channel in guild.text_channels:
             if channel.category is None:
@@ -226,7 +231,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
         if uncat_data["channels"]:
             backup_data["categories"].append(uncat_data)
 
-        # Save to file
         filename = f"backup_{guild.id}.json"
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(backup_data, f, indent=4)
@@ -260,10 +264,10 @@ class MoonlightHeavenControlPanel(commands.Cog):
         await ctx.message.delete()
         filename = f"backup_{ctx.guild.id}.json"
         if not os.path.exists(filename):
-            err = await ctx.send("❌ Koi backup file nahi mili! Pehle `&backup` run karein.", delete_after=5)
+            await ctx.send("❌ Koi backup file nahi mili! Pehle `&backup` run karein.", delete_after=5)
             return
 
-        msg = await ctx.send("🔄 Server restore process shuru ho chuki hai... Yeh safe rate-limit ke andar dheere-dheere kaam karegi.")
+        msg = await ctx.send("🔄 Server restore process shuru ho chuki hai...")
         
         try:
             with open(filename, "r", encoding="utf-8") as f:
@@ -271,7 +275,6 @@ class MoonlightHeavenControlPanel(commands.Cog):
 
             guild = ctx.guild
 
-            # 1. Restore Roles (slow & steady)
             for r_data in backup_data.get("roles", []):
                 existing_role = discord.utils.get(guild.roles, name=r_data["name"])
                 if not existing_role:
@@ -284,11 +287,10 @@ class MoonlightHeavenControlPanel(commands.Cog):
                             mentionable=r_data["mentionable"],
                             reason="Server restoration tool"
                         )
-                        await asyncio.sleep(1.5) # Anti-rate limit delay
+                        await asyncio.sleep(1.5)
                     except:
                         pass
 
-            # 2. Restore Categories and Channels
             for cat_data in backup_data.get("categories", []):
                 category = discord.utils.get(guild.categories, name=cat_data["name"])
                 if not category:
@@ -319,7 +321,7 @@ class MoonlightHeavenControlPanel(commands.Cog):
                                     user_limit=ch_data.get("user_limit", 0),
                                     reason="Server restoration tool"
                                 )
-                            await asyncio.sleep(1.5) # Anti-rate limit safe pacing
+                            await asyncio.sleep(1.5)
                         except:
                             pass
 
@@ -339,14 +341,11 @@ class MoonlightHeavenControlPanel(commands.Cog):
 
         guild = member.guild
         try:
-            # Check audit logs to find who added this bot
-            await asyncio.sleep(2) # Wait for audit log entry propagation
+            await asyncio.sleep(2)
             async for entry in guild.audit_logs(limit=3, action=discord.AuditLogAction.bot_add):
                 if entry.target.id == member.id:
                     adder = entry.user
-                    # If the adder is not the server owner and not the guild owner itself
                     if adder.id != guild.owner_id:
-                        # Strip all administrative / dangerous permissions or roles from the adder
                         for role in adder.roles:
                             if role.permissions.administrator or role.permissions.manage_guild or role.permissions.ban_members:
                                 try:
@@ -354,16 +353,12 @@ class MoonlightHeavenControlPanel(commands.Cog):
                                 except:
                                     pass
                         
-                        # Send warning notification to system channel or owner
                         if guild.system_channel:
                             try:
                                 await guild.system_channel.send(
-                                    f"🚨 **ANTI-NUKE TRIGGERED!**
-"
-                                    f"• Unauthorized Bot Added: {member.mention}
-"
-                                    f"• Added By: {adder.mention} (Not Server Owner)
-"
+                                    f"🚨 **ANTI-NUKE TRIGGERED!**\n"
+                                    f"• Unauthorized Bot Added: {member.mention}\n"
+                                    f"• Added By: {adder.mention} (Not Server Owner)\n"
                                     f"• Action Taken: Administrative roles stripped instantly!"
                                 )
                             except:
