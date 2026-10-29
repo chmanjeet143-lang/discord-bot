@@ -6,6 +6,7 @@ import os
 import io
 import aiohttp
 import re
+import asyncio
 
 DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
 PREFIX_FILE = "prefixes.json"
@@ -62,6 +63,12 @@ class Utility(commands.Cog, name="Utility"):
     @commands.command(name="start", hidden=True, help="Start or configure the counting game with a custom starting number and emoji.\n\n**Example:** &start 1 #counting ✅")
     @commands.has_permissions(manage_channels=True)
     async def start_counting(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
+        # User ka command message delete karna
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+
         self.current_count = number
         self.counting_channel = channel or ctx.channel
         self.success_emoji = emoji
@@ -76,7 +83,14 @@ class Utility(commands.Cog, name="Utility"):
                         f"✨ **Reaction Emoji:** {self.success_emoji}",
             color=discord.Color.green()
         )
-        await ctx.send(embed=embed)
+        
+        # Bot ka message bhejna aur kuch seconds baad delete karna
+        sent_msg = await ctx.send(embed=embed)
+        await asyncio.sleep(5)
+        try:
+            await sent_msg.delete()
+        except:
+            pass
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -166,7 +180,6 @@ class Utility(commands.Cog, name="Utility"):
                 )
                 err_msg = await message.channel.send(embed=embed)
                 
-                import asyncio
                 await asyncio.sleep(4)
                 try:
                     await err_msg.delete()
