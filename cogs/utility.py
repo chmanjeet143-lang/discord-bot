@@ -52,7 +52,7 @@ class Utility(commands.Cog, name="Utility"):
         self.current_count = 1
         self.counting_channel = None
         self.success_emoji = "✅"
-        self.last_user_id = None  # To prevent double counting by the same user
+        self.last_user_id = None
         
         self.message_counts = {}
         self.invite_counts = {}
@@ -63,7 +63,6 @@ class Utility(commands.Cog, name="Utility"):
     @commands.command(name="start", hidden=True, help="Start or configure the counting game.")
     @commands.has_permissions(manage_channels=True)
     async def start_counting(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
-        # User ka command message turant delete karna
         try:
             await ctx.message.delete()
         except:
@@ -84,7 +83,6 @@ class Utility(commands.Cog, name="Utility"):
             color=discord.Color.green()
         )
         
-        # Bot ka confirmation message turant delete karna (bina sleep ke)
         try:
             sent_msg = await ctx.send(embed=embed)
             await sent_msg.delete()
@@ -98,19 +96,16 @@ class Utility(commands.Cog, name="Utility"):
 
         author_id = message.author.id
 
-        # --- STRICT COUNTING CHANNEL FILTERING & AUTO-DELETE ---
         if self.counting_channel and message.channel.id == self.counting_channel.id:
             try:
                 number = int(message.content.strip())
             except ValueError:
-                # Agar koi bhi hi, hello ya faltu text likhe toh turant delete kar do[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span)
                 try:
                     await message.delete()
                 except:
                     pass
                 return  
 
-            # Anti-Double Count & Wrong Number Check with Auto-Delete
             if author_id == self.last_user_id or number != self.current_count:
                 try:
                     await message.delete()
@@ -145,9 +140,8 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 self.current_count += 1
                 self.last_user_id = author_id
-                return  # Counting channel ke messages ko general message count me add nahi karna hai
+                return
 
-        # --- AFK SYSTEM ---
         if message.mentions:
             for mention in message.mentions:
                 if mention.id in self.afk_users:
@@ -194,7 +188,6 @@ class Utility(commands.Cog, name="Utility"):
             except:
                 pass
 
-        # Normal message count tracking
         self.message_counts[author_id] = self.message_counts.get(author_id, 0) + 1
 
     @commands.Cog.listener()
@@ -376,8 +369,22 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="lm", help="View the messages leaderboard.")
-    async def leaderboard_messages(self, ctx):
+    # --- LEADERBOARD COMMANDS (lb msg, lb vc, lb inv) ---
+    @commands.group(name="lb", invoke_without_command=True, help="View leaderboards.")
+    async def leaderboard_group(self, ctx):
+        embed = create_embed(
+            ctx.guild,
+            title="🏆 Leaderboard Categories",
+            description="Please use proper syntax:\n"
+                        "• `lb msg`\n"
+                        "• `lb vc`\n"
+                        "• `lb inv`",
+            color=discord.Color.gold()
+        )
+        await ctx.send(embed=embed)
+
+    @leaderboard_group.command(name="msg", help="View the messages leaderboard.")
+    async def lb_msg(self, ctx):
         if not self.message_counts:
             embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description="No message data recorded yet.", color=discord.Color.blue())
             return await ctx.send(embed=embed)
@@ -387,8 +394,8 @@ class Utility(commands.Cog, name="Utility"):
         embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description=desc, color=discord.Color.blue())
         await ctx.send(embed=embed)
 
-    @commands.command(name="lv", help="View the voice time leaderboard.")
-    async def leaderboard_voice(self, ctx):
+    @leaderboard_group.command(name="vc", help="View the voice time leaderboard.")
+    async def lb_vc(self, ctx):
         if not self.voice_time_seconds and not self.vc_joins:
             embed = create_embed(ctx.guild, title="🎙️ Voice Leaderboard", description="No voice time recorded yet.", color=discord.Color.green())
             return await ctx.send(embed=embed)
@@ -403,8 +410,8 @@ class Utility(commands.Cog, name="Utility"):
         embed = create_embed(ctx.guild, title="🎙️ Voice Time Leaderboard", description=desc, color=discord.Color.green())
         await ctx.send(embed=embed)
 
-    @commands.command(name="li", help="View the invites leaderboard.")
-    async def leaderboard_invites(self, ctx):
+    @leaderboard_group.command(name="inv", help="View the invites leaderboard.")
+    async def lb_inv(self, ctx):
         if not self.invite_counts:
             embed = create_embed(ctx.guild, title="✉️ Invites Leaderboard", description="No invite data recorded yet.", color=discord.Color.purple())
             return await ctx.send(embed=embed)
