@@ -60,9 +60,10 @@ class Utility(commands.Cog, name="Utility"):
         self.vc_joins = {}
         self.afk_users = {}
 
-    @commands.command(name="start", hidden=True, help="Start or configure the counting game with a custom starting number and emoji.\n\n**Example:** &start 1 #counting ✅")
+    @commands.command(name="start", hidden=True, help="Start or configure the counting game.")
     @commands.has_permissions(manage_channels=True)
     async def start_counting(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
+        # User ka command message turant delete karna
         try:
             await ctx.message.delete()
         except:
@@ -83,8 +84,9 @@ class Utility(commands.Cog, name="Utility"):
             color=discord.Color.green()
         )
         
+        # Bot ka confirmation message bhejna aur turant delete karna
         sent_msg = await ctx.send(embed=embed)
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
         try:
             await sent_msg.delete()
         except:
@@ -97,11 +99,61 @@ class Utility(commands.Cog, name="Utility"):
 
         author_id = message.author.id
 
+        # --- COUNTING CHANNEL LOGIC (Strict Filtering) ---
+        if self.counting_channel and message.channel.id == self.counting_channel.id:
+            try:
+                number = int(message.content.strip())
+            except ValueError:
+                # Agar koi hi, hello ya koi bhi non-number text likhe toh turant delete kar do[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
+                try:
+                    await message.delete()
+                except:
+                    pass
+                return  
+
+            # Anti-Double Count & Wrong Number Check with Auto-Delete
+            if author_id == self.last_user_id or number != self.current_count:
+                try:
+                    await message.delete()
+                except:
+                    pass
+                
+                error_desc = (
+                    f"❌ {message.author.mention}, you cannot count twice in a row!" 
+                    if author_id == self.last_user_id 
+                    else f"❌ {message.author.mention}, that's incorrect! Next correct number is **{self.current_count}**."
+                )
+                
+                embed = create_embed(
+                    message.guild,
+                    title="⚠️ Counting Error",
+                    description=error_desc,
+                    color=discord.Color.red()
+                )
+                err_msg = await message.channel.send(embed=embed)
+                
+                await asyncio.sleep(4)
+                try:
+                    await err_msg.delete()
+                except:
+                    pass
+                return
+
+            if number == self.current_count:
+                try:
+                    await message.add_reaction(self.success_emoji)
+                except:
+                    pass
+                self.current_count += 1
+                self.last_user_id = author_id
+                # Counting channel ke messages ko message count me add nahi karna hai, isliye yhi se return kar dete hain
+                return
+
+        # --- AFK SYSTEM ---
         if message.mentions:
             for mention in message.mentions:
                 if mention.id in self.afk_users:
                     afk_data = self.afk_users[mention.id]
-                    
                     afk_data["mentions"].append({
                         "author": message.author.name,
                         "channel": message.channel,
@@ -144,52 +196,8 @@ class Utility(commands.Cog, name="Utility"):
             except:
                 pass
 
+        # Normal message count tracking
         self.message_counts[author_id] = self.message_counts.get(author_id, 0) + 1
-
-        if self.counting_channel and message.channel.id == self.counting_channel.id:
-            try:
-                number = int(message.content.strip())
-            except ValueError:
-                try:
-                    await message.delete()
-                except:
-                    pass
-                return  
-
-            if author_id == self.last_user_id or number != self.current_count:
-                try:
-                    await message.delete()
-                except:
-                    pass
-                
-                error_desc = (
-                    f"❌ {message.author.mention}, you cannot count twice in a row!" 
-                    if author_id == self.last_user_id 
-                    else f"❌ {message.author.mention}, that's incorrect! Next correct number is **{self.current_count}**."
-                )
-                
-                embed = create_embed(
-                    message.guild,
-                    title="⚠️ Counting Error",
-                    description=error_desc,
-                    color=discord.Color.red()
-                )
-                err_msg = await message.channel.send(embed=embed)
-                
-                await asyncio.sleep(4)
-                try:
-                    await err_msg.delete()
-                except:
-                    pass
-                return
-
-            if number == self.current_count:
-                try:
-                    await message.add_reaction(self.success_emoji)
-                except:
-                    pass
-                self.current_count += 1
-                self.last_user_id = author_id
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -207,7 +215,7 @@ class Utility(commands.Cog, name="Utility"):
                 self.voice_time_seconds[member.id] = self.voice_time_seconds.get(member.id, 0) + duration
                 del self.vc_joins[member.id]
 
-    @commands.command(name="afk", help="Set your AFK status with an optional reason.\n\n**Example:** &afk Sleeping")
+    @commands.command(name="afk", help="Set your AFK status with an optional reason.")
     async def afk_command(self, ctx, *, reason: str = "AFK"):
         self.afk_users[ctx.author.id] = {
             "reason": reason,
@@ -222,7 +230,7 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="setprefix", help="Changes the bot prefix for this server.\n\n**Example:** &setprefix !")
+    @commands.command(name="setprefix", help="Changes the bot prefix for this server.")
     @commands.has_permissions(manage_guild=True)
     async def set_prefix(self, ctx, new_prefix: str):
         prefixes = load_prefixes()
@@ -237,47 +245,47 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="msg", aliases=["M"], help="Check how many messages you have sent.\n\n**Example:** &msg")
+    @commands.command(name="msg", help="Check how many messages a member has sent.")
     async def msg_stats(self, ctx, member: discord.Member = None):
-        member = member or ctx.author
-        count = self.message_counts.get(member.id, 0)
+        target = member or ctx.author
+        count = self.message_counts.get(target.id, 0)
         embed = create_embed(
             ctx.guild,
             title="💬 Message Count",
-            description=f"**{member.mention}** has sent **{count}** messages.",
+            description=f"**{target.mention}** has sent **{count}** messages.",
             color=discord.Color.blue()
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="vc", aliases=["V"], help="Check how much time you have spent in voice channels.\n\n**Example:** &vc")
+    @commands.command(name="vc", help="Check how much time a member has spent in voice channels.")
     async def vc_stats(self, ctx, member: discord.Member = None):
-        member = member or ctx.author
-        total_secs = self.voice_time_seconds.get(member.id, 0)
-        if member.id in self.vc_joins:
-            total_secs += int(datetime.datetime.utcnow().timestamp() - self.vc_joins[member.id])
+        target = member or ctx.author
+        total_secs = self.voice_time_seconds.get(target.id, 0)
+        if target.id in self.vc_joins:
+            total_secs += int(datetime.datetime.utcnow().timestamp() - self.vc_joins[target.id])
 
         formatted_time = format_time(total_secs)
         embed = create_embed(
             ctx.guild,
             title="🎙️ Voice Time",
-            description=f"**{member.mention}** has spent **{formatted_time}** in voice channels.",
+            description=f"**{target.mention}** has spent **{formatted_time}** in voice channels.",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="inv", aliases=["I"], help="Check how many members you have successfully invited.\n\n**Example:** &inv")
+    @commands.command(name="inv", help="Check how many members a user has invited.")
     async def inv_stats(self, ctx, member: discord.Member = None):
-        member = member or ctx.author
-        invites = self.invite_counts.get(member.id, 0)
+        target = member or ctx.author
+        invites = self.invite_counts.get(target.id, 0)
         embed = create_embed(
             ctx.guild,
             title="✉️ Invite Count",
-            description=f"**{member.mention}** has successfully invited **{invites}** members.",
+            description=f"**{target.mention}** has successfully invited **{invites}** members.",
             color=discord.Color.purple()
         )
         await ctx.send(embed=embed)
 
-    # --- RESET COMMANDS GROUP ---
+    # --- RESET COMMANDS (reset msg all user / reset msg @user) ---
     @commands.group(name="reset", invoke_without_command=True)
     @commands.has_permissions(manage_messages=True)
     async def reset_group(self, ctx):
@@ -292,7 +300,6 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    # Reset Message Group
     @reset_group.group(name="msg", invoke_without_command=True)
     @commands.has_permissions(manage_messages=True)
     async def reset_msg(self, ctx, member: discord.Member):
@@ -318,7 +325,6 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    # Reset VC Group
     @reset_group.group(name="vc", invoke_without_command=True)
     @commands.has_permissions(manage_messages=True)
     async def reset_vc(self, ctx, member: discord.Member):
@@ -347,7 +353,6 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    # Reset Invite Group
     @reset_group.group(name="inv", invoke_without_command=True)
     @commands.has_permissions(manage_messages=True)
     async def reset_inv(self, ctx, member: discord.Member):
@@ -373,22 +378,18 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    # --- LEADERBOARD COMMANDS ---
-    @commands.command(name="lbmsg", aliases=["lm"], help="View the messages leaderboard.")
+    @commands.command(name="lm", help="View the messages leaderboard.")
     async def leaderboard_messages(self, ctx):
         if not self.message_counts:
             embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description="No message data recorded yet.", color=discord.Color.blue())
             return await ctx.send(embed=embed)
 
         sorted_users = sorted(self.message_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        desc = ""
-        for idx, (uid, count) in enumerate(sorted_users, 1):
-            desc += f"`#{idx}` <@{uid}> — **{count}** messages\n"
-
+        desc = "".join([f"`#{idx}` <@{uid}> — **{count}** messages\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
         embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description=desc, color=discord.Color.blue())
         await ctx.send(embed=embed)
 
-    @commands.command(name="lbvc", aliases=["Lv"], help="View the voice time leaderboard.")
+    @commands.command(name="lv", help="View the voice time leaderboard.")
     async def leaderboard_voice(self, ctx):
         if not self.voice_time_seconds and not self.vc_joins:
             embed = create_embed(ctx.guild, title="🎙️ Voice Leaderboard", description="No voice time recorded yet.", color=discord.Color.green())
@@ -400,29 +401,22 @@ class Utility(commands.Cog, name="Utility"):
             current_data[uid] = current_data.get(uid, 0) + int(now - join_time)
 
         sorted_users = sorted(current_data.items(), key=lambda x: x[1], reverse=True)[:10]
-        desc = ""
-        for idx, (uid, secs) in enumerate(sorted_users, 1):
-            desc += f"`#{idx}` <@{uid}> — **{format_time(secs)}**\n"
-
+        desc = "".join([f"`#{idx}` <@{uid}> — **{format_time(secs)}**\n" for idx, (uid, secs) in enumerate(sorted_users, 1)])
         embed = create_embed(ctx.guild, title="🎙️ Voice Time Leaderboard", description=desc, color=discord.Color.green())
         await ctx.send(embed=embed)
 
-    @commands.command(name="lbinv", aliases=["Li"], help="View the invites leaderboard.")
+    @commands.command(name="li", help="View the invites leaderboard.")
     async def leaderboard_invites(self, ctx):
         if not self.invite_counts:
             embed = create_embed(ctx.guild, title="✉️ Invites Leaderboard", description="No invite data recorded yet.", color=discord.Color.purple())
             return await ctx.send(embed=embed)
 
         sorted_users = sorted(self.invite_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        desc = ""
-        for idx, (uid, count) in enumerate(sorted_users, 1):
-            desc += f"`#{idx}` <@{uid}> — **{count}** invites\n"
-
+        desc = "".join([f"`#{idx}` <@{uid}> — **{count}** invites\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
         embed = create_embed(ctx.guild, title="✉️ Invites Leaderboard", description=desc, color=discord.Color.purple())
         await ctx.send(embed=embed)
 
-    @commands.command(name="say", help="Make the bot say a message in embed format and delete your command message.")
-    @commands.has_permissions(manage_messages=True)
+    @commands.command(name="say", help="Make the bot say a message in embed format.")
     async def say_command(self, ctx, *, message: str):
         try:
             await ctx.message.delete()
