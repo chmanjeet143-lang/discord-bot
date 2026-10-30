@@ -84,10 +84,9 @@ class Utility(commands.Cog, name="Utility"):
             color=discord.Color.green()
         )
         
-        # Bot ka confirmation message bhejna aur turant delete karna
-        sent_msg = await ctx.send(embed=embed)
-        await asyncio.sleep(3)
+        # Bot ka confirmation message turant delete karna (bina sleep ke)
         try:
+            sent_msg = await ctx.send(embed=embed)
             await sent_msg.delete()
         except:
             pass
@@ -99,12 +98,12 @@ class Utility(commands.Cog, name="Utility"):
 
         author_id = message.author.id
 
-        # --- COUNTING CHANNEL LOGIC (Strict Filtering) ---
+        # --- STRICT COUNTING CHANNEL FILTERING & AUTO-DELETE ---
         if self.counting_channel and message.channel.id == self.counting_channel.id:
             try:
                 number = int(message.content.strip())
             except ValueError:
-                # Agar koi hi, hello ya koi bhi non-number text likhe toh turant delete kar do[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
+                # Agar koi bhi hi, hello ya faltu text likhe toh turant delete kar do[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span)
                 try:
                     await message.delete()
                 except:
@@ -146,8 +145,7 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 self.current_count += 1
                 self.last_user_id = author_id
-                # Counting channel ke messages ko message count me add nahi karna hai, isliye yhi se return kar dete hain
-                return
+                return  # Counting channel ke messages ko general message count me add nahi karna hai
 
         # --- AFK SYSTEM ---
         if message.mentions:
