@@ -213,7 +213,7 @@ class Level(commands.Cog, description="Explore all commands related to Leveling 
 
             for vc in guild.voice_channels:
                 active_members = [m for m in vc.members if not m.bot and not m.voice.self_deaf]
-                if len(active_members) < 2:
+                if not active_members:
                     continue
 
                 for member in active_members:
@@ -221,7 +221,7 @@ class Level(commands.Cog, description="Explore all commands related to Leveling 
                     if user_id not in users_data:
                         users_data[user_id] = {"msg_xp": 0, "msg_level": 1, "vc_xp": 0, "vc_level": 1}
 
-                    vc_earned = random.randint(1, 2)
+                    vc_earned = 4
                     u_info = users_data[user_id]
                     u_info["vc_xp"] += vc_earned
 
