@@ -63,7 +63,6 @@ class Utility(commands.Cog, name="Utility"):
     @commands.command(name="start", hidden=True, help="Start or configure the counting game with a custom starting number and emoji.\n\n**Example:** &start 1 #counting ✅")
     @commands.has_permissions(manage_channels=True)
     async def start_counting(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
-        # User ka command message delete karna
         try:
             await ctx.message.delete()
         except:
@@ -84,7 +83,6 @@ class Utility(commands.Cog, name="Utility"):
             color=discord.Color.green()
         )
         
-        # Bot ka message bhejna aur kuch seconds baad delete karna
         sent_msg = await ctx.send(embed=embed)
         await asyncio.sleep(5)
         try:
@@ -152,14 +150,12 @@ class Utility(commands.Cog, name="Utility"):
             try:
                 number = int(message.content.strip())
             except ValueError:
-                # Agar koi number ki jagah text/kuch aur likhe, toh sirf uska message delete kar do
                 try:
                     await message.delete()
                 except:
                     pass
                 return  
 
-            # Anti-Double Count & Wrong Number Check with Auto-Delete
             if author_id == self.last_user_id or number != self.current_count:
                 try:
                     await message.delete()
@@ -241,75 +237,144 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="m", help="Check how many messages you have sent.\n\n**Example:** &m")
-    async def message_count(self, ctx):
-        count = self.message_counts.get(ctx.author.id, 0)
+    @commands.command(name="msg", aliases=["M"], help="Check how many messages you have sent.\n\n**Example:** &msg")
+    async def msg_stats(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        count = self.message_counts.get(member.id, 0)
         embed = create_embed(
             ctx.guild,
             title="💬 Message Count",
-            description=f"You have sent **{count}** messages.",
+            description=f"**{member.mention}** has sent **{count}** messages.",
             color=discord.Color.blue()
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="v", help="Check how much time you have spent in voice channels.\n\n**Example:** &v")
-    async def voice_count(self, ctx):
-        total_secs = self.voice_time_seconds.get(ctx.author.id, 0)
-        if ctx.author.id in self.vc_joins:
-            total_secs += int(datetime.datetime.utcnow().timestamp() - self.vc_joins[ctx.author.id])
+    @commands.command(name="vc", aliases=["V"], help="Check how much time you have spent in voice channels.\n\n**Example:** &vc")
+    async def vc_stats(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        total_secs = self.voice_time_seconds.get(member.id, 0)
+        if member.id in self.vc_joins:
+            total_secs += int(datetime.datetime.utcnow().timestamp() - self.vc_joins[member.id])
 
         formatted_time = format_time(total_secs)
         embed = create_embed(
             ctx.guild,
             title="🎙️ Voice Time",
-            description=f"You have spent **{formatted_time}** in voice channels.",
+            description=f"**{member.mention}** has spent **{formatted_time}** in voice channels.",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="i", help="Check how many members you have successfully invited.\n\n**Example:** &i")
-    async def invite_count(self, ctx):
-        invites = self.invite_counts.get(ctx.author.id, 0)
+    @commands.command(name="inv", aliases=["I"], help="Check how many members you have successfully invited.\n\n**Example:** &inv")
+    async def inv_stats(self, ctx, member: discord.Member = None):
+        member = member or ctx.author
+        invites = self.invite_counts.get(member.id, 0)
         embed = create_embed(
             ctx.guild,
             title="✉️ Invite Count",
-            description=f"You have successfully invited **{invites}** members.",
+            description=f"**{member.mention}** has successfully invited **{invites}** members.",
             color=discord.Color.purple()
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="rm", help="Reset message counts for all users.\n\n**Example:** &rm all")
+    # --- RESET COMMANDS GROUP ---
+    @commands.group(name="reset", invoke_without_command=True)
     @commands.has_permissions(manage_messages=True)
-    async def remove_messages_all(self, ctx, action: str = None):
-        if action and action.lower() == "all":
-            self.message_counts.clear()
-            embed = create_embed(ctx.guild, title="💬 Messages Reset", description="Successfully cleared message counts for all users.", color=discord.Color.red())
-            await ctx.send(embed=embed)
-        else:
-            await ctx.send("❌ Usage: `&rm all`")
+    async def reset_group(self, ctx):
+        embed = create_embed(
+            ctx.guild,
+            title="⚠️ Invalid Reset Usage",
+            description="Please use proper syntax:\n"
+                        "• `reset msg all user` / `reset msg @user`\n"
+                        "• `reset inv all user` / `reset inv @user`\n"
+                        "• `reset vc all user` / `reset vc @user`",
+            color=discord.Color.orange()
+        )
+        await ctx.send(embed=embed)
 
-    @commands.command(name="rv", help="Reset voice time counts for all users.\n\n**Example:** &rv all")
+    # Reset Message Group
+    @reset_group.group(name="msg", invoke_without_command=True)
     @commands.has_permissions(manage_messages=True)
-    async def remove_voice_all(self, ctx, action: str = None):
-        if action and action.lower() == "all":
-            self.voice_time_seconds.clear()
-            self.vc_joins.clear()
-            embed = create_embed(ctx.guild, title="🎙️ Voice Time Reset", description="Successfully cleared voice time counts for all users.", color=discord.Color.red())
-            await ctx.send(embed=embed)
-        else:
-            await ctx.send("❌ Usage: `&rv all`")
+    async def reset_msg(self, ctx, member: discord.Member):
+        if member.id in self.message_counts:
+            self.message_counts[member.id] = 0
+        embed = create_embed(
+            ctx.guild,
+            title="💬 Message Stats Reset",
+            description=f"Successfully reset message count for **{member.mention}**.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
 
-    @commands.command(name="ri", help="Reset invite counts for all users.\n\n**Example:** &ri all")
+    @reset_msg.command(name="all")
     @commands.has_permissions(manage_messages=True)
-    async def remove_invites_all(self, ctx, action: str = None):
-        if action and action.lower() == "all":
-            self.invite_counts.clear()
-            embed = create_embed(ctx.guild, title="✉️ Invites Reset", description="Successfully cleared invite counts for all users.", color=discord.Color.red())
-            await ctx.send(embed=embed)
-        else:
-            await ctx.send("❌ Usage: `&ri all`")
+    async def reset_msg_all(self, ctx, *, user_str: str = None):
+        self.message_counts.clear()
+        embed = create_embed(
+            ctx.guild,
+            title="💬 Messages Reset",
+            description="Successfully cleared message counts for **all users**.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
 
-    @commands.command(name="lm", help="View the messages leaderboard.\n\n**Example:** &lm")
+    # Reset VC Group
+    @reset_group.group(name="vc", invoke_without_command=True)
+    @commands.has_permissions(manage_messages=True)
+    async def reset_vc(self, ctx, member: discord.Member):
+        if member.id in self.voice_time_seconds:
+            self.voice_time_seconds[member.id] = 0
+        if member.id in self.vc_joins:
+            self.vc_joins[member.id] = datetime.datetime.utcnow().timestamp()
+        embed = create_embed(
+            ctx.guild,
+            title="🎙️ Voice Time Reset",
+            description=f"Successfully reset voice time for **{member.mention}**.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+
+    @reset_vc.command(name="all")
+    @commands.has_permissions(manage_messages=True)
+    async def reset_vc_all(self, ctx, *, user_str: str = None):
+        self.voice_time_seconds.clear()
+        self.vc_joins.clear()
+        embed = create_embed(
+            ctx.guild,
+            title="🎙️ Voice Time Reset",
+            description="Successfully cleared voice time for **all users**.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+
+    # Reset Invite Group
+    @reset_group.group(name="inv", invoke_without_command=True)
+    @commands.has_permissions(manage_messages=True)
+    async def reset_inv(self, ctx, member: discord.Member):
+        if member.id in self.invite_counts:
+            self.invite_counts[member.id] = 0
+        embed = create_embed(
+            ctx.guild,
+            title="✉️ Invite Count Reset",
+            description=f"Successfully reset invite count for **{member.mention}**.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+
+    @reset_inv.command(name="all")
+    @commands.has_permissions(manage_messages=True)
+    async def reset_inv_all(self, ctx, *, user_str: str = None):
+        self.invite_counts.clear()
+        embed = create_embed(
+            ctx.guild,
+            title="✉️ Invites Reset",
+            description="Successfully cleared invite counts for **all users**.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+
+    # --- LEADERBOARD COMMANDS ---
+    @commands.command(name="lbmsg", aliases=["lm"], help="View the messages leaderboard.")
     async def leaderboard_messages(self, ctx):
         if not self.message_counts:
             embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description="No message data recorded yet.", color=discord.Color.blue())
@@ -323,7 +388,7 @@ class Utility(commands.Cog, name="Utility"):
         embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description=desc, color=discord.Color.blue())
         await ctx.send(embed=embed)
 
-    @commands.command(name="lv", help="View the voice time leaderboard.\n\n**Example:** &lv")
+    @commands.command(name="lbvc", aliases=["Lv"], help="View the voice time leaderboard.")
     async def leaderboard_voice(self, ctx):
         if not self.voice_time_seconds and not self.vc_joins:
             embed = create_embed(ctx.guild, title="🎙️ Voice Leaderboard", description="No voice time recorded yet.", color=discord.Color.green())
@@ -342,7 +407,7 @@ class Utility(commands.Cog, name="Utility"):
         embed = create_embed(ctx.guild, title="🎙️ Voice Time Leaderboard", description=desc, color=discord.Color.green())
         await ctx.send(embed=embed)
 
-    @commands.command(name="li", help="View the invites leaderboard.\n\n**Example:** &li")
+    @commands.command(name="lbinv", aliases=["Li"], help="View the invites leaderboard.")
     async def leaderboard_invites(self, ctx):
         if not self.invite_counts:
             embed = create_embed(ctx.guild, title="✉️ Invites Leaderboard", description="No invite data recorded yet.", color=discord.Color.purple())
@@ -356,21 +421,35 @@ class Utility(commands.Cog, name="Utility"):
         embed = create_embed(ctx.guild, title="✉️ Invites Leaderboard", description=desc, color=discord.Color.purple())
         await ctx.send(embed=embed)
 
-    @commands.command(name="say", help="Make the bot say a message and delete your command message.\n\n**Example:** &say Hello everyone!")
+    @commands.command(name="say", help="Make the bot say a message in embed format and delete your command message.")
+    @commands.has_permissions(manage_messages=True)
     async def say_command(self, ctx, *, message: str):
         try:
             await ctx.message.delete()
         except:
             pass
-        await ctx.send(message)
+        embed = create_embed(ctx.guild, description=message, color=discord.Color.blurple())
+        await ctx.send(embed=embed)
 
-    @commands.command(name="reply", help="Make the bot reply to a specific message.\n\n**Example:** &reply Hello!")
+    @commands.command(name="reply", help="Make the bot reply to a specific message.")
     async def reply_command(self, ctx, *, message: str):
         if ctx.message.reference:
             original_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
             await original_msg.reply(message)
         else:
-            await ctx.send(message)
+            embed = create_embed(ctx.guild, description=message, color=discord.Color.blurple())
+            await ctx.send(embed=embed)
+
+    @commands.command(name="count", hidden=True, help="Hidden count command stats.")
+    @commands.has_permissions(administrator=True)
+    async def hidden_count(self, ctx):
+        embed = create_embed(
+            ctx.guild,
+            title="🔢 Hidden Count Stats",
+            description=f"Current Counting Number: **{self.current_count}**\nStatus: **Active**",
+            color=discord.Color.dark_theme()
+        )
+        await ctx.send(embed=embed)
 
 
 class Clone(commands.Cog, name="Clone"):
@@ -378,16 +457,18 @@ class Clone(commands.Cog, name="Clone"):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="clone", help="Clone custom emojis or stickers by replying to a message.\n\n**Example:** &clone (replying to an emoji/sticker)")
+    @commands.command(name="clone", help="Clone custom emojis or stickers by replying to a message.")
     @commands.has_permissions(manage_emojis=True)
     async def clone_command(self, ctx):
         if not ctx.message.reference:
-            return await ctx.send("❌ Please reply to a message containing a custom emoji or sticker that you want to clone!")
+            embed = create_embed(ctx.guild, title="❌ Error", description="Please reply to a message containing a custom emoji or sticker that you want to clone!", color=discord.Color.red())
+            return await ctx.send(embed=embed)
 
         try:
             referenced_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
         except Exception:
-            return await ctx.send("❌ Could not fetch the referenced message.")
+            embed = create_embed(ctx.guild, title="❌ Error", description="Could not fetch the referenced message.", color=discord.Color.red())
+            return await ctx.send(embed=embed)
 
         cloned_count = 0
         async with aiohttp.ClientSession() as session:
@@ -428,7 +509,8 @@ class Clone(commands.Cog, name="Clone"):
             )
             await ctx.send(embed=embed)
         else:
-            await ctx.send("❌ No valid custom emojis or stickers found in that replied message!")
+            embed = create_embed(ctx.guild, title="❌ Error", description="No valid custom emojis or stickers found in that replied message!", color=discord.Color.red())
+            await ctx.send(embed=embed)
 
 
 async def setup(bot):
