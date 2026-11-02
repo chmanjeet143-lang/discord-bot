@@ -422,6 +422,7 @@ class Utility(commands.Cog, name="Utility"):
         await ctx.send(embed=embed)
 
     @commands.command(name="say", help="Make the bot say a message in embed format.")
+    @commands.has_permissions(administrator=True)
     async def say_command(self, ctx, *, message: str):
         try:
             await ctx.message.delete()
