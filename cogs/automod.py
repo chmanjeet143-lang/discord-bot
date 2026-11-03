@@ -116,8 +116,6 @@ class AutoMod(commands.Cog):
         guild_id = message.guild.id
         row = self.get_settings(guild_id)
         # Unpack settings
-        # row indices: 0:guild_id, 1:antilink, 2:antilink_punishment, 3:antilink_duration, 4:antiyoutube, 5:antiyoutube_punishment, 6:antiyoutube_duration, 7:antispam, 8:antispam_limit, 9:antispam_seconds, 10:antispam_punishment, 11:antispam_duration, 12:badwords, 13:badwords_punishment, 14:badwords_duration
-        
         antilink, antilink_p, antilink_d = row[1], row[2], row[3]
         antiyoutube, antiyoutube_p, antiyoutube_d = row[4], row[5], row[6]
         antispam, spam_limit, spam_secs, antispam_p, antispam_d = row[7], row[8], row[9], row[10], row[11]
@@ -131,9 +129,17 @@ class AutoMod(commands.Cog):
                 await self.handle_punishment(message, antiyoutube_p, antiyoutube_d, "YouTube links violation")
                 return
 
-            # 2. Anti-Link Filter (Allowing GIFs)
-            has_link = "discord.gg/" in content_lower or "http://" in content_lower or "https://" in content_lower or "www." in content_lower
-            is_gif = "tenor.com" in content_lower or "giphy.com" in content_lower or ".gif" in content_lower
+            # 2. Anti-Link Filter (Allowing GIFs properly)
+            has_link = "http://" in content_lower or "https://" in content_lower or "www." in content_lower
+            
+            # Check if it's a GIF (Tenor, Giphy, direct .gif extension, or Discord built-in GIF picker attachments)
+            is_gif = (
+                "tenor.com" in content_lower 
+                or "giphy.com" in content_lower 
+                or content_lower.endswith(".gif") 
+                or ".gif?" in content_lower
+                or message.attachments
+            )
             
             if antilink and has_link and not is_gif:
                 if not (antiyoutube and ("youtube.com" in content_lower or "youtu.be" in content_lower)):
@@ -279,7 +285,6 @@ class AutoMod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def cmd_badwords_toggle(self, ctx, status: str = None):
         if not status:
-            # View banned words list if no argument provided
             self.cursor.execute("SELECT word FROM bad_words WHERE guild_id = ?", (ctx.guild.id,))
             rows = self.cursor.fetchall()
             if not rows:
