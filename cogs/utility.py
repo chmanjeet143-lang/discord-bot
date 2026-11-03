@@ -12,7 +12,8 @@ DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w
 PREFIX_FILE = "prefixes.json"
 
 def create_embed(guild, title="", description="", color=0x2B2D31):
-    thumbnail_url = guild.icon.url if guild and guild.icon else DEFAULT_AVATAR
+    # Fix 3: Safe check for guild and guild.icon to prevent AttributeError in DMs or edge cases
+    thumbnail_url = guild.icon.url if (guild and hasattr(guild, 'icon') and guild.icon) else DEFAULT_AVATAR
     embed = discord.Embed(title=title, description=description, color=color)
     embed.set_thumbnail(url=thumbnail_url)
     embed.set_footer(text="Moonlight Heaven • Developed By Zeus")
@@ -43,6 +44,13 @@ def save_prefixes(prefixes):
             json.dump(prefixes, f, indent=4)
     except Exception:
         pass
+
+# Fix 2: Global prefix getter function for bot initialization
+async def get_prefix(bot, message):
+    if not message.guild:
+        return "&"
+    prefixes = load_prefixes()
+    return prefixes.get(str(message.guild.id), "&")
 
 
 class Utility(commands.Cog, name="Utility"):
@@ -156,6 +164,9 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 self.current_count += 1
                 self.last_user_id = author_id
+                
+                # Fix 1: Track message counts even inside the counting channel successfully
+                self.message_counts[author_id] = self.message_counts.get(author_id, 0) + 1
                 return
 
         if message.mentions:
@@ -168,6 +179,10 @@ class Utility(commands.Cog, name="Utility"):
                         "time": datetime.datetime.now(datetime.timezone.utc),
                         "content": message.content
                     })
+                    
+                    # Fix 4: Limit mentions list size to prevent infinite memory growth (max 10 mentions)
+                    if len(afk_data["mentions"]) > 10:
+                        afk_data["mentions"].pop(0)
                     
                     duration = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - afk_data["time"])
                     time_ago = format_time(duration)
