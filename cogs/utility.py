@@ -60,7 +60,7 @@ class Utility(commands.Cog, name="Utility"):
         self.vc_joins = {}
         self.afk_users = {}
 
-    # --- केवल एक छिपी हुई काउंटिंग कमांड ---
+    # --- Hidden Counting Command ---
     @commands.command(name="count", hidden=True, help="Start or configure the counting game.")
     @commands.has_permissions(manage_channels=True)
     async def count_command(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
@@ -96,15 +96,15 @@ class Utility(commands.Cog, name="Utility"):
         author_id = message.author.id
 
         if self.counting_channel and message.channel.id == self.counting_channel.id:
-            # अगर मैसेज कोई बॉट कमांड है, तो उसे जाने दें
+            # Allow bot prefix commands to pass through
             if message.content.startswith(tuple(await self.bot.get_prefix(message)) if hasattr(self.bot, 'get_prefix') else "&"):
                 return
 
-            # चेक करें कि मैसेज पूरी तरह से एक वैध नंबर है या नहीं
+            # Check if the message is a valid integer number
             try:
                 number = int(message.content.strip())
             except ValueError:
-                # यदि कोई इंग्लिश शब्द या फालतू चैट है, तो एडमिन को छोड़कर सबका मैसेज तुरंत डिलीट कर दें
+                # Delete any non-number text/English words instantly if author is not admin
                 if not message.author.guild_permissions.manage_messages:
                     try:
                         await message.delete()
@@ -112,7 +112,7 @@ class Utility(commands.Cog, name="Utility"):
                         pass
                 return  
 
-            # नियम 1: एक ही यूजर लगातार दो बार काउंट नहीं कर सकता (Back-to-back check)
+            # Rule 1: Prevent back-to-back counting by the same user
             if author_id == self.last_user_id:
                 try:
                     await message.delete()
@@ -133,7 +133,7 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 return
 
-            # नियम 2: अगर नंबर गलत है
+            # Rule 2: Check if the number is incorrect
             if number != self.current_count:
                 try:
                     await message.delete()
@@ -154,7 +154,7 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 return
 
-            # नियम 3: सब कुछ सही है
+            # Rule 3: Correct number processed successfully
             if number == self.current_count:
                 try:
                     await message.add_reaction(self.success_emoji)
@@ -164,7 +164,7 @@ class Utility(commands.Cog, name="Utility"):
                 self.last_user_id = author_id
                 return
 
-        # बाकी AFK और मैसेज ट्रैकिंग लॉजिक
+        # AFK and message tracking logic
         if message.mentions:
             for mention in message.mentions:
                 if mention.id in self.afk_users:
