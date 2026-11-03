@@ -12,7 +12,6 @@ DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w
 PREFIX_FILE = "prefixes.json"
 
 def create_embed(guild, title="", description="", color=0x2B2D31):
-    # Fix 3: Safe check for guild and guild.icon to prevent AttributeError in DMs or edge cases
     thumbnail_url = guild.icon.url if (guild and hasattr(guild, 'icon') and guild.icon) else DEFAULT_AVATAR
     embed = discord.Embed(title=title, description=description, color=color)
     embed.set_thumbnail(url=thumbnail_url)
@@ -45,7 +44,6 @@ def save_prefixes(prefixes):
     except Exception:
         pass
 
-# Fix 2: Global prefix getter function for bot initialization
 async def get_prefix(bot, message):
     if not message.guild:
         return "&"
@@ -68,6 +66,29 @@ class Utility(commands.Cog, name="Utility"):
         self.vc_joins = {}
         self.afk_users = {}
 
+    # --- New Command: Set Counting Channel ---
+    @commands.command(name="setcountchannel", help="Set the channel for the counting game.")
+    @commands.has_permissions(manage_channels=True)
+    async def set_count_channel(self, ctx, channel: discord.TextChannel = None):
+        try:
+            await ctx.message.delete()
+        except discord.HTTPException:
+            pass
+
+        self.counting_channel = channel or ctx.channel
+        embed = create_embed(
+            ctx.guild,
+            title="🎯 Counting Channel Set",
+            description=f"Counting channel successfully set to {self.counting_channel.mention}!",
+            color=discord.Color.green()
+        )
+        try:
+            sent_msg = await ctx.send(embed=embed)
+            await asyncio.sleep(2)
+            await sent_msg.delete()
+        except discord.HTTPException:
+            pass
+
     # --- Hidden Counting Command ---
     @commands.command(name="count", hidden=True, help="Start or configure the counting game.")
     @commands.has_permissions(manage_channels=True)
@@ -78,7 +99,11 @@ class Utility(commands.Cog, name="Utility"):
             pass
 
         self.current_count = number
-        self.counting_channel = channel or ctx.channel
+        if channel:
+            self.counting_channel = channel
+        elif not self.counting_channel:
+            self.counting_channel = ctx.channel
+            
         self.success_emoji = emoji
         self.last_user_id = None
 
@@ -110,11 +135,11 @@ class Utility(commands.Cog, name="Utility"):
             try:
                 number = int(message.content.strip())
             except ValueError:
-                if not message.author.guild_permissions.manage_messages:
-                    try:
-                        await message.delete()
-                    except discord.HTTPException:
-                        pass
+                # Strictly delete any chat text (hi, hello, etc.) in the counting channel[span_2](start_span)[span_2](end_span)
+                try:
+                    await message.delete()
+                except discord.HTTPException:
+                    pass
                 return  
 
             if author_id == self.last_user_id:
@@ -165,7 +190,7 @@ class Utility(commands.Cog, name="Utility"):
                 self.current_count += 1
                 self.last_user_id = author_id
                 
-                # Fix 1: Track message counts even inside the counting channel successfully
+                # Track message counts even inside counting channel
                 self.message_counts[author_id] = self.message_counts.get(author_id, 0) + 1
                 return
 
@@ -180,7 +205,6 @@ class Utility(commands.Cog, name="Utility"):
                         "content": message.content
                     })
                     
-                    # Fix 4: Limit mentions list size to prevent infinite memory growth (max 10 mentions)
                     if len(afk_data["mentions"]) > 10:
                         afk_data["mentions"].pop(0)
                     
@@ -237,6 +261,9 @@ class Utility(commands.Cog, name="Utility"):
                 self.voice_time_seconds[member.id] = self.voice_time_seconds.get(member.id, 0) + duration
                 del self.vc_joins[member.id]
 
+    # ==========================================
+    # --- NORMAL / PUBLIC COMMANDS ---
+    # ==========================================
     @commands.command(name="afk", help="Set your AFK status with an optional reason.")
     async def afk_command(self, ctx, *, reason: str = "AFK"):
         self.afk_users[ctx.author.id] = {
@@ -292,7 +319,7 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    # --- LEADERBOARD COMMANDS (Lb msg, Lb vc, Lb inv) ---
+    # --- LEADERBOARD COMMANDS ---
     @commands.command(name="lbmsg", help="Show message leaderboard.")
     async def lb_msg(self, ctx):
         if not self.message_counts:
@@ -346,7 +373,9 @@ class Utility(commands.Cog, name="Utility"):
         embed = create_embed(ctx.guild, title="✉️ Invite Leaderboard", description=desc, color=discord.Color.purple())
         await ctx.send(embed=embed)
 
-    # --- RESET COMMANDS ---
+    # ==========================================
+    # --- ADMIN / MANAGEMENT COMMANDS ---
+    # ==========================================
     @commands.command(name="resetmsg", help="Reset message stats for a user or all users.")
     @commands.has_permissions(administrator=True)
     async def reset_msg(self, ctx, target: discord.Member = None):
@@ -380,7 +409,6 @@ class Utility(commands.Cog, name="Utility"):
             self.invite_counts.clear()
             await ctx.send(embed=create_embed(ctx.guild, title="✅ Reset Success", description="Invite stats for all users have been reset.", color=discord.Color.green()))
 
-    # --- UTILITY COMMANDS (Say, Reply, Invite) ---
     @commands.command(name="say", help="Make the bot say something.")
     @commands.has_permissions(manage_messages=True)
     async def say_command(self, ctx, *, message: str):
