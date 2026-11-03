@@ -96,15 +96,12 @@ class Utility(commands.Cog, name="Utility"):
         author_id = message.author.id
 
         if self.counting_channel and message.channel.id == self.counting_channel.id:
-            # Allow bot prefix commands to pass through
             if message.content.startswith(tuple(await self.bot.get_prefix(message)) if hasattr(self.bot, 'get_prefix') else "&"):
                 return
 
-            # Check if the message is a valid integer number
             try:
                 number = int(message.content.strip())
             except ValueError:
-                # Delete any non-number text/English words instantly if author is not admin
                 if not message.author.guild_permissions.manage_messages:
                     try:
                         await message.delete()
@@ -112,7 +109,6 @@ class Utility(commands.Cog, name="Utility"):
                         pass
                 return  
 
-            # Rule 1: Prevent back-to-back counting by the same user
             if author_id == self.last_user_id:
                 try:
                     await message.delete()
@@ -133,7 +129,6 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 return
 
-            # Rule 2: Check if the number is incorrect
             if number != self.current_count:
                 try:
                     await message.delete()
@@ -154,7 +149,6 @@ class Utility(commands.Cog, name="Utility"):
                     pass
                 return
 
-            # Rule 3: Correct number processed successfully
             if number == self.current_count:
                 try:
                     await message.add_reaction(self.success_emoji)
@@ -164,7 +158,6 @@ class Utility(commands.Cog, name="Utility"):
                 self.last_user_id = author_id
                 return
 
-        # AFK and message tracking logic
         if message.mentions:
             for mention in message.mentions:
                 if mention.id in self.afk_users:
@@ -283,6 +276,124 @@ class Utility(commands.Cog, name="Utility"):
             color=discord.Color.purple()
         )
         await ctx.send(embed=embed)
+
+    # --- LEADERBOARD COMMANDS (Lb msg, Lb vc, Lb inv) ---
+    @commands.command(name="lbmsg", help="Show message leaderboard.")
+    async def lb_msg(self, ctx):
+        if not self.message_counts:
+            embed = create_embed(ctx.guild, title="💬 Message Leaderboard", description="No message data recorded yet.", color=discord.Color.blue())
+            return await ctx.send(embed=embed)
+        
+        sorted_users = sorted(self.message_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        desc = ""
+        for idx, (uid, count) in enumerate(sorted_users, 1):
+            user = ctx.guild.get_member(uid)
+            name = user.mention if user else f"User ID: {uid}"
+            desc += f"`#{idx}` {name} - **{count}** messages\n"
+
+        embed = create_embed(ctx.guild, title="💬 Message Leaderboard", description=desc, color=discord.Color.blue())
+        await ctx.send(embed=embed)
+
+    @commands.command(name="lbvc", help="Show voice time leaderboard.")
+    async def lb_vc(self, ctx):
+        all_vc = self.voice_time_seconds.copy()
+        for uid, start_time in self.vc_joins.items():
+            duration = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - start_time)
+            all_vc[uid] = all_vc.get(uid, 0) + duration
+
+        if not all_vc:
+            embed = create_embed(ctx.guild, title="🎙️ Voice Leaderboard", description="No voice data recorded yet.", color=discord.Color.green())
+            return await ctx.send(embed=embed)
+
+        sorted_users = sorted(all_vc.items(), key=lambda x: x[1], reverse=True)[:10]
+        desc = ""
+        for idx, (uid, secs) in enumerate(sorted_users, 1):
+            user = ctx.guild.get_member(uid)
+            name = user.mention if user else f"User ID: {uid}"
+            desc += f"`#{idx}` {name} - **{format_time(secs)}**\n"
+
+        embed = create_embed(ctx.guild, title="🎙️ Voice Leaderboard", description=desc, color=discord.Color.green())
+        await ctx.send(embed=embed)
+
+    @commands.command(name="lbinv", help="Show invite leaderboard.")
+    async def lb_inv(self, ctx):
+        if not self.invite_counts:
+            embed = create_embed(ctx.guild, title="✉️ Invite Leaderboard", description="No invite data recorded yet.", color=discord.Color.purple())
+            return await ctx.send(embed=embed)
+
+        sorted_users = sorted(self.invite_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        desc = ""
+        for idx, (uid, count) in enumerate(sorted_users, 1):
+            user = ctx.guild.get_member(uid)
+            name = user.mention if user else f"User ID: {uid}"
+            desc += f"`#{idx}` {name} - **{count}** invites\n"
+
+        embed = create_embed(ctx.guild, title="✉️ Invite Leaderboard", description=desc, color=discord.Color.purple())
+        await ctx.send(embed=embed)
+
+    # --- RESET COMMANDS ---
+    @commands.command(name="resetmsg", help="Reset message stats for a user or all users.")
+    @commands.has_permissions(administrator=True)
+    async def reset_msg(self, ctx, target: discord.Member = None):
+        if target:
+            self.message_counts[target.id] = 0
+            await ctx.send(embed=create_embed(ctx.guild, title="✅ Reset Success", description=f"Message stats for {target.mention} have been reset.", color=discord.Color.green()))
+        else:
+            self.message_counts.clear()
+            await ctx.send(embed=create_embed(ctx.guild, title="✅ Reset Success", description="Message stats for all users have been reset.", color=discord.Color.green()))
+
+    @commands.command(name="resetvc", help="Reset voice stats for a user or all users.")
+    @commands.has_permissions(administrator=True)
+    async def reset_vc(self, ctx, target: discord.Member = None):
+        if target:
+            self.voice_time_seconds[target.id] = 0
+            if target.id in self.vc_joins:
+                self.vc_joins[target.id] = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            await ctx.send(embed=create_embed(ctx.guild, title="✅ Reset Success", description=f"Voice stats for {target.mention} have been reset.", color=discord.Color.green()))
+        else:
+            self.voice_time_seconds.clear()
+            self.vc_joins.clear()
+            await ctx.send(embed=create_embed(ctx.guild, title="✅ Reset Success", description="Voice stats for all users have been reset.", color=discord.Color.green()))
+
+    @commands.command(name="resetinv", help="Reset invite stats for a user or all users.")
+    @commands.has_permissions(administrator=True)
+    async def reset_inv(self, ctx, target: discord.Member = None):
+        if target:
+            self.invite_counts[target.id] = 0
+            await ctx.send(embed=create_embed(ctx.guild, title="✅ Reset Success", description=f"Invite stats for {target.mention} have been reset.", color=discord.Color.green()))
+        else:
+            self.invite_counts.clear()
+            await ctx.send(embed=create_embed(ctx.guild, title="✅ Reset Success", description="Invite stats for all users have been reset.", color=discord.Color.green()))
+
+    # --- UTILITY COMMANDS (Say, Reply, Invite) ---
+    @commands.command(name="say", help="Make the bot say something.")
+    @commands.has_permissions(manage_messages=True)
+    async def say_command(self, ctx, *, message: str):
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+        await ctx.send(message)
+
+    @commands.command(name="reply", help="Make the bot reply to a message.")
+    @commands.has_permissions(manage_messages=True)
+    async def reply_command(self, ctx, message_id: int, *, message: str):
+        try:
+            await ctx.message.delete()
+            target_msg = await ctx.channel.fetch_message(message_id)
+            await target_msg.reply(message)
+        except Exception as e:
+            await ctx.send(f"❌ Error replying: {e}", delete_after=5)
+
+    @commands.command(name="invite", help="Create a new server invite link.")
+    @commands.has_permissions(create_instant_invite=True)
+    async def create_invite(self, ctx):
+        try:
+            invite = await ctx.channel.create_invite(max_age=0, max_uses=0, unique=True)
+            embed = create_embed(ctx.guild, title="🔗 New Invite Link", description=f"Here is your permanent invite link:\n{invite.url}", color=discord.Color.green())
+            await ctx.send(embed=embed)
+        except Exception as e:
+            await ctx.send(f"❌ Could not create invite: {e}", delete_after=5)
 
     @commands.command(name="setprefix", help="Changes the bot prefix for this server.")
     @commands.has_permissions(manage_guild=True)
