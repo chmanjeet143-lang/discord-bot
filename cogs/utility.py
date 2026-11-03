@@ -33,7 +33,7 @@ def load_prefixes():
         try:
             with open(PREFIX_FILE, "r") as f:
                 return json.load(f)
-        except:
+        except Exception:
             return {}
     return {}
 
@@ -41,7 +41,7 @@ def save_prefixes(prefixes):
     try:
         with open(PREFIX_FILE, "w") as f:
             json.dump(prefixes, f, indent=4)
-    except:
+    except Exception:
         pass
 
 
@@ -60,12 +60,14 @@ class Utility(commands.Cog, name="Utility"):
         self.vc_joins = {}
         self.afk_users = {}
 
-    @commands.command(name="start", hidden=True, help="Start or configure the counting game.")
+    # --- SIRF EK HI HIDDEN COUNTING COMMAND ---
+    @commands.command(name="count", hidden=True, help="Start or configure the counting game.")
     @commands.has_permissions(manage_channels=True)
-    async def start_counting(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
+    async def count_command(self, ctx, number: int, channel: discord.TextChannel = None, emoji: str = "✅"):
+        # Admin ka command message aur bot ka response dono delete kar dena taaki bilkul clean lage
         try:
             await ctx.message.delete()
-        except:
+        except discord.HTTPException:
             pass
 
         self.current_count = number
@@ -76,17 +78,15 @@ class Utility(commands.Cog, name="Utility"):
         embed = create_embed(
             ctx.guild,
             title="🎯 Counting Game Started!",
-            description=f"The counting game has been configured successfully!\n\n"
-                        f"📂 **Channel:** {self.counting_channel.mention}\n"
-                        f"🔢 **Start Number:** **{self.current_count}**\n"
-                        f"✨ **Reaction Emoji:** {self.success_emoji}",
+            description=f"Counting successfully started at **{self.current_count}** in {self.counting_channel.mention}!",
             color=discord.Color.green()
         )
         
         try:
             sent_msg = await ctx.send(embed=embed)
+            await asyncio.sleep(2)  # 2 second baad bot apna message bhi uda dega
             await sent_msg.delete()
-        except:
+        except discord.HTTPException:
             pass
 
     @commands.Cog.listener()
@@ -97,23 +97,26 @@ class Utility(commands.Cog, name="Utility"):
         author_id = message.author.id
 
         if self.counting_channel and message.channel.id == self.counting_channel.id:
-            # Agar message koi bot command hai (jaise &start), toh counting logic run mat karo
-            if message.content.startswith("&"):
+            # Agar koi command run ki gayi hai is channel mein, toh usko handle karne do
+            if message.content.startswith(tuple(await self.bot.get_prefix(message)) if hasattr(self.bot, 'get_prefix') else "&"):
                 return
 
             try:
                 number = int(message.content.strip())
             except ValueError:
-                try:
-                    await message.delete()
-                except:
-                    pass
+                # Agar koi hi, hello ya koi bhi faltu text likhe, toh message turant delete kar do
+                if not message.author.guild_permissions.manage_messages:
+                    try:
+                        await message.delete()
+                    except discord.HTTPException:
+                        pass
                 return  
 
+            # Double count ya wrong number check
             if author_id == self.last_user_id or number != self.current_count:
                 try:
                     await message.delete()
-                except:
+                except discord.HTTPException:
                     pass
                 
                 error_desc = (
@@ -133,19 +136,20 @@ class Utility(commands.Cog, name="Utility"):
                 await asyncio.sleep(4)
                 try:
                     await err_msg.delete()
-                except:
+                except discord.HTTPException:
                     pass
                 return
 
             if number == self.current_count:
                 try:
                     await message.add_reaction(self.success_emoji)
-                except:
+                except discord.HTTPException:
                     pass
                 self.current_count += 1
                 self.last_user_id = author_id
                 return
 
+        # Baaki AFK aur message tracking logic jo pehle se thi
         if message.mentions:
             for mention in message.mentions:
                 if mention.id in self.afk_users:
@@ -153,11 +157,11 @@ class Utility(commands.Cog, name="Utility"):
                     afk_data["mentions"].append({
                         "author": message.author.name,
                         "channel": message.channel,
-                        "time": datetime.datetime.utcnow(),
+                        "time": datetime.datetime.now(datetime.timezone.utc),
                         "content": message.content
                     })
                     
-                    duration = int(datetime.datetime.utcnow().timestamp() - afk_data["time"])
+                    duration = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - afk_data["time"])
                     time_ago = format_time(duration)
                     
                     embed_afk = create_embed(
@@ -189,7 +193,7 @@ class Utility(commands.Cog, name="Utility"):
                     color=discord.Color.green()
                 )
                 await message.channel.send(embed=embed_back, delete_after=15)
-            except:
+            except discord.HTTPException:
                 pass
 
         self.message_counts[author_id] = self.message_counts.get(author_id, 0) + 1
@@ -199,7 +203,7 @@ class Utility(commands.Cog, name="Utility"):
         if member.bot:
             return
         
-        now = datetime.datetime.utcnow().timestamp()
+        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
         if before.channel is None and after.channel is not None:
             self.vc_joins[member.id] = now
@@ -214,7 +218,7 @@ class Utility(commands.Cog, name="Utility"):
     async def afk_command(self, ctx, *, reason: str = "AFK"):
         self.afk_users[ctx.author.id] = {
             "reason": reason,
-            "time": datetime.datetime.utcnow().timestamp(),
+            "time": datetime.datetime.now(datetime.timezone.utc).timestamp(),
             "mentions": []
         }
         embed = create_embed(
@@ -222,21 +226,6 @@ class Utility(commands.Cog, name="Utility"):
             title="💤 AFK Status Set",
             description=f"**{ctx.author.mention}**, you are now marked as AFK.\n📝 **Reason:** {reason}",
             color=discord.Color.blue()
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(name="setprefix", help="Changes the bot prefix for this server.")
-    @commands.has_permissions(manage_guild=True)
-    async def set_prefix(self, ctx, new_prefix: str):
-        prefixes = load_prefixes()
-        prefixes[str(ctx.guild.id)] = new_prefix
-        save_prefixes(prefixes)
-        
-        embed = create_embed(
-            ctx.guild,
-            title="⚙️ Prefix Updated",
-            description=f"Successfully changed the server prefix to: **{new_prefix}**\nExample: `{new_prefix}help`",
-            color=discord.Color.green()
         )
         await ctx.send(embed=embed)
 
@@ -257,7 +246,7 @@ class Utility(commands.Cog, name="Utility"):
         target = member or ctx.author
         total_secs = self.voice_time_seconds.get(target.id, 0)
         if target.id in self.vc_joins:
-            total_secs += int(datetime.datetime.utcnow().timestamp() - self.vc_joins[target.id])
+            total_secs += int(datetime.datetime.now(datetime.timezone.utc).timestamp() - self.vc_joins[target.id])
 
         formatted_time = format_time(total_secs)
         embed = create_embed(
@@ -280,178 +269,18 @@ class Utility(commands.Cog, name="Utility"):
         )
         await ctx.send(embed=embed)
 
-    # --- RESET COMMANDS (reset msg all user / reset msg @user) ---
-    @commands.group(name="reset", invoke_without_command=True)
-    @commands.has_permissions(manage_messages=True)
-    async def reset_group(self, ctx):
+    @commands.command(name="setprefix", help="Changes the bot prefix for this server.")
+    @commands.has_permissions(manage_guild=True)
+    async def set_prefix(self, ctx, new_prefix: str):
+        prefixes = load_prefixes()
+        prefixes[str(ctx.guild.id)] = new_prefix
+        save_prefixes(prefixes)
+        
         embed = create_embed(
             ctx.guild,
-            title="⚠️ Invalid Reset Usage",
-            description="Please use proper syntax:\n"
-                        "• `reset msg all user` / `reset msg @user`\n"
-                        "• `reset inv all user` / `reset inv @user`\n"
-                        "• `reset vc all user` / `reset vc @user`",
-            color=discord.Color.orange()
-        )
-        await ctx.send(embed=embed)
-
-    @reset_group.group(name="msg", invoke_without_command=True)
-    @commands.has_permissions(manage_messages=True)
-    async def reset_msg(self, ctx, member: discord.Member):
-        if member.id in self.message_counts:
-            self.message_counts[member.id] = 0
-        embed = create_embed(
-            ctx.guild,
-            title="💬 Message Stats Reset",
-            description=f"Successfully reset message count for **{member.mention}**.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
-
-    @reset_msg.command(name="all")
-    @commands.has_permissions(manage_messages=True)
-    async def reset_msg_all(self, ctx, *, user_str: str = None):
-        self.message_counts.clear()
-        embed = create_embed(
-            ctx.guild,
-            title="💬 Messages Reset",
-            description="Successfully cleared message counts for **all users**.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
-
-    @reset_group.group(name="vc", invoke_without_command=True)
-    @commands.has_permissions(manage_messages=True)
-    async def reset_vc(self, ctx, member: discord.Member):
-        if member.id in self.voice_time_seconds:
-            self.voice_time_seconds[member.id] = 0
-        if member.id in self.vc_joins:
-            self.vc_joins[member.id] = datetime.datetime.utcnow().timestamp()
-        embed = create_embed(
-            ctx.guild,
-            title="🎙️ Voice Time Reset",
-            description=f"Successfully reset voice time for **{member.mention}**.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
-
-    @reset_vc.command(name="all")
-    @commands.has_permissions(manage_messages=True)
-    async def reset_vc_all(self, ctx, *, user_str: str = None):
-        self.voice_time_seconds.clear()
-        self.vc_joins.clear()
-        embed = create_embed(
-            ctx.guild,
-            title="🎙️ Voice Time Reset",
-            description="Successfully cleared voice time for **all users**.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
-
-    @reset_group.group(name="inv", invoke_without_command=True)
-    @commands.has_permissions(manage_messages=True)
-    async def reset_inv(self, ctx, member: discord.Member):
-        if member.id in self.invite_counts:
-            self.invite_counts[member.id] = 0
-        embed = create_embed(
-            ctx.guild,
-            title="✉️ Invite Count Reset",
-            description=f"Successfully reset invite count for **{member.mention}**.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
-
-    @reset_inv.command(name="all")
-    @commands.has_permissions(manage_messages=True)
-    async def reset_inv_all(self, ctx, *, user_str: str = None):
-        self.invite_counts.clear()
-        embed = create_embed(
-            ctx.guild,
-            title="✉️ Invites Reset",
-            description="Successfully cleared invite counts for **all users**.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
-
-    # --- LEADERBOARD COMMANDS (lb msg, lb vc, lb inv) ---
-    @commands.group(name="lb", invoke_without_command=True, help="View leaderboards.")
-    async def leaderboard_group(self, ctx):
-        embed = create_embed(
-            ctx.guild,
-            title="🏆 Leaderboard Categories",
-            description="Please use proper syntax:\n"
-                        "• `lb msg`\n"
-                        "• `lb vc`\n"
-                        "• `lb inv`",
-            color=discord.Color.gold()
-        )
-        await ctx.send(embed=embed)
-
-    @leaderboard_group.command(name="msg", help="View the messages leaderboard.")
-    async def lb_msg(self, ctx):
-        if not self.message_counts:
-            embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description="No message data recorded yet.", color=discord.Color.blue())
-            return await ctx.send(embed=embed)
-
-        sorted_users = sorted(self.message_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        desc = "".join([f"`#{idx}` <@{uid}> — **{count}** messages\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
-        embed = create_embed(ctx.guild, title="💬 Messages Leaderboard", description=desc, color=discord.Color.blue())
-        await ctx.send(embed=embed)
-
-    @leaderboard_group.command(name="vc", help="View the voice time leaderboard.")
-    async def lb_vc(self, ctx):
-        if not self.voice_time_seconds and not self.vc_joins:
-            embed = create_embed(ctx.guild, title="🎙️ Voice Leaderboard", description="No voice time recorded yet.", color=discord.Color.green())
-            return await ctx.send(embed=embed)
-
-        current_data = self.voice_time_seconds.copy()
-        now = datetime.datetime.utcnow().timestamp()
-        for uid, join_time in self.vc_joins.items():
-            current_data[uid] = current_data.get(uid, 0) + int(now - join_time)
-
-        sorted_users = sorted(current_data.items(), key=lambda x: x[1], reverse=True)[:10]
-        desc = "".join([f"`#{idx}` <@{uid}> — **{format_time(secs)}**\n" for idx, (uid, secs) in enumerate(sorted_users, 1)])
-        embed = create_embed(ctx.guild, title="🎙️ Voice Time Leaderboard", description=desc, color=discord.Color.green())
-        await ctx.send(embed=embed)
-
-    @leaderboard_group.command(name="inv", help="View the invites leaderboard.")
-    async def lb_inv(self, ctx):
-        if not self.invite_counts:
-            embed = create_embed(ctx.guild, title="✉️ Invites Leaderboard", description="No invite data recorded yet.", color=discord.Color.purple())
-            return await ctx.send(embed=embed)
-
-        sorted_users = sorted(self.invite_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        desc = "".join([f"`#{idx}` <@{uid}> — **{count}** invites\n" for idx, (uid, count) in enumerate(sorted_users, 1)])
-        embed = create_embed(ctx.guild, title="✉️ Invites Leaderboard", description=desc, color=discord.Color.purple())
-        await ctx.send(embed=embed)
-
-    @commands.command(name="say", help="Make the bot say a message in embed format.")
-    @commands.has_permissions(administrator=True)
-    async def say_command(self, ctx, *, message: str):
-        try:
-            await ctx.message.delete()
-        except:
-            pass
-        embed = create_embed(ctx.guild, description=message, color=discord.Color.blurple())
-        await ctx.send(embed=embed)
-
-    @commands.command(name="reply", help="Make the bot reply to a specific message.")
-    async def reply_command(self, ctx, *, message: str):
-        if ctx.message.reference:
-            original_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-            await original_msg.reply(message)
-        else:
-            embed = create_embed(ctx.guild, description=message, color=discord.Color.blurple())
-            await ctx.send(embed=embed)
-
-    @commands.command(name="count", hidden=True, help="Hidden count command stats.")
-    @commands.has_permissions(administrator=True)
-    async def hidden_count(self, ctx):
-        embed = create_embed(
-            ctx.guild,
-            title="🔢 Hidden Count Stats",
-            description=f"Current Counting Number: **{self.current_count}**\nStatus: **Active**",
-            color=discord.Color.dark_theme()
+            title="⚙️ Prefix Updated",
+            description=f"Successfully changed the server prefix to: **{new_prefix}**\nExample: `{new_prefix}help`",
+            color=discord.Color.green()
         )
         await ctx.send(embed=embed)
 
