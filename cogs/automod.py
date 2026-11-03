@@ -1,5 +1,3 @@
-Bhai, AutoMod file mein GIF ki problem ko fix karne ke liye hume is_gif wale check ko thoda aur behtar aur strong karna hoga, taaki koi bhi GIF (chahe Tenor ho, Giphy ho ya direct link) delete na ho. Baki koi bhi cheez nahi chhedi jayegi.
-Ye lijiye aapka updated AutoMod.py code:
 import discord
 from discord.ext import commands
 import sqlite3
