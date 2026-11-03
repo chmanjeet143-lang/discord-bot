@@ -97,6 +97,10 @@ class Utility(commands.Cog, name="Utility"):
         author_id = message.author.id
 
         if self.counting_channel and message.channel.id == self.counting_channel.id:
+            # Agar message koi bot command hai (jaise &start), toh counting logic run mat karo
+            if message.content.startswith("&"):
+                return
+
             try:
                 number = int(message.content.strip())
             except ValueError:
