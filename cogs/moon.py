@@ -14,17 +14,19 @@ class MoonTagTracker(commands.Cog):
             if not channel:
                 return
 
-            # Poora raw data print karke dekhte hain ki clan kahan hai
-            print(f"[RAW DEBUG] Member Data: {getattr(new_member, '_data', {})}")
+            # User object ya _user ke andar se data nikalna
+            user_obj = getattr(new_member, '_user', new_member)
+            user_data = getattr(user_obj, '_data', {})
+            
+            # Agar _data dictionary mein clan ho
+            clan_info = user_data.get('clan') if isinstance(user_data, dict) else None
+            tag = clan_info.get('tag', '') if isinstance(clan_info, dict) else ''
 
-            new_user_data = getattr(new_member, '_data', {}).get('user', {})
-            new_clan = new_user_data.get('clan') if isinstance(new_user_data, dict) else None
-            new_tag = new_clan.get('tag', '') if isinstance(new_clan, dict) else ''
+            print(f"[DEBUG] User: {new_member.name} | Detected Clan Tag: '{tag}'")
 
-            print(f"[DEBUG] User: {new_member.name} | Found Tag: '{new_tag}'")
-
-            if new_tag == self.target_tag:
-                # Agar tag match ho jaye
+            # Agar tag match kare toh embed bhejain
+            if tag == self.target_tag:
+                # Aap yahan apna success message ya embed laga sakte hain
                 pass
 
         except Exception as e:
@@ -32,4 +34,4 @@ class MoonTagTracker(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(MoonTagTracker(bot))
-    print("[LOADED] Raw Debugger loaded successfully!")
+    print("[LOADED] Updated MoonTagTracker loaded successfully!")
