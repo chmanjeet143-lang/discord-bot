@@ -10,17 +10,26 @@ class MoonTagTracker(commands.Cog):
     @commands.Cog.listener()
     async def on_member_update(self, old_member, new_member):
         try:
+            print(f"[DEBUG] Member update detect hua: {new_member.name}")
+            
             channel = self.bot.get_channel(self.log_channel_id)
             if not channel:
+                print(f"[ERROR] Log channel ID {self.log_channel_id} nahi mila! Channel ID check karein.")
                 return
 
-            # Yahan .nickname ki jagah .nick kar diya gaya hai
-            old_nick = old_member.nick or old_member.name
-            new_nick = new_member.nick or new_member.name
+            # Clan badge / Server tag check karna (Discord ke naye attribute ke mutabiq)
+            old_clan = getattr(old_member, 'clan', None)
+            new_clan = getattr(new_member, 'clan', None)
 
-            old_has_tag = self.target_tag in old_nick
-            new_has_tag = self.target_tag in new_nick
+            old_tag = old_clan.tag if old_clan else ""
+            new_tag = new_clan.tag if new_clan else ""
 
+            print(f"[DEBUG] Old Tag: '{old_tag}' | New Tag: '{new_tag}'")
+
+            old_has_tag = (old_tag == self.target_tag)
+            new_has_tag = (new_tag == self.target_tag)
+
+            # Jab user tag add kare
             if not old_has_tag and new_has_tag:
                 embed = discord.Embed(
                     color=0x00FF00,
@@ -29,7 +38,9 @@ class MoonTagTracker(commands.Cog):
                 embed.set_author(name=str(new_member), icon_url=new_member.display_avatar.url)
                 embed.set_footer(text=f"{new_member.name} adopted the server tag :)")
                 await channel.send(embed=embed)
+                print(f"[SUCCESS] {new_member.name} ne tag adopt kar liya hai!")
 
+            # Jab user tag remove kare
             elif old_has_tag and not new_has_tag:
                 embed = discord.Embed(
                     color=0xFF0000,
@@ -38,9 +49,12 @@ class MoonTagTracker(commands.Cog):
                 embed.set_author(name=str(new_member), icon_url=new_member.display_avatar.url)
                 embed.set_footer(text=f"{new_member.name} removed the server tag :(")
                 await channel.send(embed=embed)
+                print(f"[SUCCESS] {new_member.name} ne tag remove kar diya hai!")
+
         except Exception as e:
-            print(f"[ERROR in MoonTagTracker]: {e}")
+            # Agar koi bhi error aayega toh woh yahan direct print ho jayega
+            print(f"[CRITICAL ERROR in MoonTagTracker]: {e}")
 
 async def setup(bot):
     await bot.add_cog(MoonTagTracker(bot))
-    print("[LOADED] MoonTagTracker cog successfully loaded!")
+    print("[LOADED] MoonTagTracker cog successfully load ho gaya hai!")
