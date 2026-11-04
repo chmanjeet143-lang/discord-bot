@@ -12,11 +12,11 @@ class MoonTagTracker(commands.Cog):
         try:
             channel = self.bot.get_channel(self.log_channel_id)
             if not channel:
-                print(f"[DEBUG] Channel ID {self.log_channel_id} nahi mila!")
                 return
 
-            old_nick = old_member.nickname or old_member.name
-            new_nick = new_member.nickname or new_member.name
+            # Yahan .nickname ki jagah .nick kar diya gaya hai
+            old_nick = old_member.nick or old_member.name
+            new_nick = new_member.nick or new_member.name
 
             old_has_tag = self.target_tag in old_nick
             new_has_tag = self.target_tag in new_nick
