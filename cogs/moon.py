@@ -10,30 +10,27 @@ class MoonTagTracker(commands.Cog):
     @commands.Cog.listener()
     async def on_member_update(self, old_member, new_member):
         try:
-            # Yeh check karne ke liye ki member ka clan object kya data de raha hai
-            old_clan = getattr(old_member, 'clan', None)
-            new_clan = getattr(new_member, 'clan', None)
-            
-            print(f"[DEBUG] Member: {new_member.name} | Old Clan: {old_clan} (Type: {type(old_clan)}) | New Clan: {new_clan} (Type: {type(new_clan)})")
-
             channel = self.bot.get_channel(self.log_channel_id)
             if not channel:
                 return
 
-            # Agar clan seedha string hai ya object hai, dono ko handle karne ke liye
-            old_tag = str(old_clan) if old_clan else ""
-            new_tag = str(new_clan) if new_clan else ""
+            # Discord ke raw payload se official clan data nikalna
+            old_data = getattr(old_member, '_data', {})
+            new_data = getattr(new_member, '_data', {})
 
-            # Agar yeh ek object hai jisme .tag property hai:
-            if hasattr(old_clan, 'tag'):
-                old_tag = old_clan.tag
-            if hasattr(new_clan, 'tag'):
-                new_tag = new_clan.tag
+            old_clan = old_data.get('clan') if isinstance(old_data, dict) else None
+            new_clan = new_data.get('clan') if isinstance(new_data, dict) else None
 
-            old_has_tag = (self.target_tag in str(old_tag))
-            new_has_tag = (self.target_tag in str(new_tag))
+            # Clan object ke andar se 'tag' extract karna
+            old_tag = old_clan.get('tag', '') if isinstance(old_clan, dict) else ''
+            new_tag = new_clan.get('tag', '') if isinstance(new_clan, dict) else ''
 
-            # Jab user tag add kare
+            print(f"[DEBUG] User: {new_member.name} | Official Old Clan Tag: '{old_tag}' | Official New Clan Tag: '{new_tag}'")
+
+            old_has_tag = (old_tag == self.target_tag)
+            new_has_tag = (new_tag == self.target_tag)
+
+            # Jab user official clan badge add kare
             if not old_has_tag and new_has_tag:
                 embed = discord.Embed(
                     color=0x00FF00,
@@ -42,9 +39,9 @@ class MoonTagTracker(commands.Cog):
                 embed.set_author(name=str(new_member), icon_url=new_member.display_avatar.url)
                 embed.set_footer(text=f"{new_member.name} adopted the server tag :)")
                 await channel.send(embed=embed)
-                print(f"[SUCCESS] {new_member.name} ne tag adopt kar liya!")
+                print(f"[SUCCESS] {new_member.name} ne official clan tag adopt kiya!")
 
-            # Jab user tag remove kare
+            # Jab user official clan badge remove kare
             elif old_has_tag and not new_has_tag:
                 embed = discord.Embed(
                     color=0xFF0000,
@@ -53,11 +50,11 @@ class MoonTagTracker(commands.Cog):
                 embed.set_author(name=str(new_member), icon_url=new_member.display_avatar.url)
                 embed.set_footer(text=f"{new_member.name} removed the server tag :(")
                 await channel.send(embed=embed)
-                print(f"[SUCCESS] {new_member.name} ne tag remove kar diya!")
+                print(f"[SUCCESS] {new_member.name} ne official clan tag remove kiya!")
 
         except Exception as e:
             print(f"[CRITICAL ERROR in MoonTagTracker]: {e}")
 
 async def setup(bot):
     await bot.add_cog(MoonTagTracker(bot))
-    print("[LOADED] MoonTagTracker cog successfully load ho gaya hai!")
+    print("[LOADED] Official Clan Badge Tracker successfully loaded!")
