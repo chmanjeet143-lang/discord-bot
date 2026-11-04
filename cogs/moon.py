@@ -14,19 +14,20 @@ class MoonTagTracker(commands.Cog):
             if not channel:
                 return
 
-            # User object ya _user ke andar se data nikalna
-            user_obj = getattr(new_member, '_user', new_member)
+            # Cache ki jagah guild se fresh member data fetch karna taaki official clan tag mil sake
+            fetched_member = await new_member.guild.fetch_member(new_member.id)
+            
+            user_obj = getattr(fetched_member, '_user', fetched_member)
             user_data = getattr(user_obj, '_data', {})
             
-            # Agar _data dictionary mein clan ho
             clan_info = user_data.get('clan') if isinstance(user_data, dict) else None
             tag = clan_info.get('tag', '') if isinstance(clan_info, dict) else ''
 
-            print(f"[DEBUG] User: {new_member.name} | Detected Clan Tag: '{tag}'")
+            print(f"[DEBUG API] User: {new_member.name} | Fetched Clan Tag: '{tag}'")
 
-            # Agar tag match kare toh embed bhejain
+            # Agar official tag match ho jaye
             if tag == self.target_tag:
-                # Aap yahan apna success message ya embed laga sakte hain
+                # Aap yahan apna success embed laga sakte hain
                 pass
 
         except Exception as e:
@@ -34,4 +35,4 @@ class MoonTagTracker(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(MoonTagTracker(bot))
-    print("[LOADED] Updated MoonTagTracker loaded successfully!")
+    print("[LOADED] API Fetcher Tracker loaded successfully!")
