@@ -3,6 +3,8 @@ from discord.ext import commands
 import json
 import os
 
+DEFAULT_WELCOME1_CHANNEL_ID = 1532781914958729276
+
 BANNER_IMAGE_URL = (
     "https://cdn.discordapp.com/attachments/1532422031650455655/"
     "1573444294839369738/IMG_3070.png"
@@ -20,6 +22,17 @@ class Welcome1(commands.Cog):
         self.config_file = "welcome_config.json"
         self.load_config()
 
+    def _default_guild_config(self, channel_id: int) -> dict:
+        return {
+            "channel_id": int(channel_id),
+            "content": "Welcome to love heaven {user}",
+            "title": "Welcome to Love Heaven 🌸✨",
+            "image_url": BANNER_IMAGE_URL,
+            "lawz_url": LAWZ_URL,
+            "hex_url": HEX_URL,
+            "intro_url": INTRO_URL,
+        }
+
     def load_config(self):
         if os.path.exists(self.config_file):
             try:
@@ -36,6 +49,27 @@ class Welcome1(commands.Cog):
                 json.dump(self.config, f, indent=4)
         except Exception as e:
             print(f"Error saving welcome config: {e}")
+
+    def ensure_default_welcome_for_guild(self, guild: discord.Guild):
+        if not guild:
+            return
+        guild_id = str(guild.id)
+        channel = guild.get_channel(DEFAULT_WELCOME1_CHANNEL_ID)
+        if not channel:
+            return
+
+        if guild_id not in self.config or not self.config[guild_id].get("channel_id"):
+            self.config[guild_id] = self._default_guild_config(DEFAULT_WELCOME1_CHANNEL_ID)
+            self.save_config()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        for guild in self.bot.guilds:
+            self.ensure_default_welcome_for_guild(guild)
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild: discord.Guild):
+        self.ensure_default_welcome_for_guild(guild)
 
     def build_welcome_payload(self, member: discord.Member, config_data: dict):
         content_template = config_data.get("content", "Welcome to love heaven {user}")
@@ -76,9 +110,12 @@ class Welcome1(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         guild_id = str(member.guild.id)
         if guild_id not in self.config:
+            self.ensure_default_welcome_for_guild(member.guild)
+
+        data = self.config.get(guild_id)
+        if not data:
             return
 
-        data = self.config[guild_id]
         channel_id = data.get("channel_id")
         if not channel_id:
             return
@@ -98,16 +135,7 @@ class Welcome1(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def setup_welcome_1(self, ctx):
         guild_id = str(ctx.guild.id)
-
-        self.config[guild_id] = {
-            "channel_id": ctx.channel.id,
-            "content": "Welcome to love heaven {user}",
-            "title": "Welcome to Love Heaven 🌸✨",
-            "image_url": BANNER_IMAGE_URL,
-            "lawz_url": LAWZ_URL,
-            "hex_url": HEX_URL,
-            "intro_url": INTRO_URL,
-        }
+        self.config[guild_id] = self._default_guild_config(ctx.channel.id)
         self.save_config()
 
         await ctx.send(f"✅ Welcome 1 setup complete in {ctx.channel.mention}! Use `&wlcm1test` to preview it.")
@@ -117,9 +145,12 @@ class Welcome1(commands.Cog):
     async def test_welcome_1(self, ctx):
         guild_id = str(ctx.guild.id)
         if guild_id not in self.config:
+            self.ensure_default_welcome_for_guild(ctx.guild)
+
+        data = self.config.get(guild_id)
+        if not data:
             return await ctx.send("❌ No welcome message configured yet! Run `&wlcm1setup` first.")
 
-        data = self.config[guild_id]
         channel_id = data.get("channel_id")
         channel = ctx.guild.get_channel(int(channel_id)) if channel_id else ctx.channel
 
