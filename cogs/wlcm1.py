@@ -39,36 +39,30 @@ class Welcome1(commands.Cog):
 
     def build_welcome_payload(self, member: discord.Member, config_data: dict):
         content_template = config_data.get("content", "Welcome to love heaven {user}")
-        embed_title = config_data.get("title", "Welcome to Love Heaven")
+        embed_title = config_data.get("title", "Welcome to Love Heaven 🌸✨")
         image_url = config_data.get("image_url", BANNER_IMAGE_URL)
 
-        links = config_data.get(
-            "links",
-            [
-                {"label": "Lawz", "url": LAWZ_URL},
-                {"label": "Hex", "url": HEX_URL},
-                {"label": "Intro", "url": INTRO_URL},
-            ],
-        )
+        lawz_url = config_data.get("lawz_url", LAWZ_URL)
+        hex_url = config_data.get("hex_url", HEX_URL)
+        intro_url = config_data.get("intro_url", INTRO_URL)
 
         content = content_template.replace("{user}", member.mention)
 
-        description_lines = ["**Check these out !**"]
-        for item in links:
-            label = item.get("label", "Link")
-            url = item.get("url", "")
-            if url:
-                description_lines.append(f"• [{label}]({url})")
-        description_lines.append("\nEnjoy Ur Stay With Us")
+        description = (
+            f"🌺 **Check these out !**\n"
+            f"💕 [**Lawz**]({lawz_url}) . [**Hex**]({hex_url})\n"
+            f"▷◁ [**Intro**]({intro_url})\n"
+            f"🍃 **Enjoy Ur Stay With Us** 🦋"
+        )
 
         embed = discord.Embed(
             title=embed_title,
-            description="\n".join(description_lines),
+            description=description,
             color=discord.Color.from_rgb(245, 215, 225),
         )
 
         avatar_url = member.display_avatar.url if member.display_avatar else None
-        embed.set_author(name=member.display_name, icon_url=avatar_url)
+        embed.set_author(name=member.name, icon_url=avatar_url)
 
         if image_url:
             embed.set_image(url=image_url)
@@ -108,13 +102,11 @@ class Welcome1(commands.Cog):
         self.config[guild_id] = {
             "channel_id": ctx.channel.id,
             "content": "Welcome to love heaven {user}",
-            "title": "Welcome to Love Heaven",
+            "title": "Welcome to Love Heaven 🌸✨",
             "image_url": BANNER_IMAGE_URL,
-            "links": [
-                {"label": "Lawz", "url": LAWZ_URL},
-                {"label": "Hex", "url": HEX_URL},
-                {"label": "Intro", "url": INTRO_URL},
-            ],
+            "lawz_url": LAWZ_URL,
+            "hex_url": HEX_URL,
+            "intro_url": INTRO_URL,
         }
         self.save_config()
 
