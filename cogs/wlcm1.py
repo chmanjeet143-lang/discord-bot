@@ -25,8 +25,6 @@ class Welcome1(commands.Cog):
     def _default_guild_config(self, channel_id: int) -> dict:
         return {
             "channel_id": int(channel_id),
-            "content": "Welcome to love heaven {user}",
-            "title": "Welcome to Love Heaven 🌸✨",
             "image_url": BANNER_IMAGE_URL,
             "lawz_url": LAWZ_URL,
             "hex_url": HEX_URL,
@@ -72,15 +70,12 @@ class Welcome1(commands.Cog):
         self.ensure_default_welcome_for_guild(guild)
 
     def build_welcome_payload(self, member: discord.Member, config_data: dict):
-        content_template = config_data.get("content", "Welcome to love heaven {user}")
-        embed_title = config_data.get("title", "Welcome to Love Heaven 🌸✨")
         image_url = config_data.get("image_url", BANNER_IMAGE_URL)
-
         lawz_url = config_data.get("lawz_url", LAWZ_URL)
         hex_url = config_data.get("hex_url", HEX_URL)
         intro_url = config_data.get("intro_url", INTRO_URL)
 
-        content = content_template.replace("{user}", member.mention)
+        content = f"**Welcome to Love Heaven 🌸✨** {member.mention}"
 
         description = (
             f"🌺 **Check these out !**\n"
@@ -90,7 +85,6 @@ class Welcome1(commands.Cog):
         )
 
         embed = discord.Embed(
-            title=embed_title,
             description=description,
             color=discord.Color.from_rgb(245, 215, 225),
         )
