@@ -10,13 +10,11 @@ DEFAULT_AVATAR = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w
 BOT_CREDIT = "Bot Made By : Zeus"
 ACCENT_COLOR = 0x3498DB
 
-# Home embed ke liye alag description
 HOME_DESCRIPTION = (
-    "Welcome to **Love heaven help** — your server's complete command hub "
-    "for smooth moderation, automated systems, and active community engagement."
+    "Experience the ultimate Discord bot designed for seamless "
+    "management and community engagement."
 )
 
-# Har category/module ke liye alag description (keys lowercase mein rakhein)
 CATEGORY_DESCRIPTIONS = {
     "automod": "Automated protection rules to filter spam, links, and unwanted chat activity.",
     "boost": "Server boost alerts, milestones, and perk management tools.",
@@ -35,7 +33,6 @@ CATEGORY_DESCRIPTIONS = {
     "welcome": "Greeting messages and onboarding commands for new members.",
 }
 
-# Specific commands ke liye alag description (agar command docstring khali ho to yahan se lega)
 COMMAND_DESCRIPTIONS = {
     "help": "Shows the interactive help menu or details for a specific command.",
 }
@@ -57,6 +54,22 @@ EMOJI_MAP = {
     "welcome2": "✨",
     "welcome": "💌",
 }
+
+HAS_COMPONENTS_V2 = (
+    hasattr(discord.ui, "LayoutView")
+    and hasattr(discord.ui, "Container")
+    and hasattr(discord.ui, "Section")
+    and hasattr(discord.ui, "MediaGallery")
+)
+
+
+def get_bot_dp(bot, guild=None) -> str:
+    """Side thumbnail ke liye bot ki DP (avatar) return karta hai."""
+    if getattr(bot, "user", None) and bot.user.display_avatar:
+        return bot.user.display_avatar.url
+    if guild and guild.icon:
+        return guild.icon.url
+    return DEFAULT_AVATAR
 
 
 def get_current_prefix(bot, guild=None) -> str:
@@ -88,12 +101,12 @@ def get_current_prefix(bot, guild=None) -> str:
 
 
 def count_bot_commands(bot) -> int:
-    """Sabhi non-hidden commands aur subcommands count karta hai."""
+    """Sabhi public commands aur subcommands count karta hai."""
     return sum(1 for cmd in bot.walk_commands() if not cmd.hidden)
 
 
 def get_active_cogs(bot) -> list[str]:
-    """Help cog ke alawa un active cogs ki list deta hai jinmein kam se kam 1 visible command ho."""
+    """Help cog ke alawa active cogs ki sorted list return karta hai."""
     cogs = [
         cog_name
         for cog_name in bot.cogs
@@ -109,15 +122,13 @@ def get_active_cogs(bot) -> list[str]:
 
 
 def get_category_description(cog_name: str, display_name: str) -> str:
-    """Category ke liye alag description return karta hai."""
-    custom = CATEGORY_DESCRIPTIONS.get(cog_name.lower())
-    if custom:
-        return custom
-    return f"Dedicated commands and tools for the **{display_name}** module."
+    return CATEGORY_DESCRIPTIONS.get(
+        cog_name.lower(),
+        f"Dedicated commands and tools for the **{display_name}** module.",
+    )
 
 
 def get_command_description(cmd) -> str:
-    """Command ke liye custom ya docstring description return karta hai."""
     if cmd.qualified_name.lower() in COMMAND_DESCRIPTIONS:
         return COMMAND_DESCRIPTIONS[cmd.qualified_name.lower()]
     if cmd.name.lower() in COMMAND_DESCRIPTIONS:
@@ -125,160 +136,183 @@ def get_command_description(cmd) -> str:
     return cmd.short_doc or cmd.help or "No description provided."
 
 
-def apply_common_visuals(embed: discord.Embed, guild, prefix: str, include_banner: bool = True):
-    """Thumbnail, banner image, aur footer apply karta hai."""
-    thumb = IMAGE_URL or (guild.icon.url if guild and guild.icon else DEFAULT_AVATAR)
-    embed.set_thumbnail(url=thumb)
-    if include_banner and IMAGE_URL:
-        embed.set_image(url=IMAGE_URL)
-    embed.set_footer(
-        text=f"{BOT_CREDIT} • Use {prefix}help (command) for details on a specific command"
-    )
-    return embed
+def build_select_options(bot) -> list[discord.SelectOption]:
+    options = [
+        discord.SelectOption(
+            label="Home",
+            value="__home__",
+            description="Return to the main Love heaven help overview.",
+            emoji="🏠",
+        )
+    ]
+    for cog_name in get_active_cogs(bot):
+        display_name = "Support Tickets" if cog_name.lower() == "supporttickets" else cog_name
+        emoji = EMOJI_MAP.get(cog_name.lower(), "🔹")
+        cat_desc = get_category_description(cog_name, display_name)
+        options.append(
+            discord.SelectOption(
+                label=f"{display_name} Commands",
+                value=cog_name,
+                description=cat_desc[:100],
+                emoji=emoji,
+            )
+        )
+    return options[:25]
 
 
-def build_home_embed(bot, guild, prefix: str) -> discord.Embed:
-    """Love heaven help home embed banata hai."""
+def get_home_body_text(bot, prefix: str) -> str:
     commands_count = count_bot_commands(bot)
     modules_count = len(get_active_cogs(bot))
-
-    embed = discord.Embed(
-        title="Love heaven help",
-        description=(
-            f"{HOME_DESCRIPTION}\n\n"
-            f"**Prefix** `{prefix}`\n"
-            f"**Commands** `{commands_count:,}`\n"
-            f"**Modules** `{modules_count}`"
-        ),
-        color=ACCENT_COLOR,
+    return (
+        f"## Love heaven help\n"
+        f"{HOME_DESCRIPTION}\n\n"
+        f"**Prefix** `{prefix}`\n"
+        f"**Commands** `{commands_count:,}`\n"
+        f"**Modules** `{modules_count}`"
     )
-    return apply_common_visuals(embed, guild, prefix, include_banner=True)
 
 
-def build_category_embed(bot, guild, cog_name: str, prefix: str) -> discord.Embed:
-    """Selected module ke commands aur uski alag description dikhata hai."""
+def get_category_body_text(bot, cog_name: str, prefix: str) -> str:
     cog = bot.get_cog(cog_name)
     display_name = "Support Tickets" if cog_name.lower() == "supporttickets" else cog_name
-
     if not cog:
-        embed = discord.Embed(
-            title="Love heaven help",
-            description="❌ This category could not be found.",
-            color=ACCENT_COLOR,
-        )
-        return apply_common_visuals(embed, guild, prefix, include_banner=False)
+        return f"## Love heaven help\n❌ This category could not be found."
 
     cat_desc = get_category_description(cog_name, display_name)
-    command_list = []
-
+    lines = []
     for cmd in cog.get_commands():
         if cmd.hidden:
             continue
-
         desc = get_command_description(cmd)
         if isinstance(cmd, commands.Group):
             sub_cmds = [sub.name for sub in cmd.commands if not sub.hidden]
             sub_str = f" (Subcommands: {', '.join(sub_cmds)})" if sub_cmds else ""
-            command_list.append(f"• `{prefix}{cmd.name}`{sub_str} — *{desc}*")
+            lines.append(f"• `{prefix}{cmd.name}`{sub_str} — *{desc}*")
         else:
-            command_list.append(f"• `{prefix}{cmd.name}` — *{desc}*")
+            lines.append(f"• `{prefix}{cmd.name}` — *{desc}*")
 
-    commands_str = (
-        "\n".join(command_list)
-        if command_list
-        else "No public commands available in this category."
+    cmds_block = "\n".join(lines) if lines else "No public commands available in this category."
+    return (
+        f"## Love heaven help\n"
+        f"**{display_name} Commands**\n"
+        f"{cat_desc}\n\n"
+        f"{cmds_block}"
     )
 
-    embed = discord.Embed(
-        title=f"Love heaven help • {display_name}",
-        description=f"{cat_desc}\n\n**Commands**\n{commands_str}",
-        color=ACCENT_COLOR,
-    )
-    return apply_common_visuals(embed, guild, prefix, include_banner=False)
 
-
-def build_command_detail_embed(guild, command_obj, prefix: str) -> discord.Embed:
-    """Specific command ki detail dikhata hai."""
-    aliases = (
-        ", ".join(f"`{prefix}{a}`" for a in command_obj.aliases)
-        if getattr(command_obj, "aliases", None)
-        else "None"
-    )
-    usage = f"`{prefix}{command_obj.qualified_name} {command_obj.signature}`.strip()"
-    desc = get_command_description(command_obj)
-
-    lines = [
-        f"**Command:** `{prefix}{command_obj.qualified_name}`",
-        f"**Description:** {desc}",
-        f"**Usage:** {usage}",
-        f"**Aliases:** {aliases}",
-    ]
-
-    if isinstance(command_obj, commands.Group):
-        sub_names = [s.name for s in command_obj.commands if not s.hidden]
-        if sub_names:
-            lines.append(f"**Subcommands:** {', '.join(f'`{n}`' for n in sub_names)}")
-
-    embed = discord.Embed(
-        title="Love heaven help • Command Details",
-        description="\n".join(lines),
-        color=ACCENT_COLOR,
-    )
-    return apply_common_visuals(embed, guild, prefix, include_banner=False)
-
-
-class HelpDropdown(discord.ui.Select):
-    def __init__(self, bot, prefix: str):
-        self.bot = bot
-        self.prefix = prefix
-
-        options = [
-            discord.SelectOption(
-                label="Home",
-                value="__home__",
-                description="Return to the main Love heaven help overview.",
-                emoji="🏠",
+if HAS_COMPONENTS_V2:
+    class V2HelpDropdown(discord.ui.Select):
+        def __init__(self, parent_view, bot, prefix: str):
+            self.parent_view = parent_view
+            self.bot = bot
+            self.prefix = prefix
+            super().__init__(
+                placeholder="Home",
+                min_values=1,
+                max_values=1,
+                options=build_select_options(bot),
             )
-        ]
 
-        for cog_name in get_active_cogs(bot):
-            display_name = (
-                "Support Tickets" if cog_name.lower() == "supporttickets" else cog_name
-            )
-            emoji = EMOJI_MAP.get(cog_name.lower(), "🔹")
-            cat_desc = get_category_description(cog_name, display_name)
+        async def callback(self, interaction: discord.Interaction):
+            self.parent_view.selected_value = self.values[0]
+            self.parent_view.rebuild(interaction.guild)
+            await interaction.response.edit_message(view=self.parent_view)
 
-            options.append(
-                discord.SelectOption(
-                    label=f"{display_name} Commands",
-                    value=cog_name,
-                    description=cat_desc[:100],  # Discord select description max 100 chars
-                    emoji=emoji,
+    class LoveHeavenV2View(discord.ui.LayoutView):
+        def __init__(self, bot, guild, prefix: str, selected_value: str = "__home__"):
+            super().__init__(timeout=180)
+            self.bot = bot
+            self.prefix = prefix
+            self.selected_value = selected_value
+            self.message = None
+            self.rebuild(guild)
+
+        def rebuild(self, guild):
+            self.clear_items()
+            dp_url = get_bot_dp(self.bot, guild)
+
+            if self.selected_value == "__home__":
+                header_text = get_home_body_text(self.bot, self.prefix)
+            else:
+                header_text = get_category_body_text(self.bot, self.selected_value, self.prefix)
+
+            gallery_items = []
+            if IMAGE_URL:
+                gallery_items.append(discord.MediaGalleryItem(media=IMAGE_URL))
+
+            container_children = []
+            if gallery_items:
+                container_children.append(discord.ui.MediaGallery(*gallery_items))
+
+            # Bot DP side mein + bada Love heaven help heading aur stats
+            container_children.append(
+                discord.ui.Section(
+                    discord.ui.TextDisplay(header_text),
+                    accessory=discord.ui.Thumbnail(media=dp_url),
                 )
             )
+            container_children.append(discord.ui.Separator())
 
+            # Embed/Container ke andar Home dropdown
+            dropdown = V2HelpDropdown(self, self.bot, self.prefix)
+            container_children.append(discord.ui.ActionRow(dropdown))
+
+            # Sabse last mein help command details line + credit
+            footer_line = (
+                f"Use `{self.prefix}help (command)` for details on a specific command\n"
+                f"-# {BOT_CREDIT}"
+            )
+            container_children.append(discord.ui.TextDisplay(footer_line))
+
+            container = discord.ui.Container(*container_children, accent_color=ACCENT_COLOR)
+            self.add_item(container)
+
+        async def on_timeout(self):
+            for child in self.walk_children():
+                if hasattr(child, "disabled"):
+                    child.disabled = True
+            if self.message:
+                try:
+                    await self.message.edit(view=self)
+                except Exception:
+                    pass
+
+
+# Fallback Embed View (agar discord.py 2.5 se purana ho)
+class FallbackDropdown(discord.ui.Select):
+    def __init__(self, bot, guild, prefix: str):
+        self.bot = bot
+        self.guild = guild
+        self.prefix = prefix
         super().__init__(
             placeholder="Home",
             min_values=1,
             max_values=1,
-            options=options[:25],
+            options=build_select_options(bot),
         )
 
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
         if selected == "__home__":
-            embed = build_home_embed(self.bot, interaction.guild, self.prefix)
+            desc = get_home_body_text(self.bot, self.prefix)
         else:
-            embed = build_category_embed(self.bot, interaction.guild, selected, self.prefix)
+            desc = get_category_body_text(self.bot, selected, self.prefix)
 
+        embed = discord.Embed(description=desc, color=ACCENT_COLOR)
+        if IMAGE_URL:
+            embed.set_image(url=IMAGE_URL)
+        embed.set_thumbnail(url=get_bot_dp(self.bot, interaction.guild))
+        embed.set_footer(
+            text=f"Use {self.prefix}help (command) for details on a specific command • {BOT_CREDIT}"
+        )
         await interaction.response.edit_message(embed=embed, view=self.view)
 
 
-class HelpView(discord.ui.View):
-    def __init__(self, bot, prefix: str):
+class FallbackHelpView(discord.ui.View):
+    def __init__(self, bot, guild, prefix: str):
         super().__init__(timeout=180)
         self.message = None
-        self.add_item(HelpDropdown(bot, prefix))
+        self.add_item(FallbackDropdown(bot, guild, prefix))
 
     async def on_timeout(self):
         for child in self.children:
@@ -288,6 +322,37 @@ class HelpView(discord.ui.View):
                 await self.message.edit(view=self)
             except Exception:
                 pass
+
+
+def build_command_detail_embed(bot, guild, command_obj, prefix: str) -> discord.Embed:
+    aliases = (
+        ", ".join(f"`{prefix}{a}`" for a in command_obj.aliases)
+        if getattr(command_obj, "aliases", None)
+        else "None"
+    )
+    usage = f"`{prefix}{command_obj.qualified_name} {command_obj.signature}`.strip()"
+    desc = get_command_description(command_obj)
+
+    lines = [
+        "## Love heaven help",
+        f"**Command:** `{prefix}{command_obj.qualified_name}`",
+        f"**Description:** {desc}",
+        f"**Usage:** {usage}",
+        f"**Aliases:** {aliases}",
+    ]
+    if isinstance(command_obj, commands.Group):
+        sub_names = [s.name for s in command_obj.commands if not s.hidden]
+        if sub_names:
+            lines.append(f"**Subcommands:** {', '.join(f'`{n}`' for n in sub_names)}")
+
+    embed = discord.Embed(description="\n".join(lines), color=ACCENT_COLOR)
+    if IMAGE_URL:
+        embed.set_image(url=IMAGE_URL)
+    embed.set_thumbnail(url=get_bot_dp(bot, guild))
+    embed.set_footer(
+        text=f"Use {prefix}help (command) for details on a specific command • {BOT_CREDIT}"
+    )
+    return embed
 
 
 class HelpCog(commands.Cog):
@@ -305,13 +370,25 @@ class HelpCog(commands.Cog):
         if query:
             target_cmd = self.bot.get_command(query.strip())
             if target_cmd and not target_cmd.hidden:
-                embed = build_command_detail_embed(ctx.guild, target_cmd, prefix)
+                embed = build_command_detail_embed(self.bot, ctx.guild, target_cmd, prefix)
                 return await ctx.send(embed=embed)
 
-        embed = build_home_embed(self.bot, ctx.guild, prefix)
-        view = HelpView(self.bot, prefix)
-        message = await ctx.send(embed=embed, view=view)
-        view.message = message
+        if HAS_COMPONENTS_V2:
+            view = LoveHeavenV2View(self.bot, ctx.guild, prefix)
+            message = await ctx.send(view=view)
+            view.message = message
+        else:
+            desc = get_home_body_text(self.bot, prefix)
+            embed = discord.Embed(description=desc, color=ACCENT_COLOR)
+            if IMAGE_URL:
+                embed.set_image(url=IMAGE_URL)
+            embed.set_thumbnail(url=get_bot_dp(self.bot, ctx.guild))
+            embed.set_footer(
+                text=f"Use {prefix}help (command) for details on a specific command • {BOT_CREDIT}"
+            )
+            view = FallbackHelpView(self.bot, ctx.guild, prefix)
+            message = await ctx.send(embed=embed, view=view)
+            view.message = message
 
 
 async def setup(bot):
