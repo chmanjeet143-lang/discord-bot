@@ -165,23 +165,11 @@ class SupportTicketSelect(ui.Select):
         self.bot = bot
         options = [
             discord.SelectOption(
-                label="Staff Complaint",
-                description="Report or complain about a staff member.",
-                emoji="⚖️",
-                value="staff_complaint",
-            ),
-            discord.SelectOption(
-                label="Promo & Sponsorship",
-                description="Inquiries for promotions or partnerships.",
-                emoji="🤝",
-                value="promo_sponsor",
-            ),
-            discord.SelectOption(
-                label="Giveaway Claim",
-                description="Claim your won giveaway prize.",
-                emoji="🎁",
-                value="giveaway_claim",
-            ),
+                label="General Support",
+                description="Open a support ticket with the Love heaven team.",
+                emoji="🎫",
+                value="general_support",
+            )
         ]
         super().__init__(
             placeholder="Make a selection to open a ticket...",
@@ -197,38 +185,16 @@ class SupportTicketSelect(ui.Select):
             guild = interaction.guild
             val = self.values[0]
 
-            if val == "staff_complaint":
-                category_name = "Staff Complaints"
-                role_id = 1558070324229316731
-                channel_prefix = "complaint"
-                auto_msg = (
-                    f"Thank you for bringing this to our notice, {interaction.user.mention}. "
-                    "Management will review your complaint shortly. Please share all the details and proofs below."
-                )
-            elif val == "promo_sponsor":
-                category_name = "Promotions & Partnerships"
-                role_id = 1558070509256581170
-                channel_prefix = "promo"
-                auto_msg = (
-                    f"Thanks for reaching out for a promo/partnership with **Moonlight Heaven**, "
-                    f"{interaction.user.mention}! Our partnership team will connect with you soon. "
-                    "Please share your proposal or link below."
-                )
-            else:
-                category_name = "Giveaway Claims"
-                role_id = 1558070577527390248
-                channel_prefix = "giveaway"
-                auto_msg = (
-                    f"Congratulations on winning the giveaway, {interaction.user.mention}! 🎉 "
-                    "Our team will verify your win and deliver your prize shortly. "
-                    "Please share the giveaway message link or screenshot below."
-                )
+            category_name = "Love heaven Tickets"
+            channel_prefix = "ticket"
+            auto_msg = (
+                f"Welcome to **Love heaven** support, {interaction.user.mention}! "
+                "Our team will assist you shortly. Please share your query or details below."
+            )
 
             category = discord.utils.get(guild.categories, name=category_name)
             if not category:
                 category = await guild.create_category(category_name)
-
-            support_role = guild.get_role(role_id)
 
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -239,10 +205,6 @@ class SupportTicketSelect(ui.Select):
                     view_channel=True, send_messages=True, manage_channels=True
                 ),
             }
-            if support_role:
-                overwrites[support_role] = discord.PermissionOverwrite(
-                    view_channel=True, send_messages=True, read_message_history=True
-                )
 
             ticket_channel = await guild.create_text_channel(
                 name=f"{channel_prefix}-{interaction.user.name}",
@@ -251,18 +213,16 @@ class SupportTicketSelect(ui.Select):
                 topic=f"Support Ticket ({val}) by {interaction.user.id}",
             )
 
-            role_mention = support_role.mention if support_role else f"<@&{role_id}>"
-
             if HAS_COMPONENTS_V2:
                 opened_view = TicketOpenedV2View(bot, guild, auto_msg)
                 await ticket_channel.send(
-                    content=f"{interaction.user.mention} {role_mention}",
+                    content=f"{interaction.user.mention}",
                     view=opened_view,
                 )
             else:
                 embed = create_embed(bot, guild, title="🎫 Ticket Opened", description=auto_msg)
                 await ticket_channel.send(
-                    content=f"{interaction.user.mention} {role_mention}",
+                    content=f"{interaction.user.mention}",
                     embed=embed,
                     view=TicketControlView(bot, guild),
                 )
@@ -314,14 +274,10 @@ class SupportTickets(commands.Cog):
     @commands.command(name="ticketsetsupport")
     @commands.has_permissions(administrator=True)
     async def ticket_set_support(self, ctx):
-        title = "Moonlight Heaven | Support Center"
+        title = "Love heaven | Support Center"
         description = (
-            "Welcome to **Moonlight Heaven** Support Center! Please select the appropriate category "
-            "from the dropdown menu below depending on what you need assistance with.\n\n"
-            "⚖️ **Staff Complaint** - Report any issues or unfair treatment.\n"
-            "🤝 **Promo & Sponsorship** - Partner or promote with us.\n"
-            "🎁 **Giveaway Claim** - Claim your won prizes.\n\n"
-            "⚠️ **Please make sure to select the correct category to avoid delays!**"
+            "Welcome to **Love heaven** Support Center! Select an option from the "
+            "dropdown menu below to open a support ticket."
         )
 
         if HAS_COMPONENTS_V2:
