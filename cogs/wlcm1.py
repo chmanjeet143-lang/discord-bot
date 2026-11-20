@@ -3,6 +3,17 @@ from discord.ext import commands
 import json
 import os
 
+BANNER_IMAGE_URL = (
+    "https://cdn.discordapp.com/attachments/1532422031650455655/"
+    "1573444294839369738/IMG_3070.png"
+    "?ex=6b0207b1&is=6b00b631&hm=6b89a015d4120ecda71e296b62187932543d5f536676e671784601c07ec1aa7e&"
+)
+
+LAWZ_URL = "https://discord.com/channels/1531581818468569200/1561804737420992542"
+HEX_URL = "https://discord.com/channels/1531581818468569200/1533508556316217544"
+INTRO_URL = "https://discord.com/channels/1531581818468569200/1533508168016072885"
+
+
 class Welcome1(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -12,7 +23,7 @@ class Welcome1(commands.Cog):
     def load_config(self):
         if os.path.exists(self.config_file):
             try:
-                with open(self.config_file, "r") as f:
+                with open(self.config_file, "r", encoding="utf-8") as f:
                     self.config = json.load(f)
             except Exception:
                 self.config = {}
@@ -21,59 +32,95 @@ class Welcome1(commands.Cog):
 
     def save_config(self):
         try:
-            with open(self.config_file, "w") as f:
+            with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, indent=4)
         except Exception as e:
             print(f"Error saving welcome config: {e}")
 
+    def build_welcome_payload(self, member: discord.Member, config_data: dict):
+        content_template = config_data.get("content", "Welcome to love heaven {user}")
+        embed_title = config_data.get("title", "Welcome to Love Heaven")
+        image_url = config_data.get("image_url", BANNER_IMAGE_URL)
+
+        links = config_data.get(
+            "links",
+            [
+                {"label": "Lawz", "url": LAWZ_URL},
+                {"label": "Hex", "url": HEX_URL},
+                {"label": "Intro", "url": INTRO_URL},
+            ],
+        )
+
+        content = content_template.replace("{user}", member.mention)
+
+        description_lines = ["**Check these out !**"]
+        for item in links:
+            label = item.get("label", "Link")
+            url = item.get("url", "")
+            if url:
+                description_lines.append(f"• [{label}]({url})")
+        description_lines.append("\nEnjoy Ur Stay With Us")
+
+        embed = discord.Embed(
+            title=embed_title,
+            description="\n".join(description_lines),
+            color=discord.Color.from_rgb(245, 215, 225),
+        )
+
+        avatar_url = member.display_avatar.url if member.display_avatar else None
+        embed.set_author(name=member.display_name, icon_url=avatar_url)
+
+        if image_url:
+            embed.set_image(url=image_url)
+
+        member_count = member.guild.member_count or 0
+        embed.set_footer(text=f"We've Got {member_count} Members!")
+
+        return content, embed
+
     @commands.Cog.listener()
-    async def on_member_join(self, member):
+    async def on_member_join(self, member: discord.Member):
         guild_id = str(member.guild.id)
         if guild_id not in self.config:
             return
 
         data = self.config[guild_id]
         channel_id = data.get("channel_id")
-        message_template = data.get("message")
-
-        if not channel_id or not message_template:
+        if not channel_id:
             return
 
         channel = member.guild.get_channel(int(channel_id))
         if not channel:
             return
 
-        final_message = message_template.replace("{user}", member.mention)
+        content, embed = self.build_welcome_payload(member, data)
 
         try:
-            await channel.send(final_message)
+            await channel.send(content=content, embed=embed)
         except Exception as e:
             print(f"Error sending welcome message: {e}")
 
-    @commands.command(name="wlcm1setup", help="Sets up the default welcome message in the current channel.")
+    @commands.command(name="wlcm1setup", help="Sets up the Love Heaven welcome embed in the current channel.")
     @commands.has_permissions(administrator=True)
     async def setup_welcome_1(self, ctx):
         guild_id = str(ctx.guild.id)
-        
-        # Tera diya hua exact custom message with emojis and links/mentions
-        default_message = (
-            "<:1_:1534159662063026187> Look who joined us! **Welcome to 🌜Moonlight Heaven ** {user}\n"
-            "Great to have you here!<:cinna_flower:1553906067522588705> Check these out: \n"
-            "<:GirlOwner:1553725816108621915> https://discord.com/channels/1531581818468569200/1533508168016072885\n"
-            "<:GirlOwner:1553725816108621915> <#1533508556316217544> \n"
-            "<:GirlOwner:1553725816108621915> <#1561036228474699887> \n"
-            "Got questions? Just ping our <@&1533532066254159912> <:musafir_admin:1553725963563434064>"
-        )
 
         self.config[guild_id] = {
             "channel_id": ctx.channel.id,
-            "message": default_message
+            "content": "Welcome to love heaven {user}",
+            "title": "Welcome to Love Heaven",
+            "image_url": BANNER_IMAGE_URL,
+            "links": [
+                {"label": "Lawz", "url": LAWZ_URL},
+                {"label": "Hex", "url": HEX_URL},
+                {"label": "Intro", "url": INTRO_URL},
+            ],
         }
         self.save_config()
-        
-        await ctx.send(f"✅ Welcome 1 successfully configured in {ctx.channel.mention} using your custom template!")
 
-    @commands.command(name="wlcm1test", help="Tests the welcome message instantly.")
+        await ctx.send(f"✅ Welcome 1 setup complete in {ctx.channel.mention}! Use `&wlcm1test` to preview it.")
+
+    @commands.command(name="wlcm1test", help="Tests the Love Heaven welcome message instantly.")
     @commands.has_permissions(administrator=True)
     async def test_welcome_1(self, ctx):
         guild_id = str(ctx.guild.id)
@@ -82,19 +129,19 @@ class Welcome1(commands.Cog):
 
         data = self.config[guild_id]
         channel_id = data.get("channel_id")
-        message_template = data.get("message")
+        channel = ctx.guild.get_channel(int(channel_id)) if channel_id else ctx.channel
 
-        channel = ctx.guild.get_channel(int(channel_id))
         if not channel:
             return await ctx.send("❌ Configured welcome channel not found!")
 
-        final_message = message_template.replace("{user}", ctx.author.mention)
+        content, embed = self.build_welcome_payload(ctx.author, data)
 
         try:
-            await channel.send(final_message)
+            await channel.send(content=content, embed=embed)
             await ctx.send(f"✅ Test welcome message sent to {channel.mention}!")
         except Exception as e:
             await ctx.send(f"❌ Error sending test message: {e}")
+
 
 async def setup(bot):
     await bot.add_cog(Welcome1(bot))
