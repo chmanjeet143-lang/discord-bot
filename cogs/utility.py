@@ -55,7 +55,6 @@ class Utility(commands.Cog):
                 )
                 """
             )
-            # Purane database tables ke liye safe migration columns
             for alter_sql in [
                 "ALTER TABLE guild_settings ADD COLUMN count_reaction TEXT DEFAULT '✅'",
                 "ALTER TABLE user_stats ADD COLUMN today_msg_count INTEGER DEFAULT 0",
@@ -75,8 +74,8 @@ class Utility(commands.Cog):
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.MissingPermissions):
             embed = discord.Embed(
-                title="▸ Process Denied !",
-                description="▸ **Reason** : `You don't have permission to use this command!`",
+                title="Process Denied !",
+                description="You don't have permission to use this command!",
                 accent_color=None,
             )
             await ctx.send(embed=embed)
@@ -84,8 +83,8 @@ class Utility(commands.Cog):
 
         if isinstance(error, commands.BadArgument):
             embed = discord.Embed(
-                title="▸ Process Denied !",
-                description="▸ **Reason** : `Invalid argument provided! Please check your input and try again.`",
+                title="Process Denied !",
+                description="Invalid argument provided! Please check your input and try again.",
                 accent_color=None,
             )
             await ctx.send(embed=embed)
@@ -239,7 +238,6 @@ class Utility(commands.Cog):
         now_ts = int(time.time())
 
         async with aiosqlite.connect(DB_PATH) as db:
-            # 1. Remove AFK if sender was AFK (and not running the afk command)
             ctx = await self.bot.get_context(message)
             is_afk_cmd = ctx.valid and ctx.command and ctx.command.name == "afk"
 
@@ -255,16 +253,15 @@ class Utility(commands.Cog):
                     )
                     await db.commit()
                     welcome_embed = self._build_info_embed(
-                        title="▸ Welcome Back !",
+                        title="Welcome Back !",
                         description=(
-                            f"▸ **User**   : {message.author.mention}\n"
-                            f"▸ **Status** : `AFK removed`"
+                            f"User : {message.author.mention}\n"
+                            f"Status : AFK removed"
                         ),
                         thumbnail_url=message.author.display_avatar.url,
                     )
                     await message.reply(embed=welcome_embed, mention_author=False)
 
-            # 2. Notify if any mentioned user is AFK
             if message.mentions:
                 for mentioned in message.mentions:
                     if mentioned.id == user_id or mentioned.bot:
@@ -278,17 +275,16 @@ class Utility(commands.Cog):
                         reason, since = row
                         since_text = f"<t:{since}:R>" if since else "recently"
                         afk_embed = self._build_info_embed(
-                            title="▸ User is AFK !",
+                            title="User is AFK !",
                             description=(
-                                f"▸ **User**      : {mentioned.mention}\n"
-                                f"▸ **Reason**    : `{reason}`\n"
-                                f"▸ **AFK Since** : `{since_text}`"
+                                f"User : {mentioned.mention}\n"
+                                f"Reason : {reason}\n"
+                                f"AFK Since : {since_text}"
                             ),
                             thumbnail_url=mentioned.display_avatar.url,
                         )
                         await message.reply(embed=afk_embed, mention_author=False)
 
-            # 3. Increment total + today's message count
             cur_stat = await db.execute(
                 "SELECT today_msg_count, last_msg_date, tracked_since FROM user_stats WHERE guild_id = ? AND user_id = ?",
                 (guild_id, user_id),
@@ -320,7 +316,6 @@ class Utility(commands.Cog):
                     (next_today, today, next_since, guild_id, user_id),
                 )
 
-            # 4. Counting game check
             cur = await db.execute(
                 """
                 SELECT count_channel_id, last_count, last_counter_id, count_reaction
@@ -357,11 +352,11 @@ class Utility(commands.Cog):
                         else f"Wrong number! Expected {expected}."
                     )
                     count_err_embed = self._build_info_embed(
-                        title="▸ Counting Reset !",
+                        title="Counting Reset !",
                         description=(
-                            f"▸ **User**       : {message.author.mention}\n"
-                            f"▸ **Reason**     : `{reason_text}`\n"
-                            f"▸ **Next Count** : `1`"
+                            f"User : {message.author.mention}\n"
+                            f"Reason : {reason_text}\n"
+                            f"Next Count : 1"
                         ),
                         thumbnail_url=message.author.display_avatar.url,
                     )
@@ -392,11 +387,11 @@ class Utility(commands.Cog):
         msg_ms = round((time.perf_counter() - ctx.message.created_at.timestamp()) * 1000)
 
         embed = discord.Embed(accent_color=None)
-        embed.set_author(name="☁️ Bot's Latency")
+        embed.set_author(name="Bot's Latency")
         embed.description = (
-            f"__**Websocket Latency :**__ `{ws_ms} ms`\n"
-            f"__**Message Latency :**__ `{max(1, msg_ms)} ms`\n"
-            f"__**API Latency :**__ `{ws_ms} ms`"
+            f"Websocket Latency : {ws_ms} ms\n"
+            f"Message Latency : {max(1, msg_ms)} ms\n"
+            f"API Latency : {ws_ms} ms"
         )
         thumb = ctx.guild.icon.url if (ctx.guild and ctx.guild.icon) else self.bot.user.display_avatar.url
         embed.set_thumbnail(url=thumb)
@@ -406,9 +401,9 @@ class Utility(commands.Cog):
         api_ms = max(1, round((time.perf_counter() - api_start) * 1000))
 
         embed.description = (
-            f"__**Websocket Latency :**__ `{ws_ms} ms`\n"
-            f"__**Message Latency :**__ `{max(1, msg_ms)} ms`\n"
-            f"__**API Latency :**__ `{api_ms} ms`"
+            f"Websocket Latency : {ws_ms} ms\n"
+            f"Message Latency : {max(1, msg_ms)} ms\n"
+            f"API Latency : {api_ms} ms"
         )
         await sent.edit(embed=embed)
 
@@ -446,12 +441,12 @@ class Utility(commands.Cog):
             await db.commit()
 
         embed = self._build_info_embed(
-            title="▸ Counting Started !",
+            title="Counting Started !",
             description=(
-                f"▸ **Channel**  : {target_channel.mention}\n"
-                f"▸ **Start At** : `{start_num}`\n"
-                f"▸ **Reaction** : `{reaction_clean}`\n"
-                f"▸ **Set By**   : {ctx.author.mention}"
+                f"Channel : {target_channel.mention}\n"
+                f"Start At : {start_num}\n"
+                f"Reaction : {reaction_clean}\n"
+                f"Set By : {ctx.author.mention}"
             ),
             thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else ctx.author.display_avatar.url,
         )
@@ -474,11 +469,11 @@ class Utility(commands.Cog):
             await db.commit()
 
         embed = self._build_info_embed(
-            title="▸ User is AFK !",
+            title="User is AFK !",
             description=(
-                f"▸ **User**      : {ctx.author.mention}\n"
-                f"▸ **Reason**    : `{reason}`\n"
-                f"▸ **AFK Since** : `<t:{now_ts}:R>`"
+                f"User : {ctx.author.mention}\n"
+                f"Reason : {reason}\n"
+                f"AFK Since : <t:{now_ts}:R>"
             ),
             thumbnail_url=ctx.author.display_avatar.url,
         )
@@ -507,12 +502,12 @@ class Utility(commands.Cog):
         avg_daily = self._format_avg_daily(total_msgs, tracked_since)
 
         embed = discord.Embed(accent_color=None)
-        embed.set_author(name="▸ Message Tracker")
+        embed.set_author(name="Message Tracker")
         embed.description = (
-            f"▸ **User:** {target.mention}\n"
-            f"▸ **Total Messages:** `{total_msgs}`\n"
-            f"▸ **Today's Messages:** `{today_msgs}`\n"
-            f"▸ **Avg. Daily:** `{avg_daily}`"
+            f"User: {target.mention}\n"
+            f"Total Messages: {total_msgs}\n"
+            f"Today's Messages: {today_msgs}\n"
+            f"Avg. Daily: {avg_daily}"
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         await ctx.send(embed=embed)
@@ -534,10 +529,10 @@ class Utility(commands.Cog):
             total_seconds += int(time.time() - active_join)
 
         embed = discord.Embed(accent_color=None)
-        embed.set_author(name="▸ Voice Tracker")
+        embed.set_author(name="Voice Tracker")
         embed.description = (
-            f"▸ **User:** {target.mention}\n"
-            f"▸ **Total Voice Time:** `{self._format_duration(total_seconds)}`"
+            f"User: {target.mention}\n"
+            f"Total Voice Time: {self._format_duration(total_seconds)}"
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         await ctx.send(embed=embed)
@@ -555,10 +550,10 @@ class Utility(commands.Cog):
         invites = row[0] if (row and row[0]) else 0
 
         embed = discord.Embed(accent_color=None)
-        embed.set_author(name="▸ Invite Tracker")
+        embed.set_author(name="Invite Tracker")
         embed.description = (
-            f"▸ **User:** {target.mention}\n"
-            f"▸ **Total Invites:** `{invites}`"
+            f"User: {target.mention}\n"
+            f"Total Invites: {invites}"
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         await ctx.send(embed=embed)
@@ -579,8 +574,8 @@ class Utility(commands.Cog):
 
         if not rows:
             embed = self._build_info_embed(
-                title=f"▸ {title}",
-                description="▸ **Status** : `No leaderboard data available yet.`",
+                title=title,
+                description="Status : No leaderboard data available yet.",
                 thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
             )
             await ctx.send(embed=embed)
@@ -589,15 +584,15 @@ class Utility(commands.Cog):
         lines = []
         for idx, (uid, val) in enumerate(rows, start=1):
             member = ctx.guild.get_member(uid)
-            name = member.mention if member else f"User (`{uid}`)"
-            lines.append(f"▸ **`#{idx}`** {name} — `{formatter(val)}`")
+            name = member.mention if member else f"User ({uid})"
+            lines.append(f"#{idx} {name} - {formatter(val)}")
 
         embed = discord.Embed(
             description="\n".join(lines),
             accent_color=None,
             timestamp=datetime.now(timezone.utc),
         )
-        embed.set_author(name=f"▸ {title}")
+        embed.set_author(name=title)
         if ctx.guild.icon:
             embed.set_thumbnail(url=ctx.guild.icon.url)
         await ctx.send(embed=embed)
@@ -633,7 +628,7 @@ class Utility(commands.Cog):
                     """,
                     (ctx.guild.id, member.id),
                 )
-                desc = f"▸ **Target**     : {member.mention}\n▸ **Stat Reset** : `Message stats`"
+                desc = f"Target : {member.mention}\nStat Reset : Message stats"
             else:
                 await db.execute(
                     """
@@ -643,11 +638,11 @@ class Utility(commands.Cog):
                     """,
                     (ctx.guild.id,),
                 )
-                desc = "▸ **Target**     : `All server members`\n▸ **Stat Reset** : `Message stats`"
+                desc = "Target : All server members\nStat Reset : Message stats"
             await db.commit()
 
         embed = self._build_info_embed(
-            title="▸ Message Stats Reset",
+            title="Message Stats Reset",
             description=desc,
             thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
@@ -664,7 +659,7 @@ class Utility(commands.Cog):
                     "UPDATE user_stats SET vc_seconds = 0 WHERE guild_id = ? AND user_id = ?",
                     (ctx.guild.id, member.id),
                 )
-                desc = f"▸ **Target**     : {member.mention}\n▸ **Stat Reset** : `Voice stats`"
+                desc = f"Target : {member.mention}\nStat Reset : Voice stats"
             else:
                 keys_to_remove = [k for k in self.vc_join_times if k[0] == ctx.guild.id]
                 for k in keys_to_remove:
@@ -673,11 +668,11 @@ class Utility(commands.Cog):
                     "UPDATE user_stats SET vc_seconds = 0 WHERE guild_id = ?",
                     (ctx.guild.id,),
                 )
-                desc = "▸ **Target**     : `All server members`\n▸ **Stat Reset** : `Voice stats`"
+                desc = "Target : All server members\nStat Reset : Voice stats"
             await db.commit()
 
         embed = self._build_info_embed(
-            title="▸ Voice Stats Reset",
+            title="Voice Stats Reset",
             description=desc,
             thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
@@ -693,17 +688,17 @@ class Utility(commands.Cog):
                     "UPDATE user_stats SET inv_count = 0 WHERE guild_id = ? AND user_id = ?",
                     (ctx.guild.id, member.id),
                 )
-                desc = f"▸ **Target**     : {member.mention}\n▸ **Stat Reset** : `Invite stats`"
+                desc = f"Target : {member.mention}\nStat Reset : Invite stats"
             else:
                 await db.execute(
                     "UPDATE user_stats SET inv_count = 0 WHERE guild_id = ?",
                     (ctx.guild.id,),
                 )
-                desc = "▸ **Target**     : `All server members`\n▸ **Stat Reset** : `Invite stats`"
+                desc = "Target : All server members\nStat Reset : Invite stats"
             await db.commit()
 
         embed = self._build_info_embed(
-            title="▸ Invite Stats Reset",
+            title="Invite Stats Reset",
             description=desc,
             thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
@@ -733,8 +728,8 @@ class Utility(commands.Cog):
 
         if not ref_msg or not text:
             err_embed = self._build_info_embed(
-                title="▸ Process Denied !",
-                description="▸ **Reason** : `Reply a message with text or provide <message_id_or_link> <text>.`",
+                title="Process Denied !",
+                description="Reason : Reply a message with text or provide message_id_or_link and text.",
             )
             await ctx.send(embed=err_embed)
             return
@@ -753,18 +748,18 @@ class Utility(commands.Cog):
         try:
             inv = await ctx.channel.create_invite(max_age=max_age, max_uses=max_uses)
             embed = self._build_info_embed(
-                title="▸ Server Invite Created",
+                title="Server Invite Created",
                 description=(
-                    f"▸ **Invite Link** : {inv.url}\n"
-                    f"▸ **Channel**     : {ctx.channel.mention}"
+                    f"Invite Link : {inv.url}\n"
+                    f"Channel : {ctx.channel.mention}"
                 ),
                 thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
             )
             await ctx.send(embed=embed)
         except discord.Forbidden:
             err_embed = self._build_info_embed(
-                title="▸ Process Denied !",
-                description="▸ **Reason** : `Bot does not have permission to create an invite link.`",
+                title="Process Denied !",
+                description="Reason : Bot does not have permission to create an invite link.",
             )
             await ctx.send(embed=err_embed)
 
@@ -774,8 +769,8 @@ class Utility(commands.Cog):
         """Is server ke liye bot ka prefix embed confirmation ke saath badalta hai."""
         if len(new_prefix) > 10:
             err_embed = self._build_info_embed(
-                title="▸ Process Denied !",
-                description="▸ **Reason** : `Prefix must be 10 characters or fewer.`",
+                title="Process Denied !",
+                description="Reason : Prefix must be 10 characters or fewer.",
             )
             await ctx.send(embed=err_embed)
             return
@@ -793,10 +788,10 @@ class Utility(commands.Cog):
             await db.commit()
 
         embed = self._build_info_embed(
-            title="▸ Prefix Updated",
+            title="Prefix Updated",
             description=(
-                f"▸ **New Prefix** : `{new_prefix}`\n"
-                f"▸ **Updated By** : {ctx.author.mention}"
+                f"New Prefix : {new_prefix}\n"
+                f"Updated By : {ctx.author.mention}"
             ),
             thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
         )
