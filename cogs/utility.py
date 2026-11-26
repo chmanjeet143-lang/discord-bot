@@ -24,7 +24,8 @@ class Utility(commands.Cog):
                     prefix TEXT,
                     count_channel_id INTEGER,
                     last_count INTEGER DEFAULT 0,
-                    last_counter_id INTEGER
+                    last_counter_id INTEGER,
+                    count_reaction TEXT DEFAULT '✅'
                 )
                 """
             )
@@ -56,6 +57,7 @@ class Utility(commands.Cog):
             )
             # Purane database tables ke liye safe migration columns
             for alter_sql in [
+                "ALTER TABLE guild_settings ADD COLUMN count_reaction TEXT DEFAULT '✅'",
                 "ALTER TABLE user_stats ADD COLUMN today_msg_count INTEGER DEFAULT 0",
                 "ALTER TABLE user_stats ADD COLUMN last_msg_date TEXT",
                 "ALTER TABLE user_stats ADD COLUMN tracked_since INTEGER",
@@ -73,8 +75,8 @@ class Utility(commands.Cog):
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.MissingPermissions):
             embed = discord.Embed(
-                title="Process Denied !",
-                description="❌ You don't have permission to use this command!",
+                title="▸ Process Denied !",
+                description="▸ **Reason** : `You don't have permission to use this command!`",
                 color=discord.Color.red(),
             )
             await ctx.send(embed=embed)
@@ -82,8 +84,8 @@ class Utility(commands.Cog):
 
         if isinstance(error, commands.BadArgument):
             embed = discord.Embed(
-                title="Process Denied !",
-                description="❌ Invalid argument provided! Please check your input and try again.",
+                title="▸ Process Denied !",
+                description="▸ **Reason** : `Invalid argument provided! Please check your input and try again.`",
                 color=discord.Color.red(),
             )
             await ctx.send(embed=embed)
@@ -131,7 +133,8 @@ class Utility(commands.Cog):
         color: discord.Color = discord.Color.blurple(),
         thumbnail_url: str = None,
     ) -> discord.Embed:
-        embed = discord.Embed(title=title, description=description, color=color)
+        embed = discord.Embed(description=description, color=color)
+        embed.set_author(name=title)
         if thumbnail_url:
             embed.set_thumbnail(url=thumbnail_url)
         return embed
@@ -254,7 +257,10 @@ class Utility(commands.Cog):
                     await db.commit()
                     welcome_embed = self._build_info_embed(
                         title="▸ Welcome Back !",
-                        description=f"▸ **User** : {message.author.mention}\n▸ **Status** : AFK removed",
+                        description=(
+                            f"▸ **User**   : {message.author.mention}\n"
+                            f"▸ **Status** : `AFK removed`"
+                        ),
                         color=discord.Color.green(),
                         thumbnail_url=message.author.display_avatar.url,
                     )
@@ -276,9 +282,9 @@ class Utility(commands.Cog):
                         afk_embed = self._build_info_embed(
                             title="▸ User is AFK !",
                             description=(
-                                f"▸ **User** : {mentioned.mention}\n"
-                                f"▸ **Reason** : {reason}\n"
-                                f"▸ **AFK Since** : {since_text}"
+                                f"▸ **User**      : {mentioned.mention}\n"
+                                f"▸ **Reason**    : `{reason}`\n"
+                                f"▸ **AFK Since** : `{since_text}`"
                             ),
                             color=discord.Color.blurple(),
                             thumbnail_url=mentioned.display_avatar.url,
@@ -319,13 +325,18 @@ class Utility(commands.Cog):
 
             # 4. Counting game check
             cur = await db.execute(
-                "SELECT count_channel_id, last_count, last_counter_id FROM guild_settings WHERE guild_id = ?",
+                """
+                SELECT count_channel_id, last_count, last_counter_id, count_reaction
+                FROM guild_settings
+                WHERE guild_id = ?
+                """,
                 (guild_id,),
             )
             settings = await cur.fetchone()
             if settings and settings[0] == message.channel.id:
-                _, last_count, last_counter_id = settings
+                _, last_count, last_counter_id, count_reaction = settings
                 expected = (last_count or 0) + 1
+                reaction_emoji = (count_reaction or "✅").strip()
                 content = message.content.strip()
 
                 if not content.isdigit():
@@ -346,24 +357,29 @@ class Utility(commands.Cog):
                     reason_text = (
                         "One user cannot count twice in a row!"
                         if last_counter_id == user_id
-                        else f"Wrong number! Expected **{expected}**."
+                        else f"Wrong number! Expected {expected}."
                     )
                     count_err_embed = self._build_info_embed(
                         title="▸ Counting Reset !",
                         description=(
-                            f"▸ **User** : {message.author.mention}\n"
-                            f"▸ **Reason** : {reason_text}\n"
-                            f"▸ **Next Count** : **1**"
+                            f"▸ **User**       : {message.author.mention}\n"
+                            f"▸ **Reason**     : `{reason_text}`\n"
+                            f"▸ **Next Count** : `1`"
                         ),
                         color=discord.Color.red(),
+                        thumbnail_url=message.author.display_avatar.url,
                     )
                     await message.channel.send(embed=count_err_embed)
                     return
 
                 try:
-                    await message.add_reaction("✅")
+                    await message.add_reaction(reaction_emoji)
                 except discord.HTTPException:
-                    pass
+                    try:
+                        await message.add_reaction("✅")
+                    except discord.HTTPException:
+                        pass
+
                 await db.execute(
                     "UPDATE guild_settings SET last_count = ?, last_counter_id = ? WHERE guild_id = ?",
                     (num, user_id, guild_id),
@@ -376,7 +392,6 @@ class Utility(commands.Cog):
     @commands.command(name="ping")
     async def ping(self, ctx: commands.Context):
         """Websocket, Message aur API latency embed mein dikhata hai."""
-        start = time.perf_counter()
         ws_ms = round(self.bot.latency * 1000)
         msg_ms = round((time.perf_counter() - ctx.message.created_at.timestamp()) * 1000)
 
@@ -401,31 +416,50 @@ class Utility(commands.Cog):
         )
         await sent.edit(embed=embed)
 
-    @commands.command(name="setcountchannel")
+    @commands.command(name="start")
     @commands.has_permissions(manage_channels=True)
-    async def setcountchannel(self, ctx: commands.Context, channel: discord.TextChannel = None):
-        """Counting game ke liye channel set karta hai."""
-        target = channel or ctx.channel
+    async def start_counting(
+        self,
+        ctx: commands.Context,
+        counting_number: int = 1,
+        counting_channel: discord.TextChannel = None,
+        reaction: str = "✅",
+    ):
+        """Counting start karta hai: &start <counting_number> <counting_channel> <reaction>"""
+        target_channel = counting_channel or ctx.channel
+        start_num = max(0, counting_number)
+        # Agar start_num = 1 diya gaya hai, toh next expected count 1 hona chahiye (last_count = 0)
+        last_count_val = start_num - 1 if start_num > 0 else 0
+        reaction_clean = reaction.strip() or "✅"
+
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
                 """
-                INSERT INTO guild_settings (guild_id, count_channel_id, last_count, last_counter_id)
-                VALUES (?, ?, 0, NULL)
+                INSERT INTO guild_settings (
+                    guild_id, count_channel_id, last_count, last_counter_id, count_reaction
+                )
+                VALUES (?, ?, ?, NULL, ?)
                 ON CONFLICT(guild_id)
-                DO UPDATE SET count_channel_id = excluded.count_channel_id, last_count = 0, last_counter_id = NULL
+                DO UPDATE SET
+                    count_channel_id = excluded.count_channel_id,
+                    last_count = excluded.last_count,
+                    last_counter_id = NULL,
+                    count_reaction = excluded.count_reaction
                 """,
-                (ctx.guild.id, target.id),
+                (ctx.guild.id, target_channel.id, last_count_val, reaction_clean),
             )
             await db.commit()
 
         embed = self._build_info_embed(
-            title="▸ Counting Channel Set",
+            title="▸ Counting Started !",
             description=(
-                f"▸ **Channel** : {target.mention}\n"
-                f"▸ **Start From** : **1**\n"
-                f"▸ **Set By** : {ctx.author.mention}"
+                f"▸ **Channel**  : {target_channel.mention}\n"
+                f"▸ **Start At** : `{start_num}`\n"
+                f"▸ **Reaction** : `{reaction_clean}`\n"
+                f"▸ **Set By**   : {ctx.author.mention}"
             ),
             color=discord.Color.green(),
+            thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else ctx.author.display_avatar.url,
         )
         await ctx.send(embed=embed)
 
@@ -448,9 +482,9 @@ class Utility(commands.Cog):
         embed = self._build_info_embed(
             title="▸ User is AFK !",
             description=(
-                f"▸ **User** : {ctx.author.mention}\n"
-                f"▸ **Reason** : {reason}\n"
-                f"▸ **AFK Since** : <t:{now_ts}:R>"
+                f"▸ **User**      : {ctx.author.mention}\n"
+                f"▸ **Reason**    : `{reason}`\n"
+                f"▸ **AFK Since** : `<t:{now_ts}:R>`"
             ),
             color=discord.Color.blurple(),
             thumbnail_url=ctx.author.display_avatar.url,
@@ -553,7 +587,7 @@ class Utility(commands.Cog):
         if not rows:
             embed = self._build_info_embed(
                 title=f"▸ {title}",
-                description="▸ **Status** : No leaderboard data available yet.",
+                description="▸ **Status** : `No leaderboard data available yet.`",
                 color=discord.Color.blurple(),
                 thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
             )
@@ -607,7 +641,7 @@ class Utility(commands.Cog):
                     """,
                     (ctx.guild.id, member.id),
                 )
-                desc = f"▸ **Target** : {member.mention}\n▸ **Stat Reset** : Message stats"
+                desc = f"▸ **Target**     : {member.mention}\n▸ **Stat Reset** : `Message stats`"
             else:
                 await db.execute(
                     """
@@ -617,13 +651,14 @@ class Utility(commands.Cog):
                     """,
                     (ctx.guild.id,),
                 )
-                desc = "▸ **Target** : All server members\n▸ **Stat Reset** : Message stats"
+                desc = "▸ **Target**     : `All server members`\n▸ **Stat Reset** : `Message stats`"
             await db.commit()
 
         embed = self._build_info_embed(
             title="▸ Message Stats Reset",
             description=desc,
             color=discord.Color.green(),
+            thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
         await ctx.send(embed=embed)
 
@@ -638,7 +673,7 @@ class Utility(commands.Cog):
                     "UPDATE user_stats SET vc_seconds = 0 WHERE guild_id = ? AND user_id = ?",
                     (ctx.guild.id, member.id),
                 )
-                desc = f"▸ **Target** : {member.mention}\n▸ **Stat Reset** : Voice stats"
+                desc = f"▸ **Target**     : {member.mention}\n▸ **Stat Reset** : `Voice stats`"
             else:
                 keys_to_remove = [k for k in self.vc_join_times if k[0] == ctx.guild.id]
                 for k in keys_to_remove:
@@ -647,13 +682,14 @@ class Utility(commands.Cog):
                     "UPDATE user_stats SET vc_seconds = 0 WHERE guild_id = ?",
                     (ctx.guild.id,),
                 )
-                desc = "▸ **Target** : All server members\n▸ **Stat Reset** : Voice stats"
+                desc = "▸ **Target**     : `All server members`\n▸ **Stat Reset** : `Voice stats`"
             await db.commit()
 
         embed = self._build_info_embed(
             title="▸ Voice Stats Reset",
             description=desc,
             color=discord.Color.green(),
+            thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
         await ctx.send(embed=embed)
 
@@ -667,19 +703,20 @@ class Utility(commands.Cog):
                     "UPDATE user_stats SET inv_count = 0 WHERE guild_id = ? AND user_id = ?",
                     (ctx.guild.id, member.id),
                 )
-                desc = f"▸ **Target** : {member.mention}\n▸ **Stat Reset** : Invite stats"
+                desc = f"▸ **Target**     : {member.mention}\n▸ **Stat Reset** : `Invite stats`"
             else:
                 await db.execute(
                     "UPDATE user_stats SET inv_count = 0 WHERE guild_id = ?",
                     (ctx.guild.id,),
                 )
-                desc = "▸ **Target** : All server members\n▸ **Stat Reset** : Invite stats"
+                desc = "▸ **Target**     : `All server members`\n▸ **Stat Reset** : `Invite stats`"
             await db.commit()
 
         embed = self._build_info_embed(
             title="▸ Invite Stats Reset",
             description=desc,
             color=discord.Color.green(),
+            thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
         await ctx.send(embed=embed)
 
@@ -707,8 +744,8 @@ class Utility(commands.Cog):
 
         if not ref_msg or not text:
             err_embed = self._build_info_embed(
-                title="Process Denied !",
-                description="❌ Reply a message with text or provide `<message_id_or_link> <text>`.",
+                title="▸ Process Denied !",
+                description="▸ **Reason** : `Reply a message with text or provide <message_id_or_link> <text>.`",
                 color=discord.Color.red(),
             )
             await ctx.send(embed=err_embed)
@@ -731,7 +768,7 @@ class Utility(commands.Cog):
                 title="▸ Server Invite Created",
                 description=(
                     f"▸ **Invite Link** : {inv.url}\n"
-                    f"▸ **Channel** : {ctx.channel.mention}"
+                    f"▸ **Channel**     : {ctx.channel.mention}"
                 ),
                 color=discord.Color.blurple(),
                 thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
@@ -739,8 +776,8 @@ class Utility(commands.Cog):
             await ctx.send(embed=embed)
         except discord.Forbidden:
             err_embed = self._build_info_embed(
-                title="Process Denied !",
-                description="❌ Bot does not have permission to create an invite link.",
+                title="▸ Process Denied !",
+                description="▸ **Reason** : `Bot does not have permission to create an invite link.`",
                 color=discord.Color.red(),
             )
             await ctx.send(embed=err_embed)
@@ -751,8 +788,8 @@ class Utility(commands.Cog):
         """Is server ke liye bot ka prefix embed confirmation ke saath badalta hai."""
         if len(new_prefix) > 10:
             err_embed = self._build_info_embed(
-                title="Process Denied !",
-                description="❌ Prefix must be 10 characters or fewer.",
+                title="▸ Process Denied !",
+                description="▸ **Reason** : `Prefix must be 10 characters or fewer.`",
                 color=discord.Color.red(),
             )
             await ctx.send(embed=err_embed)
@@ -777,6 +814,7 @@ class Utility(commands.Cog):
                 f"▸ **Updated By** : {ctx.author.mention}"
             ),
             color=discord.Color.green(),
+            thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
         )
         await ctx.send(embed=embed)
 
