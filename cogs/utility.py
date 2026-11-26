@@ -5,6 +5,7 @@ import discord
 from discord.ext import commands
 
 DB_PATH = "utility_data.db"
+WHITE_COLOR = 0xFFFFFF
 
 
 class Utility(commands.Cog):
@@ -76,7 +77,7 @@ class Utility(commands.Cog):
             embed = discord.Embed(
                 title="Process Denied !",
                 description="You don't have permission to use this command!",
-                accent_color=None,
+                color=WHITE_COLOR,
             )
             await ctx.send(embed=embed)
             return
@@ -85,7 +86,7 @@ class Utility(commands.Cog):
             embed = discord.Embed(
                 title="Process Denied !",
                 description="Invalid argument provided! Please check your input and try again.",
-                accent_color=None,
+                color=WHITE_COLOR,
             )
             await ctx.send(embed=embed)
             return
@@ -131,7 +132,7 @@ class Utility(commands.Cog):
         description: str = None,
         thumbnail_url: str = None,
     ) -> discord.Embed:
-        embed = discord.Embed(description=description, accent_color=None)
+        embed = discord.Embed(description=description, color=WHITE_COLOR)
         embed.set_author(name=title)
         if thumbnail_url:
             embed.set_thumbnail(url=thumbnail_url)
@@ -386,7 +387,7 @@ class Utility(commands.Cog):
         ws_ms = round(self.bot.latency * 1000)
         msg_ms = round((time.perf_counter() - ctx.message.created_at.timestamp()) * 1000)
 
-        embed = discord.Embed(accent_color=None)
+        embed = discord.Embed(color=WHITE_COLOR)
         embed.set_author(name="Bot's Latency")
         embed.description = (
             f"Websocket Latency : {ws_ms} ms\n"
@@ -501,7 +502,7 @@ class Utility(commands.Cog):
         tracked_since = row[3] if row else None
         avg_daily = self._format_avg_daily(total_msgs, tracked_since)
 
-        embed = discord.Embed(accent_color=None)
+        embed = discord.Embed(color=WHITE_COLOR)
         embed.set_author(name="Message Tracker")
         embed.description = (
             f"User: {target.mention}\n"
@@ -528,7 +529,7 @@ class Utility(commands.Cog):
         if active_join is not None:
             total_seconds += int(time.time() - active_join)
 
-        embed = discord.Embed(accent_color=None)
+        embed = discord.Embed(color=WHITE_COLOR)
         embed.set_author(name="Voice Tracker")
         embed.description = (
             f"User: {target.mention}\n"
@@ -549,7 +550,7 @@ class Utility(commands.Cog):
             row = await cur.fetchone()
         invites = row[0] if (row and row[0]) else 0
 
-        embed = discord.Embed(accent_color=None)
+        embed = discord.Embed(color=WHITE_COLOR)
         embed.set_author(name="Invite Tracker")
         embed.description = (
             f"User: {target.mention}\n"
@@ -589,7 +590,7 @@ class Utility(commands.Cog):
 
         embed = discord.Embed(
             description="\n".join(lines),
-            accent_color=None,
+            color=WHITE_COLOR,
             timestamp=datetime.now(timezone.utc),
         )
         embed.set_author(name=title)
@@ -712,7 +713,7 @@ class Utility(commands.Cog):
             await ctx.message.delete()
         except discord.Forbidden:
             pass
-        embed = discord.Embed(description=text, accent_color=None)
+        embed = discord.Embed(description=text, color=WHITE_COLOR)
         await ctx.send(embed=embed)
 
     @commands.command(name="reply")
@@ -738,7 +739,7 @@ class Utility(commands.Cog):
             await ctx.message.delete()
         except discord.Forbidden:
             pass
-        reply_embed = discord.Embed(description=text, accent_color=None)
+        reply_embed = discord.Embed(description=text, color=WHITE_COLOR)
         await ref_msg.reply(embed=reply_embed, mention_author=False)
 
     @commands.command(name="invite")
