@@ -77,7 +77,7 @@ class Utility(commands.Cog):
             embed = discord.Embed(
                 title="▸ Process Denied !",
                 description="▸ **Reason** : `You don't have permission to use this command!`",
-                color=discord.Color.red(),
+                accent_color=None,
             )
             await ctx.send(embed=embed)
             return
@@ -86,7 +86,7 @@ class Utility(commands.Cog):
             embed = discord.Embed(
                 title="▸ Process Denied !",
                 description="▸ **Reason** : `Invalid argument provided! Please check your input and try again.`",
-                color=discord.Color.red(),
+                accent_color=None,
             )
             await ctx.send(embed=embed)
             return
@@ -130,10 +130,9 @@ class Utility(commands.Cog):
         self,
         title: str,
         description: str = None,
-        color: discord.Color = discord.Color.blurple(),
         thumbnail_url: str = None,
     ) -> discord.Embed:
-        embed = discord.Embed(description=description, color=color)
+        embed = discord.Embed(description=description, accent_color=None)
         embed.set_author(name=title)
         if thumbnail_url:
             embed.set_thumbnail(url=thumbnail_url)
@@ -261,7 +260,6 @@ class Utility(commands.Cog):
                             f"▸ **User**   : {message.author.mention}\n"
                             f"▸ **Status** : `AFK removed`"
                         ),
-                        color=discord.Color.green(),
                         thumbnail_url=message.author.display_avatar.url,
                     )
                     await message.reply(embed=welcome_embed, mention_author=False)
@@ -286,7 +284,6 @@ class Utility(commands.Cog):
                                 f"▸ **Reason**    : `{reason}`\n"
                                 f"▸ **AFK Since** : `{since_text}`"
                             ),
-                            color=discord.Color.blurple(),
                             thumbnail_url=mentioned.display_avatar.url,
                         )
                         await message.reply(embed=afk_embed, mention_author=False)
@@ -366,7 +363,6 @@ class Utility(commands.Cog):
                             f"▸ **Reason**     : `{reason_text}`\n"
                             f"▸ **Next Count** : `1`"
                         ),
-                        color=discord.Color.red(),
                         thumbnail_url=message.author.display_avatar.url,
                     )
                     await message.channel.send(embed=count_err_embed)
@@ -395,7 +391,7 @@ class Utility(commands.Cog):
         ws_ms = round(self.bot.latency * 1000)
         msg_ms = round((time.perf_counter() - ctx.message.created_at.timestamp()) * 1000)
 
-        embed = discord.Embed(color=discord.Color.blurple())
+        embed = discord.Embed(accent_color=None)
         embed.set_author(name="☁️ Bot's Latency")
         embed.description = (
             f"__**Websocket Latency :**__ `{ws_ms} ms`\n"
@@ -428,7 +424,6 @@ class Utility(commands.Cog):
         """Counting start karta hai: &start <counting_number> <counting_channel> <reaction>"""
         target_channel = counting_channel or ctx.channel
         start_num = max(0, counting_number)
-        # Agar start_num = 1 diya gaya hai, toh next expected count 1 hona chahiye (last_count = 0)
         last_count_val = start_num - 1 if start_num > 0 else 0
         reaction_clean = reaction.strip() or "✅"
 
@@ -458,7 +453,6 @@ class Utility(commands.Cog):
                 f"▸ **Reaction** : `{reaction_clean}`\n"
                 f"▸ **Set By**   : {ctx.author.mention}"
             ),
-            color=discord.Color.green(),
             thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else ctx.author.display_avatar.url,
         )
         await ctx.send(embed=embed)
@@ -486,7 +480,6 @@ class Utility(commands.Cog):
                 f"▸ **Reason**    : `{reason}`\n"
                 f"▸ **AFK Since** : `<t:{now_ts}:R>`"
             ),
-            color=discord.Color.blurple(),
             thumbnail_url=ctx.author.display_avatar.url,
         )
         await ctx.send(embed=embed)
@@ -513,7 +506,7 @@ class Utility(commands.Cog):
         tracked_since = row[3] if row else None
         avg_daily = self._format_avg_daily(total_msgs, tracked_since)
 
-        embed = discord.Embed(color=discord.Color.blurple())
+        embed = discord.Embed(accent_color=None)
         embed.set_author(name="▸ Message Tracker")
         embed.description = (
             f"▸ **User:** {target.mention}\n"
@@ -540,7 +533,7 @@ class Utility(commands.Cog):
         if active_join is not None:
             total_seconds += int(time.time() - active_join)
 
-        embed = discord.Embed(color=discord.Color.blurple())
+        embed = discord.Embed(accent_color=None)
         embed.set_author(name="▸ Voice Tracker")
         embed.description = (
             f"▸ **User:** {target.mention}\n"
@@ -561,7 +554,7 @@ class Utility(commands.Cog):
             row = await cur.fetchone()
         invites = row[0] if (row and row[0]) else 0
 
-        embed = discord.Embed(color=discord.Color.blurple())
+        embed = discord.Embed(accent_color=None)
         embed.set_author(name="▸ Invite Tracker")
         embed.description = (
             f"▸ **User:** {target.mention}\n"
@@ -588,7 +581,6 @@ class Utility(commands.Cog):
             embed = self._build_info_embed(
                 title=f"▸ {title}",
                 description="▸ **Status** : `No leaderboard data available yet.`",
-                color=discord.Color.blurple(),
                 thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
             )
             await ctx.send(embed=embed)
@@ -602,7 +594,7 @@ class Utility(commands.Cog):
 
         embed = discord.Embed(
             description="\n".join(lines),
-            color=discord.Color.blurple(),
+            accent_color=None,
             timestamp=datetime.now(timezone.utc),
         )
         embed.set_author(name=f"▸ {title}")
@@ -657,7 +649,6 @@ class Utility(commands.Cog):
         embed = self._build_info_embed(
             title="▸ Message Stats Reset",
             description=desc,
-            color=discord.Color.green(),
             thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
         await ctx.send(embed=embed)
@@ -688,7 +679,6 @@ class Utility(commands.Cog):
         embed = self._build_info_embed(
             title="▸ Voice Stats Reset",
             description=desc,
-            color=discord.Color.green(),
             thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
         await ctx.send(embed=embed)
@@ -715,7 +705,6 @@ class Utility(commands.Cog):
         embed = self._build_info_embed(
             title="▸ Invite Stats Reset",
             description=desc,
-            color=discord.Color.green(),
             thumbnail_url=member.display_avatar.url if member else (ctx.guild.icon.url if ctx.guild.icon else None),
         )
         await ctx.send(embed=embed)
@@ -728,7 +717,7 @@ class Utility(commands.Cog):
             await ctx.message.delete()
         except discord.Forbidden:
             pass
-        embed = discord.Embed(description=text, color=discord.Color.blurple())
+        embed = discord.Embed(description=text, accent_color=None)
         await ctx.send(embed=embed)
 
     @commands.command(name="reply")
@@ -746,7 +735,6 @@ class Utility(commands.Cog):
             err_embed = self._build_info_embed(
                 title="▸ Process Denied !",
                 description="▸ **Reason** : `Reply a message with text or provide <message_id_or_link> <text>.`",
-                color=discord.Color.red(),
             )
             await ctx.send(embed=err_embed)
             return
@@ -755,7 +743,7 @@ class Utility(commands.Cog):
             await ctx.message.delete()
         except discord.Forbidden:
             pass
-        reply_embed = discord.Embed(description=text, color=discord.Color.blurple())
+        reply_embed = discord.Embed(description=text, accent_color=None)
         await ref_msg.reply(embed=reply_embed, mention_author=False)
 
     @commands.command(name="invite")
@@ -770,7 +758,6 @@ class Utility(commands.Cog):
                     f"▸ **Invite Link** : {inv.url}\n"
                     f"▸ **Channel**     : {ctx.channel.mention}"
                 ),
-                color=discord.Color.blurple(),
                 thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
             )
             await ctx.send(embed=embed)
@@ -778,7 +765,6 @@ class Utility(commands.Cog):
             err_embed = self._build_info_embed(
                 title="▸ Process Denied !",
                 description="▸ **Reason** : `Bot does not have permission to create an invite link.`",
-                color=discord.Color.red(),
             )
             await ctx.send(embed=err_embed)
 
@@ -790,7 +776,6 @@ class Utility(commands.Cog):
             err_embed = self._build_info_embed(
                 title="▸ Process Denied !",
                 description="▸ **Reason** : `Prefix must be 10 characters or fewer.`",
-                color=discord.Color.red(),
             )
             await ctx.send(embed=err_embed)
             return
@@ -813,7 +798,6 @@ class Utility(commands.Cog):
                 f"▸ **New Prefix** : `{new_prefix}`\n"
                 f"▸ **Updated By** : {ctx.author.mention}"
             ),
-            color=discord.Color.green(),
             thumbnail_url=ctx.guild.icon.url if ctx.guild.icon else None,
         )
         await ctx.send(embed=embed)
